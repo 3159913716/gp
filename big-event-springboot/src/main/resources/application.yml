@@ -8,6 +8,26 @@ spring:
     redis:
       host: localhost
       port: 6379
+      database: 0
+      timeout: 3000ms
+      lettuce:
+        pool:
+          max-active: 8
+          max-wait: -1ms
+          max-idle: 8
+          min-idle: 0
+  mail:
+    host: smtp.qq.com
+    username: 2937186435@qq.com
+    password: haolwyaszbwadfbd
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+          ssl:
+            enable: true
 
   #上传文件限制大小10mb
   servlet:
@@ -20,6 +40,10 @@ spring:
 mybatis:
   configuration:
     map-underscore-to-camel-case: true
+
+
+
+
 
 
 
