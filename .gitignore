@@ -31,4 +31,5 @@ coverage
 
 *.tsbuildinfo
 y
+y.pub
 .gitignore~
