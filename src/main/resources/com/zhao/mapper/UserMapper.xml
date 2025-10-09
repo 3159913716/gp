@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zhao.mapper.UserMapper">
+
+    <!-- 根据用户名查询用户 -->
+    <select id="findByUserName" resultType="com.zhao.pojo.User">
+        select * from user where username=#{username}
+    </select>
+
+    <!-- 添加 -->
+    <!-- now()是数据库里面的函数，旨在获取数据库系统当前时间 -->
+    <insert id="add"  parameterType="com.zhao.pojo.User">
+        insert into user(username,password,create_time,update_time)
+        values(#{username},#{encryptPassword},now(),now())
+    </insert>
+
+    <!-- 更新 -->
+    <update id="update" parameterType="com.zhao.pojo.User">
+        update user
+        set nickname=#{nickname},
+            email=#{email},
+            update_time=#{updateTime}
+        where id=#{id}
+    </update>
+
+    <!-- 更新用户头像 -->
+    <update id="updateAvatar" parameterType="com.zhao.pojo.User">
+        update user
+        set user_pic=#{avatarUrl},
+            update_time=now()
+        where id = #{id}
+    </update>
+
+    <!-- 更新用户密码 -->
+    <update id="updatePwd" parameterType="com.zhao.pojo.User">
+        update user
+        set password=#{hsPassword},
+            update_time=now()
+        where id=#{id}
+    </update>
+</mapper>
