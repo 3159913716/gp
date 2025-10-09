@@ -32,4 +32,5 @@ coverage
 *.tsbuildinfo
 y
 y.pub
+.vscode
 .gitignore~
