@@ -4,9 +4,11 @@ import com.github.pagehelper.Page;
 import com.github.pagehelper.PageHelper;
 import com.zhao.mapper.ArticleMapper;
 import com.zhao.pojo.Article;
+import com.zhao.pojo.ArticleHomeVO;
 import com.zhao.pojo.PageBean;
 import com.zhao.service.ArticleService;
 import com.zhao.utils.ThreadLocalUtil;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -15,11 +17,19 @@ import java.util.List;
 import java.util.Map;
 
 
+
+
+
+import org.springframework.util.StringUtils;
+
 @Service
+@Slf4j
 public class ArticleServiceImpl implements ArticleService {
 
     @Autowired
     private ArticleMapper articleMapper;
+
+    private static final String PUBLISHED_STATE = "已发布";
 
     @Override
     public void add(Article article) {
@@ -65,5 +75,67 @@ public class ArticleServiceImpl implements ArticleService {
     @Override
     public void delete(Integer id) {
         articleMapper.delete(id);
+    }
+
+
+    /**
+     * 获取首页文章列表业务实现
+     * 包含完整的参数校验、数据查询、异常处理逻辑
+     *
+     * @param page 当前页码
+     * @param pageSize 每页大小
+     * @param sort 排序方式
+     * @return 分页结果对象
+     */
+    @Override
+    public PageBean<ArticleHomeVO> getHomeArticles(Integer page, Integer pageSize, String sort) {
+        // 实现逻辑
+
+
+        try {
+
+            // ========== 参数校验和规范化 ==========
+            // 如果每页大小为空或者小于1，就设置为默认值10
+            // 同时限制最大不能超过50条，防止一次查询太多数据拖慢系统
+            page = (page == null || page < 1) ? 1 : page;
+            // 页大小校验：确保页大小在合理范围内，为空时默认为10
+            pageSize = (pageSize == null || pageSize < 1) ? 10 : pageSize;
+            // 限制最大页大小，防止恶意查询导致性能问题
+            pageSize = Math.min(pageSize, 50);
+
+
+            // 排序方式只允许两种：new(按时间最新) 或 hot(按热度)
+            // 如果用户传了其他值，或者没传值，就默认用new
+            if (StringUtils.isEmpty(sort) ||
+                    (!"new".equalsIgnoreCase(sort) && !"hot".equalsIgnoreCase(sort))) {
+                sort = "new";
+            } else {
+                // 统一转为小写，避免大小写问题
+                sort = sort.toLowerCase();
+            }
+
+
+            // ========== 数据查询处理 ==========
+            // 比如第1页，每页10条，就从第0条开始查
+            // 比如第2页，每页10条，就从第10条开始查
+            int offset = (page - 1) * pageSize;
+            // 查询数据
+            // 调用Mapper方法，传入排序方式、文章状态(只查已发布的)、起始位置、每页条数
+            List<ArticleHomeVO> articleList = articleMapper.selectHomeArticles(
+                    sort, "已发布", offset, pageSize);
+            // 这个数字用于前端显示总页数
+            Long total = articleMapper.countHomeArticles("已发布");
+            // 把查询到的文章列表、总条数、当前页码、每页大小打包返回
+            return new PageBean<>(articleList, total, page, pageSize);
+
+        } catch (Exception e) {
+            // ========== 异常处理：如果上面任何一步出错了 ==========
+            // 在日志里记录详细的错误信息，方便排查问题
+            log.error("获取首页文章列表失败: ", e);
+            // 给用户返回一个友好的错误提示，而不是一堆看不懂的技术细节
+            throw new RuntimeException("获取文章列表失败");
+        }
+
+
     }
 }

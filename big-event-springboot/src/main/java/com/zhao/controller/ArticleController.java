@@ -1,9 +1,11 @@
 package com.zhao.controller;
 
 import com.zhao.pojo.Article;
+import com.zhao.pojo.ArticleHomeVO;
 import com.zhao.pojo.PageBean;
 import com.zhao.pojo.Result;
 import com.zhao.service.ArticleService;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
@@ -12,6 +14,7 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/article")
+@Slf4j
 public class ArticleController {
 
 //    @GetMapping("/list")
@@ -67,5 +70,35 @@ public class ArticleController {
     public Result delete(Integer id) {
         articleService.delete(id);
         return Result.success();
+    }
+
+
+    @GetMapping("/home")
+    public Result<PageBean<ArticleHomeVO>> getHomeArticles(
+            // 页码参数，如果不传默认显示第1页,以下类似
+            @RequestParam(defaultValue = "1") Integer page,
+            @RequestParam(defaultValue = "10") Integer pageSize,
+            @RequestParam(defaultValue = "new") String sort) {
+        // 控制器逻辑
+
+
+        try {
+            // 记录一下谁在什么时候调用了这个接口，方便排查问题
+            log.info("获取首页文章列表 - page: {}, pageSize: {}, sort: {}", page, pageSize, sort);
+
+            // 调用业务层方法，真正去数据库查数据
+            PageBean<ArticleHomeVO> result = articleService.getHomeArticles(page, pageSize, sort);
+
+            // 把查到的数据包装成成功格式返回给前端
+            return Result.success(result);
+
+        } catch (Exception e) {
+            // 如果上面任何一步出错了，就在这里捕获
+            // 在后台日志记录详细错误，方便程序员排查问题
+            log.error("首页文章列表接口异常: ", e);
+            return Result.error("获取文章列表失败");
+        }
+
+
     }
 }

@@ -32,6 +32,19 @@ public class Article {
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private LocalDateTime updateTime;
 
+    /**
+     * 文章点赞数 - 用于避免频繁联表查询 article_like 表
+     * 默认值: 0
+     */
+    private Integer likeCount = 0;
+
+    /**
+     * 文章收藏数 - 用于避免频繁联表查询 article_collect 表
+     * 默认值: 0
+     */
+    private Integer collectCount = 0;
+
+    // === 验证分组接口 ===
 
     public interface Add extends Default {
 
