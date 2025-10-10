@@ -13,8 +13,6 @@ public class AliOssUtil {
     private static final String ENDPOINT = "https://oss-cn-beijing.aliyuncs.com";
 
 
-//    private static final String ACCESS_KEY_ID = "[REMOVED_KEY]";
-//    private static final String ACCESS_KEY_SECRET = "[REMOVED_SECRET]";
     private static final String ACCESS_KEY_ID = "aaa";
     private static final String ACCESS_KEY_SECRET = "aaa";
 
