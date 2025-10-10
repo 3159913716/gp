@@ -11,7 +11,7 @@ import org.springframework.data.redis.serializer.StringRedisSerializer;
 
 /**
  * Redis配置类
- * 这个类的作用是配置Redis模板，让我们能够更方便地在Java代码中操作Redis数据库
+ * 这个类的作用是配置Redis模板，让我们能够更方便地在Java代码中操作Redis数据库.
  */
 @Configuration
 public class RedisConfig {
