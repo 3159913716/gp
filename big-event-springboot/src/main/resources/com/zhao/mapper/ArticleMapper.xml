@@ -48,4 +48,40 @@
         delete from article
         where id = #{id}
     </delete>
+
+
+    <select id="selectHomeArticles" resultType="com.zhao.pojo.ArticleHomeVO">
+        SELECT
+        a.id,
+        a.title,
+        a.cover_img as coverImg,
+        SUBSTRING(a.content, 1, 100) as summary,
+        u.username as author,
+        a.create_time as createTime,
+        a.state,
+        a.category_id as categoryId,
+        COALESCE(a.like_count, 0) as likeCount,
+        COALESCE(a.collect_count, 0) as collectCount,
+        (SELECT COUNT(*) FROM article_comment ac
+        WHERE ac.article_id = a.id AND ac.is_deleted = 0) as commentCount
+        FROM article a
+        LEFT JOIN user u ON a.create_user = u.id
+        WHERE a.state = #{state}
+        <choose>
+            <when test="sort == 'hot'">
+                ORDER BY (COALESCE(a.like_count, 0) + COALESCE(a.collect_count, 0)) DESC,
+                a.create_time DESC
+            </when>
+            <otherwise>
+                ORDER BY a.create_time DESC
+            </otherwise>
+        </choose>
+        LIMIT #{offset}, #{pageSize}
+    </select>
+
+    <select id="countHomeArticles" resultType="java.lang.Long">
+        SELECT COUNT(*)
+        FROM article a
+        WHERE a.state = #{state}
+    </select>
 </mapper>

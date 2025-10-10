@@ -1,6 +1,7 @@
 package com.zhao.service;
 
 import com.zhao.pojo.Article;
+import com.zhao.pojo.ArticleHomeVO;
 import com.zhao.pojo.PageBean;
 
 public interface ArticleService {
@@ -17,4 +18,19 @@ public interface ArticleService {
     void update(Article article);
     //删除文章
     void delete(Integer id);
+
+
+    /**
+     * 获取首页文章列表
+     * 这个方法用于从数据库查询文章信息，支持分页和不同排序方式
+     * 主要用在网站首页、文章列表页等需要展示多篇文章的场景
+     * @param page 当前要看第几页，从1开始计数。比如传1就是看第一页
+     * @param pageSize 每页显示多少篇文章。比如传10就是每页10篇文章
+     * @param sort 排序方式："new"按发布时间最新，"hot"按文章热度(点赞+收藏)
+     * @return 返回一个分页对象，里面包含：文章列表 + 总文章数 + 当前页码 + 每页大小
+     * 使用示例：
+     * getHomeArticles(1, 10, "new")    // 查看第1页，每页10条，按最新排序
+     * getHomeArticles(2, 5, "hot")     // 查看第2页，每页5条，按热度排序
+     */
+    PageBean<ArticleHomeVO> getHomeArticles(Integer page, Integer pageSize, String sort);
 }
