@@ -42,6 +42,11 @@ public class User {
     private String userPic;//用户头像地址
     private LocalDateTime createTime;//创建时间
     private LocalDateTime updateTime;//更新时间
-
+    
+    // 用户角色：0-管理员，1-作者，2-普通用户
+    private Integer role = 2;
+    
+    // 账号状态：0-正常，1-禁用
+    private Integer status = 0;
 
 }

@@ -67,12 +67,19 @@ public class UserController {
         if (loginUser == null) {
             return Result.error("用户名或密码错误！");
         }
+        
+        // 检查用户状态，如果被禁用则不允许登录
+        if (loginUser.getStatus() != null && loginUser.getStatus() == 1) {
+            return Result.error("账号已被禁用，请联系管理员！");
+        }
+        
         //loginUser对象中的密码是密文
         if (PasswordUtil.verifyPassword(password, loginUser.getPassword())) {
             //登录成功，响应jwt令牌
             Map<String, Object> claims = new HashMap<>();
             claims.put("id", loginUser.getId());
             claims.put("username", loginUser.getUsername());
+            claims.put("role", loginUser.getRole()); // 将角色信息放入JWT
             String token = JwtUtil.genToken(claims);
             //把token存储到redis中
             ValueOperations<String,String> operations = stringRedisTemplate.opsForValue();
