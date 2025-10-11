@@ -58,8 +58,8 @@ public class ArticleController {
 
     @GetMapping("/detail")
     public Result<Article> detail(Integer id) {
-        articleService.findById(id);
-        return Result.success();
+        Article article = articleService.findById(id);
+        return Result.success(article);
     }
     @PutMapping
     public Result update(@RequestBody @Validated(Article.Update.class) Article article) {

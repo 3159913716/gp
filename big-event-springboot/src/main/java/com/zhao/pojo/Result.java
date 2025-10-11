@@ -19,7 +19,7 @@ public class Result<T> {
 
     }
     //快速返回操作成功响应结果
-    public static  Result success() {
+    public static <E> Result<E> success() {
         return new Result<>(0, "操作成功", null);
     }
 

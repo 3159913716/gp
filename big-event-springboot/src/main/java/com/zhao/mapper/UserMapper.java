@@ -1,11 +1,7 @@
 package com.zhao.mapper;
 
 import com.zhao.pojo.User;
-import org.apache.ibatis.annotations.Insert;
 import org.apache.ibatis.annotations.Mapper;
-import org.apache.ibatis.annotations.Select;
-import org.apache.ibatis.annotations.Update;
-import org.springframework.stereotype.Service;
 
 @Mapper
 public interface UserMapper {
