@@ -1,8 +1,11 @@
 package com.zhao.mapper;
 
 import com.zhao.pojo.ArticleCollect;
+import com.zhao.pojo.ArticleCollectionVO;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
+
+import java.util.List;
 
 @Mapper
 public interface ArticleCollectMapper {
@@ -34,4 +37,14 @@ public interface ArticleCollectMapper {
      * @param userId 用户ID
      */
     void restoreByArticleIdAndUserId(@Param("articleId") Integer articleId, @Param("userId") Integer userId);
+    
+    /**
+     * 获取用户收藏列表
+     */
+    List<ArticleCollectionVO> findUserCollections(@Param("userId") Integer userId, @Param("start") Integer start, @Param("pageSize") Integer pageSize);
+    
+    /**
+     * 计算用户收藏总数
+     */
+    int countUserCollections(@Param("userId") Integer userId);
 }
