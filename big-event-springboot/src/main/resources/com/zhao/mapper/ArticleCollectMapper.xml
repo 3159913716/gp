@@ -35,4 +35,34 @@
         where article_id = #{articleId}
         and user_id = #{userId}
     </update>
+    
+    <!-- 获取用户收藏列表 -->
+    <select id="findUserCollections" resultType="com.zhao.pojo.ArticleCollectionVO">
+        select 
+            a.id, 
+            a.title, 
+            a.cover_img as coverImg, 
+            u.username as author, 
+            ac.collect_time as collectTime
+        from 
+            article_collect ac
+        join 
+            article a on ac.article_id = a.id
+        join 
+            user u on a.create_user = u.id
+        where 
+            ac.user_id = #{userId} 
+            and ac.is_deleted = 0
+        order by 
+            ac.collect_time desc
+        limit 
+            #{start}, #{pageSize}
+    </select>
+    
+    <!-- 计算用户收藏总数 -->
+    <select id="countUserCollections" resultType="java.lang.Integer">
+        select count(*)
+        from article_collect
+        where user_id = #{userId} and is_deleted = 0
+    </select>
 </mapper>

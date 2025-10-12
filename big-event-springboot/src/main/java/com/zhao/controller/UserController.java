@@ -1,16 +1,16 @@
 package com.zhao.controller;
 
-
+import com.zhao.pojo.ArticleCollectionVO;
+import com.zhao.pojo.PageBean;
 import com.zhao.pojo.Result;
 import com.zhao.pojo.User;
+import com.zhao.service.UserCollectionService;
 import com.zhao.service.UserService;
 import com.zhao.utils.JwtUtil;
 import com.zhao.utils.PasswordUtil;
 import com.zhao.utils.ThreadLocalUtil;
-import jakarta.validation.Valid;
 import jakarta.validation.constraints.Pattern;
 import org.hibernate.validator.constraints.URL;
-import org.junit.jupiter.params.shadow.com.univocity.parsers.annotations.Validate;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
@@ -31,6 +31,8 @@ public class UserController {
     private UserService userService;
     @Autowired
     private StringRedisTemplate stringRedisTemplate;
+    @Autowired
+    private UserCollectionService userCollectionService;
 
     /**
      * 注册接口
@@ -157,6 +159,39 @@ public class UserController {
         operations.getOperations().delete(token);
         return Result.success();
 
+    }
+    
+    /**
+     * 获取我的收藏列表
+     * @param page 当前页码
+     * @param pageSize 每页条数
+     * @return 收藏列表
+     */
+    @GetMapping("/collections")
+    public Result<Map<String, Object>> getUserCollections(
+            @RequestParam(defaultValue = "1") Integer page,
+            @RequestParam(defaultValue = "10") Integer pageSize) {
+        try {
+            // 从ThreadLocal中获取当前用户ID
+            Map<String, Object> userMap = ThreadLocalUtil.get();
+            Integer userId = (Integer) userMap.get("id");
+            
+            // 调用服务层获取收藏列表
+            PageBean<ArticleCollectionVO> result = userCollectionService.getUserCollections(userId, page, pageSize);
+            
+            // 构建返回结果
+            Map<String, Object> response = new HashMap<>();
+            response.put("list", result.getItem());
+            response.put("total", result.getTotal());
+            response.put("page", page);
+            response.put("pageSize", pageSize);
+            
+            return Result.success(response);
+        } catch (Exception e) {
+            // 异常处理
+            e.printStackTrace();
+            return Result.error("获取收藏列表失败");
+        }
     }
 }
 
