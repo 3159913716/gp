@@ -4,7 +4,9 @@ import com.zhao.pojo.Article;
 import com.zhao.pojo.ArticleHomeVO;
 import com.zhao.pojo.PageBean;
 import com.zhao.pojo.Result;
+import com.zhao.service.ArticleLikeService;
 import com.zhao.service.ArticleService;
+import com.zhao.utils.ThreadLocalUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.validation.annotation.Validated;
@@ -17,21 +19,11 @@ import java.util.Map;
 @Slf4j
 public class ArticleController {
 
-//    @GetMapping("/list")
-//    public Result<String> list(/*@RequestHeader(name = "Authorization") String token, HttpServletResponse response*/) {
-//        //验证token
-    /// /        try {
-    /// /            Map<String, Object> claims = JwtUtil.parseToken(token);
-    /// /            return Result.success("所有的文章数据...  ");
-    /// /        } catch (Exception e) {
-    /// /            //http响应状态码为401
-    /// /            response.setStatus(401);
-    /// /            return Result.error("未登录");
-    /// /        }
-//        return Result.success("所有的文章数据...  ");
-//    }
     @Autowired
     private ArticleService articleService;
+    
+    @Autowired
+    private ArticleLikeService articleLikeService;
 
     @PostMapping
     public Result add(@RequestBody @Validated(Article.Add.class) Article article) {
@@ -47,12 +39,12 @@ public class ArticleController {
      * */
     @GetMapping
     public Result<PageBean<Article>> list(
-            Integer pageNum ,
+            Integer pageNum,
             Integer pageSize,
             @RequestParam(required = false) Integer categoryId,
             @RequestParam(required = false) String state
     ) {
-        PageBean<Article> pb = articleService.list(pageNum,pageSize,categoryId,state);
+        PageBean<Article> pb = articleService.list(pageNum, pageSize, categoryId, state);
         return Result.success(pb);
     }
 
@@ -61,11 +53,13 @@ public class ArticleController {
         Article article = articleService.findById(id);
         return Result.success(article);
     }
+    
     @PutMapping
     public Result update(@RequestBody @Validated(Article.Update.class) Article article) {
         articleService.update(article);
         return Result.success();
     }
+    
     @DeleteMapping
     public Result delete(Integer id) {
         articleService.delete(id);
@@ -98,7 +92,27 @@ public class ArticleController {
             log.error("首页文章列表接口异常: ", e);
             return Result.error("获取文章列表失败");
         }
-
-
+    }
+    
+    /**
+     * 点赞/取消点赞文章
+     * @param id 文章ID
+     * @return 操作结果
+     */
+    @PostMapping("/like/{id}")
+    public Result<Map<String, Object>> toggleLike(@PathVariable Integer id) {
+        try {
+            // 从ThreadLocal中获取当前用户ID
+            Map<String, Object> userMap = ThreadLocalUtil.get();
+            Integer userId = (Integer) userMap.get("id");
+            
+            // 调用服务层进行点赞操作
+            Map<String, Object> result = articleLikeService.toggleLike(id, userId);
+            
+            return Result.success(result);
+        } catch (Exception e) {
+            log.error("点赞操作失败: ", e);
+            return Result.error(e.getMessage());
+        }
     }
 }
