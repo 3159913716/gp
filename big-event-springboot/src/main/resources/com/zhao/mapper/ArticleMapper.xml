@@ -84,4 +84,35 @@
         FROM article a
         WHERE a.state = #{state}
     </select>
+    
+    <!--    搜索文章-->
+    <select id="searchArticles" resultType="com.zhao.pojo.ArticleHomeVO">
+        SELECT
+        a.id,
+        a.title,
+        a.cover_img as coverImg,
+        SUBSTRING(a.content, 1, 100) as summary,
+        u.username as author,
+        a.create_time as createTime,
+        a.state,
+        a.category_id as categoryId,
+        COALESCE(a.like_count, 0) as likeCount,
+        COALESCE(a.collect_count, 0) as collectCount,
+        (SELECT COUNT(*) FROM article_comment ac
+        WHERE ac.article_id = a.id AND ac.is_deleted = 0) as commentCount
+        FROM article a
+        LEFT JOIN user u ON a.create_user = u.id
+        WHERE a.state = #{state}
+        AND (a.title LIKE CONCAT('%', #{keyword}, '%') OR a.content LIKE CONCAT('%', #{keyword}, '%'))
+        ORDER BY a.create_time DESC
+        LIMIT #{offset}, #{pageSize}
+    </select>
+    
+    <!--    统计搜索文章总数-->
+    <select id="countSearchArticles" resultType="java.lang.Long">
+        SELECT COUNT(*)
+        FROM article a
+        WHERE a.state = #{state}
+        AND (a.title LIKE CONCAT('%', #{keyword}, '%') OR a.content LIKE CONCAT('%', #{keyword}, '%'))
+    </select>
 </mapper>

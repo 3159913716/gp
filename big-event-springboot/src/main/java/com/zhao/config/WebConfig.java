@@ -22,7 +22,8 @@ public class WebConfig implements WebMvcConfigurer {
                 "/user/register",
                 "/api/email/send-code",
                 "/api/email/verify",
-                "/article/home");
+                "/article/home",
+                "/search");
     }
 
 

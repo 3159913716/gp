@@ -30,5 +30,19 @@ public interface ArticleMapper {
     );
 
     Long countHomeArticles(@Param("state") String state);
+    
+    // 搜索文章
+    List<ArticleHomeVO> searchArticles(
+            @Param("keyword") String keyword,
+            @Param("state") String state,
+            @Param("offset") Integer offset,
+            @Param("pageSize") Integer pageSize
+    );
+    
+    // 统计搜索结果总数
+    Long countSearchArticles(
+            @Param("keyword") String keyword,
+            @Param("state") String state
+    );
 
 }
