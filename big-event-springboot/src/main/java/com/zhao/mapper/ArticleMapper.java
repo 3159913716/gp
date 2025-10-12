@@ -44,5 +44,17 @@ public interface ArticleMapper {
             @Param("keyword") String keyword,
             @Param("state") String state
     );
+    
+    /**
+     * 增加文章点赞数
+     * @param articleId 文章ID
+     */
+    void incrementLikeCount(@Param("articleId") Integer articleId);
+    
+    /**
+     * 减少文章点赞数
+     * @param articleId 文章ID
+     */
+    void decrementLikeCount(@Param("articleId") Integer articleId);
 
 }

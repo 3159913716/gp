@@ -115,4 +115,17 @@
         WHERE a.state = #{state}
         AND (a.title LIKE CONCAT('%', #{keyword}, '%') OR a.content LIKE CONCAT('%', #{keyword}, '%'))
     </select>
+    <!-- 减少文章点赞数 -->
+    <update id="decrementLikeCount">
+        update article
+        set like_count = ifnull(like_count, 0) - 1
+        where id = #{articleId}
+    </update>
+    
+    <!-- 增加文章点赞数 -->
+    <update id="incrementLikeCount">
+        update article
+        set like_count = ifnull(like_count, 0) + 1
+        where id = #{articleId}
+    </update>
 </mapper>
