@@ -128,4 +128,18 @@
         set like_count = ifnull(like_count, 0) + 1
         where id = #{articleId}
     </update>
+
+    <!-- 增加文章收藏数 -->
+    <update id="incrementCollectCount">
+        update article
+        set collect_count = ifnull(collect_count, 0) + 1
+        where id = #{articleId}
+    </update>
+    
+    <!-- 减少文章收藏数 -->
+    <update id="decrementCollectCount">
+        update article
+        set collect_count = ifnull(collect_count, 0) - 1
+        where id = #{articleId}
+    </update>
 </mapper>

@@ -5,6 +5,7 @@ import com.zhao.pojo.ArticleHomeVO;
 import com.zhao.pojo.PageBean;
 import com.zhao.pojo.Result;
 import com.zhao.service.ArticleLikeService;
+import com.zhao.service.ArticleCollectService;
 import com.zhao.service.ArticleService;
 import com.zhao.utils.ThreadLocalUtil;
 import lombok.extern.slf4j.Slf4j;
@@ -24,6 +25,9 @@ public class ArticleController {
     
     @Autowired
     private ArticleLikeService articleLikeService;
+    
+    @Autowired
+    private ArticleCollectService articleCollectService;
 
     @PostMapping
     public Result add(@RequestBody @Validated(Article.Add.class) Article article) {
@@ -112,6 +116,28 @@ public class ArticleController {
             return Result.success(result);
         } catch (Exception e) {
             log.error("点赞操作失败: ", e);
+            return Result.error(e.getMessage());
+        }
+    }
+    
+    /**
+     * 收藏/取消收藏文章
+     * @param id 文章ID
+     * @return 操作结果
+     */
+    @PostMapping("/collect/{id}")
+    public Result<Map<String, Object>> toggleCollect(@PathVariable Integer id) {
+        try {
+            // 从ThreadLocal中获取当前用户ID
+            Map<String, Object> userMap = ThreadLocalUtil.get();
+            Integer userId = (Integer) userMap.get("id");
+            
+            // 调用服务层进行收藏操作
+            Map<String, Object> result = articleCollectService.toggleCollect(id, userId);
+            
+            return Result.success(result);
+        } catch (Exception e) {
+            log.error("收藏操作失败: ", e);
             return Result.error(e.getMessage());
         }
     }

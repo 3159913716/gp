@@ -56,5 +56,17 @@ public interface ArticleMapper {
      * @param articleId 文章ID
      */
     void decrementLikeCount(@Param("articleId") Integer articleId);
+    
+    /**
+     * 增加文章收藏数
+     * @param articleId 文章ID
+     */
+    void incrementCollectCount(@Param("articleId") Integer articleId);
+    
+    /**
+     * 减少文章收藏数
+     * @param articleId 文章ID
+     */
+    void decrementCollectCount(@Param("articleId") Integer articleId);
 
 }
