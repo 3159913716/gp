@@ -16,10 +16,6 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 
-
-
-
-
 import org.springframework.util.StringUtils;
 
 @Service
@@ -77,7 +73,6 @@ public class ArticleServiceImpl implements ArticleService {
         articleMapper.delete(id);
     }
 
-
     /**
      * 获取首页文章列表业务实现
      * 包含完整的参数校验、数据查询、异常处理逻辑
@@ -106,7 +101,7 @@ public class ArticleServiceImpl implements ArticleService {
 
             // 排序方式只允许两种：new(按时间最新) 或 hot(按热度)
             // 如果用户传了其他值，或者没传值，就默认用new
-            if (StringUtils.isEmpty(sort) ||
+            if (!StringUtils.hasText(sort) ||
                     (!"new".equalsIgnoreCase(sort) && !"hot".equalsIgnoreCase(sort))) {
                 sort = "new";
             } else {
@@ -136,6 +131,40 @@ public class ArticleServiceImpl implements ArticleService {
             throw new RuntimeException("获取文章列表失败");
         }
 
+    }
 
+
+    
+    /**
+     * 搜索文章业务实现
+     * @param keyword 搜索关键词
+     * @param page 当前页码
+     * @param pageSize 每页大小
+     * @return 搜索结果
+     */
+    @Override
+    public PageBean<ArticleHomeVO> searchArticles(String keyword, Integer page, Integer pageSize) {
+        try {
+            // 参数校验和规范化
+            page = (page == null || page < 1) ? 1 : page;
+            pageSize = (pageSize == null || pageSize < 1) ? 10 : pageSize;
+            pageSize = Math.min(pageSize, 50); // 限制最大页大小
+            
+            // 计算分页偏移量
+            int offset = (page - 1) * pageSize;
+            
+            // 调用Mapper查询搜索结果
+            List<ArticleHomeVO> articleList = articleMapper.searchArticles(keyword, "已发布", offset, pageSize);
+            
+            // 查询匹配的总条数
+            Long total = articleMapper.countSearchArticles(keyword, "已发布");
+            
+            // 返回分页结果
+            return new PageBean<>(articleList, total, page, pageSize);
+        } catch (Exception e) {
+            log.error("搜索文章失败: ", e);
+            throw new RuntimeException("搜索失败，请稍后重试");
+        }
     }
 }
+

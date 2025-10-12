@@ -33,4 +33,15 @@ public interface ArticleService {
      * getHomeArticles(2, 5, "hot")     // 查看第2页，每页5条，按热度排序
      */
     PageBean<ArticleHomeVO> getHomeArticles(Integer page, Integer pageSize, String sort);
+    
+    
+    /**
+     * 搜索文章
+     * 根据关键词在文章标题和内容中进行搜索
+     * @param keyword 搜索关键词
+     * @param page 当前页码
+     * @param pageSize 每页条数
+     * @return 搜索结果，包含文章列表、总数等信息
+     */
+    PageBean<ArticleHomeVO> searchArticles(String keyword, Integer page, Integer pageSize);
 }

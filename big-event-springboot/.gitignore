@@ -5,7 +5,12 @@ target/
 !.mvn/wrapper/maven-wrapper.jar
 !**/src/main/**/target/
 !**/src/test/**/target/
+# 排除测试数据生成器
+src/main/java/com/zhao/test/ArticleTestDataGenerator.java
 
+# 排除配置文件
+*.yml
+*.yaml
 ### IntelliJ IDEA ###
 .idea/modules.xml
 .idea/jarRepositories.xml

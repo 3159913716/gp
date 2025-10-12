@@ -108,7 +108,7 @@ public class UserController {
      * 更改用户信息(昵称,电子邮件)
      */
     @PutMapping("/update")
-    public Result update(@RequestBody @Validated User user) {
+    public Result<Void> update(@RequestBody @Validated User user) {
         //@RequestBody 将前端传回来的json字符串转换成实体类对象
         userService.update(user);
         return Result.success();
