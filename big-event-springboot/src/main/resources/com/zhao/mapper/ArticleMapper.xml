@@ -142,4 +142,19 @@
         set collect_count = ifnull(collect_count, 0) - 1
         where id = #{articleId}
     </update>
+    
+    <!-- 获取文章总数 -->
+    <select id="getTotalArticles" resultType="java.lang.Integer">
+        select count(*) from article
+    </select>
+    
+    <!-- 获取今日新增文章数 -->
+    <select id="getTodayNewArticles" resultType="java.lang.Integer">
+        select count(*) from article where create_time >= #{todayStart}
+    </select>
+    
+    <!-- 根据日期范围获取新增文章数 -->
+    <select id="getNewArticlesByDateRange" resultType="java.lang.Integer">
+        select count(*) from article where create_time >= #{start} and create_time &lt; #{end}
+    </select>
 </mapper>
