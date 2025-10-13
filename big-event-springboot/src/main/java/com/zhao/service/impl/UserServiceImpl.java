@@ -5,13 +5,17 @@ import com.zhao.pojo.User;
 import com.zhao.service.UserService;
 import com.zhao.utils.PasswordUtil;
 import com.zhao.utils.ThreadLocalUtil;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
+import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 @Service
+@Slf4j
 public class UserServiceImpl implements UserService {
 
     @Autowired
@@ -49,5 +53,65 @@ public class UserServiceImpl implements UserService {
         Map<String, Object> map = ThreadLocalUtil.get();
         Integer id = (Integer) map.get("id");
         userMapper.updatePwd(PasswordUtil.encryptPassword(newPwd), id);
+    }
+    
+    @Override
+    public void updateUserRole(Integer userId, Integer role) {
+        // 验证角色值是否有效（0-管理员，1-作者，2-普通用户）
+        if (role < 0 || role > 2) {
+            throw new RuntimeException("无效的角色值");
+        }
+        // 检查用户是否存在
+        User user = userMapper.findById(userId);
+        if (user == null) {
+            throw new RuntimeException("用户不存在");
+        }
+        // 更新用户角色
+        userMapper.updateRole(userId, role);
+    }
+    
+    @Override
+    public void updateLastLoginTime(Integer userId) {
+        userMapper.updateLastLoginTime(userId);
+    }
+    
+    @Override
+    public Map<String, Object> getUserList(Integer page, Integer pageSize, Integer role, String username, Integer status, Integer excludeId) {
+        // 记录查询参数，特别是status参数
+        log.info("查询用户列表，参数：page={}, pageSize={}, role={}, username={}, status={}, excludeId={}", 
+                page, pageSize, role, username, status, excludeId);
+        
+        // 参数验证和默认值处理
+        if (page == null || page < 1) {
+            page = 1;
+        }
+        if (pageSize == null || pageSize < 1) {
+            pageSize = 10;
+        }
+        // 限制最大分页大小
+        if (pageSize > 100) {
+            pageSize = 100;
+        }
+        
+        // 计算起始索引
+        int start = (page - 1) * pageSize;
+        
+        // 查询用户列表
+        List<User> userList = userMapper.getUserList(start, pageSize, role, username, status, excludeId);
+        
+        // 查询用户总数
+        Integer total = userMapper.getUserCount(role, username, status, excludeId);
+        
+        // 记录查询结果
+        log.info("查询用户列表结果：找到 {} 条记录，总数为 {}", userList.size(), total);
+        
+        // 构建返回结果
+        Map<String, Object> result = new HashMap<>();
+        result.put("list", userList);
+        result.put("total", total);
+        result.put("page", page);
+        result.put("pageSize", pageSize);
+        
+        return result;
     }
 }

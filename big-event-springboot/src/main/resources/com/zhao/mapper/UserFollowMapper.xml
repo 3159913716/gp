@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zhao.mapper.UserFollowMapper">
+
+    <!-- 根据关注者ID和被关注者ID查询关注记录 -->
+    <select id="findByFollowerIdAndFollowedId" resultType="com.zhao.pojo.UserFollow">
+        select * from user_follow
+        where follower_id = #{followerId} and followed_id = #{followedId}
+    </select>
+
+    <!-- 插入关注记录 -->
+    <insert id="insert" parameterType="com.zhao.pojo.UserFollow" useGeneratedKeys="true" keyProperty="id">
+        insert into user_follow (follower_id, followed_id, create_time, is_deleted)
+        values (#{followerId}, #{followedId}, #{createTime}, #{isDeleted})
+    </insert>
+
+    <!-- 逻辑删除关注记录 -->
+    <update id="deleteByFollowerIdAndFollowedId">
+        update user_follow
+        set is_deleted = 1
+        where follower_id = #{followerId} and followed_id = #{followedId}
+    </update>
+
+    <!-- 恢复关注记录（取消删除） -->
+    <update id="restoreByFollowerIdAndFollowedId">
+        update user_follow
+        set is_deleted = 0
+        where follower_id = #{followerId} and followed_id = #{followedId}
+    </update>
+
+    <!-- 获取用户关注列表 -->
+    <select id="findFollowingList" resultType="java.util.Map">
+        select
+            u.id as userId,
+            u.username,
+            u.nickname,
+            u.user_pic as userPic,
+            uf.create_time as followTime
+        from
+            user_follow uf
+        join
+            user u on uf.followed_id = u.id
+        where
+            uf.follower_id = #{followerId}
+            and uf.is_deleted = 0
+        order by
+            uf.create_time desc
+    </select>
+
+    <!-- 获取用户粉丝列表 -->
+    <select id="findFollowersList" resultType="java.util.Map">
+        select
+            u.id as userId,
+            u.username,
+            u.nickname,
+            u.user_pic as userPic,
+            uf.create_time as followTime
+        from
+            user_follow uf
+        join
+            user u on uf.follower_id = u.id
+        where
+            uf.followed_id = #{followedId}
+            and uf.is_deleted = 0
+        order by
+            uf.create_time desc
+    </select>
+</mapper>

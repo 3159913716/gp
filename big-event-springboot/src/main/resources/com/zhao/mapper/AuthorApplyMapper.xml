@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zhao.mapper.AuthorApplyMapper">
+    
+    <!-- 插入作者申请记录 -->
+    <insert id="insert" parameterType="com.zhao.pojo.AuthorApply" useGeneratedKeys="true" keyProperty="id">
+        insert into author_apply (
+            user_id, real_name, id_card, apply_desc, 
+            status, create_time, audit_time, audit_user_id, reject_reason
+        ) values (
+            #{userId}, #{realName}, #{idCard}, #{applyDesc}, 
+            #{status}, #{createTime}, #{auditTime}, #{auditUserId}, #{rejectReason}
+        )
+    </insert>
+    
+    <!-- 根据用户ID查询作者申请记录 -->
+    <select id="findByUserId" parameterType="java.lang.Integer" resultType="com.zhao.pojo.AuthorApply">
+        select * from author_apply where user_id = #{userId}
+    </select>
+    
+    <!-- 根据申请ID查询作者申请记录 -->
+    <select id="findById" parameterType="java.lang.Integer" resultType="com.zhao.pojo.AuthorApply">
+        select * from author_apply where id = #{id}
+    </select>
+    
+    <!-- 更新作者申请状态 -->
+    <update id="updateStatus" parameterType="com.zhao.pojo.AuthorApply">
+        update author_apply 
+        set 
+            status = #{status}, 
+            audit_time = #{auditTime}, 
+            audit_user_id = #{auditUserId}, 
+            reject_reason = #{rejectReason}
+        where id = #{id}
+    </update>
+    
+    <!-- 获取作者申请列表，支持分页和状态过滤 -->
+    <select id="getAuthorApplyList" resultType="com.zhao.pojo.dto.AuthorApplyDTO">
+        SELECT 
+            a.id, 
+            a.real_name as realName, 
+            a.id_card as idCard, 
+            a.apply_desc as applyDesc, 
+            a.status, 
+            a.create_time as createTime, 
+            u.id as "userInfo.id",
+            u.username as "userInfo.username",
+            u.nickname as "userInfo.nickname",
+            u.email as "userInfo.email",
+            u.user_pic as "userInfo.userPic"
+        FROM author_apply a
+        LEFT JOIN USER u ON a.user_id = u.id
+        <where>
+            <if test="status != null">
+                AND a.status = #{status}
+            </if>
+        </where>
+        ORDER BY a.create_time DESC
+        LIMIT #{start}, #{pageSize}
+    </select>
+    
+    <!-- 获取作者申请总数，支持状态过滤 -->
+    <select id="getAuthorApplyCount" resultType="java.lang.Integer">
+        SELECT COUNT(*)
+        FROM author_apply a
+        <where>
+            <if test="status != null">
+                AND a.status = #{status}
+            </if>
+        </where>
+    </select>
+</mapper>
