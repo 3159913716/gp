@@ -25,6 +25,10 @@ import LoginVue from '@/views/Login.vue';
 // 应用主布局视图组件
 import LayoutVue from '@/views/Layout.vue';
 
+// 前台布局和首页组件
+import HomeLayoutVue from '@/views/HomeLayout.vue';
+import HomePageVue from '@/views/HomePage.vue';
+
 // 文章管理相关视图
 import ArticleCategoryVue from '@/views/article/ArticleCategory.vue';
 import ArticleManageVue from '@/views/article/ArticleManage.vue';
@@ -52,53 +56,37 @@ const router = createRouter({
    * 包含路径、组件映射、元数据和嵌套路由配置
    */
   routes: [
-    // === 公共路由（无需认证） ===
+    // === 公共路由（无需认证）===
+    { path: '/login', name: 'Login', component: LoginVue, meta: { requiresAuth: false } },
+    
+    // === 前台路由（无需认证）===
     {
-      path: '/login',            // 路由路径
-      name: 'Login',             // 命名路由（用于编程式导航）
-      component: LoginVue,       // 对应的视图组件
-      meta: { 
-        requiresAuth: false      // 元数据标记：此路由不需要认证
-      } 
+      path: '/',
+      component: HomeLayoutVue,
+      meta: { requiresAuth: false },
+      children: [
+        { path: '', component: HomePageVue, meta: { requiresAuth: false } },
+        { path: 'category/:id', component: HomePageVue, meta: { requiresAuth: false } },
+        { path: 'search', component: HomePageVue, meta: { requiresAuth: false } },
+        { path: 'article/:id', component: HomePageVue, meta: { requiresAuth: false } }
+      ]
     },
     
-    // === 主应用路由（需认证） ===
+    // === 主应用路由（需认证）===
     {
-      path: '/',                 // 根路径
-      component: LayoutVue,       // 布局组件（包含顶部导航和侧边栏）
-      redirect: '/article/manage', // 重定向路径（默认展示文章管理）
-      meta: { 
-        requiresAuth: true        // 元数据标记：此路由及其子路由需要认证
-      }, 
+      path: '/admin',
+      component: LayoutVue,
+      redirect: '/admin/article/manage',
+      meta: { requiresAuth: true },
       children: [
         // 文章管理子路由
-        {
-          path: '/article/category',   // 文章分类管理路径
-          component: ArticleCategoryVue, 
-          meta: { requiresAuth: true }  // 需要认证
-        },
-        {
-          path: '/article/manage',      // 文章管理路径
-          component: ArticleManageVue,
-          meta: { requiresAuth: true }  // 需要认证
-        },
+        { path: '/admin/article/category', component: ArticleCategoryVue, meta: { requiresAuth: true } },
+        { path: '/admin/article/manage', component: ArticleManageVue, meta: { requiresAuth: true } },
         
         // 用户管理子路由
-        {
-          path: '/user/avatar',         // 用户头像管理路径
-          component: UserAvatarVue,
-          meta: { requiresAuth: true }  // 需要认证
-        },
-        {
-          path: '/user/info',           // 用户信息管理路径
-          component: UserInfoVue,
-          meta: { requiresAuth: true }  // 需要认证
-        },
-        {
-          path: '/user/resetPassword',  // 密码重置路径
-          component: UserResetPasswordVue,
-          meta: { requiresAuth: true }  // 需要认证
-        }
+        { path: '/admin/user/avatar', component: UserAvatarVue, meta: { requiresAuth: true } },
+        { path: '/admin/user/info', component: UserInfoVue, meta: { requiresAuth: true } },
+        { path: '/admin/user/resetPassword', component: UserResetPasswordVue, meta: { requiresAuth: true } }
       ]
     }
   ],
@@ -139,10 +127,10 @@ router.beforeEach((to, from, next) => {
   // 情况2: 用户已登录但尝试访问登录页
   else if (to.path === '/login' && isAuthenticated) {
     /**
-     * 重定向到首页
-     * 避免已登录用户重复访问登录页
+     * 重定向到管理员首页
+     * 避免已登录用户重复访问登录页，并直接跳转到管理界面
      */
-    next('/')
+    next('/admin/article/manage')
   }
   
   // 情况3: 正常访问有权限的页面
