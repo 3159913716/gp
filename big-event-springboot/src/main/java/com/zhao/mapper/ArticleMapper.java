@@ -4,6 +4,7 @@ import com.zhao.pojo.Article;
 import com.zhao.pojo.ArticleHomeVO;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Mapper
@@ -68,5 +69,14 @@ public interface ArticleMapper {
      * @param articleId 文章ID
      */
     void decrementCollectCount(@Param("articleId") Integer articleId);
+    
+    // 获取文章总数
+    Integer getTotalArticles();
+    
+    // 获取今日新增文章数
+    Integer getTodayNewArticles(@Param("todayStart") LocalDateTime todayStart);
+    
+    // 根据日期范围获取新增文章数
+    Integer getNewArticlesByDateRange(@Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
 
 }

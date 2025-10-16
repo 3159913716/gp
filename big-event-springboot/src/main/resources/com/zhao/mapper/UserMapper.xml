@@ -8,6 +8,11 @@
     <select id="findByUserName" resultType="com.zhao.pojo.User">
         select * from user where username=#{username}
     </select>
+    
+    <!-- 根据ID查询用户 -->
+    <select id="findById" parameterType="java.lang.Integer" resultType="com.zhao.pojo.User">
+        select * from user where id=#{id}
+    </select>
 
     <!-- 添加 -->
     <!-- now()是数据库里面的函数，旨在获取数据库系统当前时间 -->
@@ -39,5 +44,81 @@
         set password=#{hsPassword},
             update_time=now()
         where id=#{id}
+    </update>
+    
+    <!-- 更新用户角色 -->
+    <update id="updateRole" parameterType="com.zhao.pojo.User">
+        update user
+        set role=#{role},
+            update_time=now()
+        where id=#{id}
+    </update>
+    
+    <!-- 获取用户列表 -->
+    <select id="getUserList" resultType="com.zhao.pojo.User">
+        select * from user
+        where 1=1
+        <if test="role != null">
+            and role = #{role}
+        </if>
+        <if test="username != null and username != ''">
+            and username like concat('%', #{username}, '%')
+        </if>
+        <if test="status != null">
+            and status = #{status}
+        </if>
+        <if test="excludeId != null">
+            and id != #{excludeId}
+        </if>
+        order by create_time desc
+        limit #{start}, #{pageSize}
+    </select>
+    
+    <!-- 获取用户总数 -->
+    <select id="getUserCount" resultType="java.lang.Integer">
+        select count(*)
+        from user
+        where 1=1
+        <if test="role != null">
+            and role = #{role}
+        </if>
+        <if test="username != null and username != ''">
+            and username like concat('%', #{username}, '%')
+        </if>
+        <if test="status != null">
+            and status = #{status}
+        </if>
+        <if test="excludeId != null">
+            and id != #{excludeId}
+        </if>
+    </select>
+    
+    <!-- 获取用户总数（数据统计） -->
+    <select id="getTotalUsers" resultType="java.lang.Integer">
+        select count(*) from user
+    </select>
+    
+    <!-- 获取今日新增用户数 -->
+    <select id="getTodayNewUsers" resultType="java.lang.Integer">
+        select count(*) from user where create_time >= #{todayStart}
+    </select>
+    
+    <!-- 获取日活跃用户数 -->
+    <select id="getDailyActiveUsers" resultType="java.lang.Integer">
+        select count(*) from (
+            select distinct admin_id as user_id from admin_operation_log where operation_time >= #{todayStart}
+            union
+            select id as user_id from user where update_time >= #{todayStart}
+        ) as active_users
+    </select>
+    
+    <!-- 根据日期范围获取新增用户数 -->
+    <select id="getNewUsersByDateRange" resultType="java.lang.Integer">
+        select count(*) from user where create_time >= #{start} and create_time &lt; #{end}
+    </select>
+    
+    <!-- 更新用户的更新时间（用于登录时更新） -->
+    <update id="updateLastLoginTime" parameterType="java.lang.Integer">
+        update user set update_time = now() where id = #{id}
     </update>
 </mapper>

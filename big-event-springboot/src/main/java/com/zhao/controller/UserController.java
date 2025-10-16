@@ -1,14 +1,18 @@
 package com.zhao.controller;
 
 import com.zhao.pojo.ArticleCollectionVO;
+import com.zhao.pojo.AuthorApply;
 import com.zhao.pojo.PageBean;
 import com.zhao.pojo.Result;
 import com.zhao.pojo.User;
+import com.zhao.service.AuthorApplyService;
 import com.zhao.service.UserCollectionService;
+import com.zhao.service.UserFollowService;
 import com.zhao.service.UserService;
 import com.zhao.utils.JwtUtil;
 import com.zhao.utils.PasswordUtil;
 import com.zhao.utils.ThreadLocalUtil;
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.Pattern;
 import org.hibernate.validator.constraints.URL;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -19,6 +23,7 @@ import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
@@ -33,6 +38,10 @@ public class UserController {
     private StringRedisTemplate stringRedisTemplate;
     @Autowired
     private UserCollectionService userCollectionService;
+    @Autowired
+    private UserFollowService userFollowService;
+    @Autowired
+    private AuthorApplyService authorApplyService;
 
     /**
      * 注册接口
@@ -77,6 +86,9 @@ public class UserController {
         
         //loginUser对象中的密码是密文
         if (PasswordUtil.verifyPassword(password, loginUser.getPassword())) {
+            // 登录成功后更新用户的最后登录时间（update_time字段）
+            userService.updateLastLoginTime(loginUser.getId());
+            
             //登录成功，响应jwt令牌
             Map<String, Object> claims = new HashMap<>();
             claims.put("id", loginUser.getId());
@@ -191,6 +203,131 @@ public class UserController {
             // 异常处理
             e.printStackTrace();
             return Result.error("获取收藏列表失败");
+        }
+    }
+    
+    /**
+     * 关注/取消关注用户
+     * @param followedId 被关注用户的ID
+     * @return 操作结果
+     */
+    @PostMapping("/{id}/follow")
+    public Result<Map<String, Boolean>> toggleFollow(@PathVariable("id") Integer followedId) {
+        try {
+            // 从ThreadLocal中获取当前登录用户的ID
+            Map<String, Object> userMap = ThreadLocalUtil.get();
+            Integer followerId = (Integer) userMap.get("id");
+            
+            // 调用服务层执行关注/取消关注操作
+            Map<String, Boolean> result = userFollowService.toggleFollow(followerId, followedId);
+            
+            // 返回操作结果
+            return Result.success(result);
+        } catch (RuntimeException e) {
+            // 异常处理
+            e.printStackTrace();
+            return Result.error(e.getMessage());
+        }
+    }
+    
+    /**
+     * 获取用户关注列表
+     * @return 关注列表
+     */
+    @GetMapping("/following")
+    public Result<List<Map<String, Object>>> getFollowingList() {
+        try {
+            // 从ThreadLocal中获取当前登录用户的ID
+            Map<String, Object> userMap = ThreadLocalUtil.get();
+            Integer userId = (Integer) userMap.get("id");
+            
+            // 调用服务层获取关注列表
+            List<Map<String, Object>> followingList = userFollowService.getFollowingList(userId);
+            
+            return Result.success(followingList);
+        } catch (Exception e) {
+            // 异常处理
+            e.printStackTrace();
+            return Result.error("获取关注列表失败");
+        }
+    }
+    
+    /**
+     * 获取用户粉丝列表
+     * @return 粉丝列表
+     */
+    @GetMapping("/followers")
+    public Result<List<Map<String, Object>>> getFollowersList() {
+        try {
+            // 从ThreadLocal中获取当前登录用户的ID
+            Map<String, Object> userMap = ThreadLocalUtil.get();
+            Integer userId = (Integer) userMap.get("id");
+            
+            // 调用服务层获取粉丝列表
+            List<Map<String, Object>> followersList = userFollowService.getFollowersList(userId);
+            
+            return Result.success(followersList);
+        } catch (Exception e) {
+            // 异常处理
+            e.printStackTrace();
+            return Result.error("获取粉丝列表失败");
+        }
+    }
+    
+    /**
+     * 提交作者申请
+     * @param apply 申请信息
+     * @return 操作结果
+     */
+    /**
+     * 处理方法参数验证异常
+     */
+    @ExceptionHandler(org.springframework.web.bind.MethodArgumentNotValidException.class)
+    public Result handleValidationExceptions(org.springframework.web.bind.MethodArgumentNotValidException ex) {
+        // 针对身份证号格式错误返回友好提示
+        return Result.error("身份证号格式不正确，请输入有效的18位身份证号");
+    }
+    
+    @PostMapping("/author-apply")
+    public Result submitAuthorApply(@RequestBody @Valid AuthorApply apply) {
+        try {
+            // 从ThreadLocal中获取当前登录用户的ID
+            Map<String, Object> userMap = ThreadLocalUtil.get();
+            Integer userId = (Integer) userMap.get("id");
+            
+            // 设置申请人ID
+            apply.setUserId(userId);
+            
+            // 调用服务层提交申请
+            authorApplyService.submitApply(apply);
+            
+            return Result.success("申请提交成功，请等待审核");
+        } catch (Exception e) {
+            // 异常处理
+            e.printStackTrace();
+            return Result.error(e.getMessage() != null ? e.getMessage() : "处理失败");
+        }
+    }
+    
+    /**
+     * 获取作者申请状态
+     * @return 申请状态信息
+     */
+    @GetMapping("/author-apply/status")
+    public Result<AuthorApply> getAuthorApplyStatus() {
+        try {
+            // 从ThreadLocal中获取当前登录用户的ID
+            Map<String, Object> userMap = ThreadLocalUtil.get();
+            Integer userId = (Integer) userMap.get("id");
+            
+            // 调用服务层获取申请状态
+            AuthorApply applyStatus = authorApplyService.getApplyStatus(userId);
+            
+            return Result.success(applyStatus);
+        } catch (Exception e) {
+            // 异常处理
+            e.printStackTrace();
+            return Result.error("获取申请状态失败");
         }
     }
 }
