@@ -1,10 +1,12 @@
 package com.zhao.controller;
 
+import com.zhao.pojo.Article;
 import com.zhao.pojo.ArticleCollectionVO;
 import com.zhao.pojo.AuthorApply;
 import com.zhao.pojo.PageBean;
 import com.zhao.pojo.Result;
 import com.zhao.pojo.User;
+import com.zhao.service.ArticleService;
 import com.zhao.service.AuthorApplyService;
 import com.zhao.service.UserCollectionService;
 import com.zhao.service.UserFollowService;
@@ -42,6 +44,8 @@ public class UserController {
     private UserFollowService userFollowService;
     @Autowired
     private AuthorApplyService authorApplyService;
+    @Autowired
+    private ArticleService articleService;
 
     /**
      * 注册接口
@@ -328,6 +332,67 @@ public class UserController {
             // 异常处理
             e.printStackTrace();
             return Result.error("获取申请状态失败");
+        }
+    }
+    
+    /**
+     * 获取我的文章列表
+     * 需要作者权限
+     * @param page 当前页码，默认1
+     * @param pageSize 每页大小，默认10
+     * @param state 文章状态（可选）
+     * @return 包含文章列表和总数的分页数据
+     */
+    @GetMapping("/articles")
+    public Result<Map<String, Object>> getUserArticles(
+            @RequestParam(defaultValue = "1") Integer page,
+            @RequestParam(defaultValue = "10") Integer pageSize,
+            @RequestParam(required = false) String state) {
+        try {
+            // 验证作者权限
+            Map<String, Object> userMap = ThreadLocalUtil.get();
+            Integer role = (Integer) userMap.get("role");
+            if (role != 1) {
+                return Result.error("需要作者权限");
+            }
+            
+            // 参数容错处理
+            // 页码容错：页码小于1时自动设为1
+            if (page < 1) {
+                page = 1;
+            }
+            
+            // 页大小容错：页大小小于1时自动设为10，大于50时自动设为50
+            if (pageSize < 1) {
+                pageSize = 10;
+            } else if (pageSize > 50) {
+                pageSize = 50;
+            }
+            
+            // 状态参数校验：如果提供了状态参数，则必须是有效状态
+            if (state != null && !state.isEmpty()) {
+                // 验证状态参数是否有效
+                // 有效状态为"草稿"和"已发布"
+                if (!"草稿".equals(state) && !"已发布".equals(state)) {
+                    return Result.error("状态参数错误，可选值：草稿, 已发布");
+                }
+            }
+            
+            // 调用服务层获取用户文章列表
+            PageBean<Article> result = articleService.getUserArticles(page, pageSize, state);
+            
+            // 构建返回结果
+            Map<String, Object> response = new HashMap<>();
+            response.put("list", result.getItem());
+            response.put("total", result.getTotal());
+            response.put("page", page);
+            response.put("pageSize", pageSize);
+            
+            return Result.success(response);
+        } catch (Exception e) {
+            // 异常处理
+            e.printStackTrace();
+            return Result.error("获取文章列表失败");
         }
     }
 }
