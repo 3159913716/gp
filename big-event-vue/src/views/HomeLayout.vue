@@ -51,7 +51,7 @@ const handleCategoryClick = (categoryId) => {
 
 // 处理登录
 const handleLogin = () => {
-  router.push('/login')
+  router.push('/admin/ucenter/mine')
 }
 
 // 处理登出
@@ -64,7 +64,7 @@ const handleLogout = () => {
 
 // 跳转到个人中心
 const goToProfile = () => {
-  router.push('/user/profile')
+ router.push('/admin/ucenter/mine')
 }
 </script>
 

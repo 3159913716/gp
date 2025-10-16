@@ -38,6 +38,13 @@ import UserAvatarVue from '@/views/user/UserAvatar.vue';
 import UserInfoVue from '@/views/user/UserInfo.vue';
 import UserResetPasswordVue from '@/views/user/UserResetPassword.vue';
 
+//用户中心相关视图
+import UcenterMineVue from '@/views/ucenter/UcenterMine.vue';
+import UcenterAuthorVue from '@/views/ucenter/UcenterAuthor.vue';
+import UcenterArticle_collectVue from '@/views/ucenter/UcenterArticle_collect.vue';
+import UcenterUser_followVue from '@/views/ucenter/UcenterUser_follow.vue';
+
+import UserLayoutVue from '@/views/UserLayout.vue';
 /**
  * 创建路由实例
  * 
@@ -75,9 +82,9 @@ const router = createRouter({
     // === 主应用路由（需认证）===
     {
       path: '/admin',
-      component: LayoutVue,
-      redirect: '/admin/article/manage',
-      meta: { requiresAuth: true },
+      component: UserLayoutVue,
+      redirect: '/admin/ucenter/mine',
+      meta: { requiresAuth: false },
       children: [
         // 文章管理子路由
         { path: '/admin/article/category', component: ArticleCategoryVue, meta: { requiresAuth: true } },
@@ -86,9 +93,22 @@ const router = createRouter({
         // 用户管理子路由
         { path: '/admin/user/avatar', component: UserAvatarVue, meta: { requiresAuth: true } },
         { path: '/admin/user/info', component: UserInfoVue, meta: { requiresAuth: true } },
-        { path: '/admin/user/resetPassword', component: UserResetPasswordVue, meta: { requiresAuth: true } }
+        { path: '/admin/user/resetPassword', component: UserResetPasswordVue, meta: { requiresAuth: true } },
+
+        //个人中心
+        { path: '/admin/ucenter/mine', 
+          component: UcenterMineVue,
+          redirect: '/admin/ucenter/collect',
+          meta: { requiresAuth: false }, 
+          children:[
+            { path: '/admin/ucenter/collect', component: UcenterArticle_collectVue, meta: { requiresAuth: false } },
+            { path: '/admin/ucenter/follow', component: UcenterUser_followVue, meta: { requiresAuth: true } },
+          ]
+          },
+        //作者中心
+        { path: '/admin/ucenter/author', component: UcenterAuthorVue, meta: { requiresAuth: true } },
       ]
-    }
+    },
   ],
 })
 
