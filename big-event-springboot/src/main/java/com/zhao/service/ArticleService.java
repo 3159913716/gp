@@ -44,4 +44,13 @@ public interface ArticleService {
      * @return 搜索结果，包含文章列表、总数等信息
      */
     PageBean<ArticleHomeVO> searchArticles(String keyword, Integer page, Integer pageSize);
+    
+    /**
+     * 获取用户文章列表
+     * @param page 当前页码
+     * @param pageSize 每页条数
+     * @param state 文章状态（可选）
+     * @return 分页后的文章列表
+     */
+    PageBean<Article> getUserArticles(Integer page, Integer pageSize, String state);
 }
