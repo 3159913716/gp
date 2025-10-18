@@ -78,5 +78,24 @@ public interface ArticleMapper {
     
     // 根据日期范围获取新增文章数
     Integer getNewArticlesByDateRange(@Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
+    
+    /**
+     * 获取用户文章列表（带分页和状态筛选）
+     * @param userId 用户ID
+     * @param state 文章状态
+     * @param offset 偏移量
+     * @param pageSize 每页大小
+     * @return 文章列表
+     */
+    List<Article> getUserArticles(@Param("userId") Integer userId, @Param("state") String state, 
+                                 @Param("offset") Integer offset, @Param("pageSize") Integer pageSize);
+    
+    /**
+     * 统计用户文章总数（带状态筛选）
+     * @param userId 用户ID
+     * @param state 文章状态
+     * @return 文章总数
+     */
+    Long countUserArticles(@Param("userId") Integer userId, @Param("state") String state);
 
 }

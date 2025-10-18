@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zhao.mapper.ArticleCommentMapper">
+    
+    <!-- 插入评论记录 -->
+    <insert id="insert" parameterType="com.zhao.pojo.ArticleComment" useGeneratedKeys="true" keyProperty="id">
+        insert into article_comment (
+            article_id, user_id, content, parent_id, create_time, is_deleted, comment_like_count
+        ) values (
+            #{articleId}, #{userId}, #{content}, #{parentId}, #{createTime}, #{isDeleted}, #{commentLikeCount}
+        )
+    </insert>
+    
+    <!-- 验证父评论是否存在且未被删除 -->
+    <select id="checkParentComment" resultType="java.lang.Integer">
+        select count(*) 
+        from article_comment 
+        where id = #{parentId} and is_deleted = 0
+    </select>
+    
+    <!-- 获取父评论所属的文章ID -->
+    <select id="getArticleIdByCommentId" resultType="java.lang.Integer">
+        select article_id 
+        from article_comment 
+        where id = #{parentId} and is_deleted = 0
+    </select>
+    
+    <!-- 获取文章的一级评论列表 -->
+    <select id="getArticleMainComments" resultType="java.util.Map">
+        select 
+            c.id, c.content, c.create_time as createTime, c.comment_like_count as likeCount,
+            u.nickname, u.user_pic as userPic
+        from 
+            article_comment c
+        left join 
+            user u on c.user_id = u.id
+        where 
+            c.article_id = #{articleId} 
+            and c.parent_id = 0 
+            and c.is_deleted = 0
+        order by 
+            c.create_time desc
+        limit 
+            #{start}, #{pageSize}
+    </select>
+    
+    <!-- 获取文章的一级评论总数 -->
+    <select id="getArticleMainCommentsCount" resultType="java.lang.Integer">
+        select count(*) 
+        from article_comment 
+        where article_id = #{articleId} 
+            and parent_id = 0 
+            and is_deleted = 0
+    </select>
+    
+    <!-- 获取指定评论的所有回复 -->
+    <select id="getCommentReplies" resultType="java.util.Map">
+        select 
+            c.id, c.content, c.create_time as createTime, c.comment_like_count as likeCount,
+            u.nickname, u.user_pic as userPic
+        from 
+            article_comment c
+        left join 
+            user u on c.user_id = u.id
+        where 
+            c.parent_id = #{parentId} 
+            and c.is_deleted = 0
+        order by 
+            c.create_time asc
+    </select>
+    
+    <!-- 查询用户点赞的评论ID列表 -->
+    <select id="getLikedCommentIds" resultType="java.lang.Integer">
+        select 
+            comment_id 
+        from 
+            article_comment_like 
+        where 
+            user_id = #{userId} 
+            and comment_id in
+            <foreach collection="commentIds" item="commentId" open="(" close=")" separator=",">
+                #{commentId}
+            </foreach>
+            and is_deleted = 0
+    </select>
+    
+    <!-- 根据评论ID查询评论信息 -->
+    <select id="selectCommentById" resultType="com.zhao.pojo.ArticleComment">
+        select * from article_comment where id = #{id}
+    </select>
+</mapper>

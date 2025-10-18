@@ -157,4 +157,24 @@
     <select id="getNewArticlesByDateRange" resultType="java.lang.Integer">
         select count(*) from article where create_time >= #{start} and create_time &lt; #{end}
     </select>
+    
+    <!-- 获取用户文章列表 -->
+    <select id="getUserArticles" resultType="com.zhao.pojo.Article">
+        select * from article
+        where create_user = #{userId}
+        <if test="state != null">
+            and state = #{state}
+        </if>
+        order by create_time desc
+        limit #{offset}, #{pageSize}
+    </select>
+    
+    <!-- 统计用户文章总数 -->
+    <select id="countUserArticles" resultType="java.lang.Long">
+        select count(*) from article
+        where create_user = #{userId}
+        <if test="state != null">
+            and state = #{state}
+        </if>
+    </select>
 </mapper>

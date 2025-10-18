@@ -166,5 +166,34 @@ public class ArticleServiceImpl implements ArticleService {
             throw new RuntimeException("搜索失败，请稍后重试");
         }
     }
+    
+    @Override
+    public PageBean<Article> getUserArticles(Integer page, Integer pageSize, String state) {
+        try {
+            // 参数校验和规范化
+            page = (page == null || page < 1) ? 1 : page;
+            pageSize = (pageSize == null || pageSize < 1) ? 10 : pageSize;
+            pageSize = Math.min(pageSize, 50); // 限制最大页大小
+            
+            // 获取当前用户ID
+            Map<String, Object> map = ThreadLocalUtil.get();
+            Integer userId = (Integer) map.get("id");
+            
+            // 计算分页偏移量
+            int offset = (page - 1) * pageSize;
+            
+            // 查询用户文章列表
+            List<Article> articleList = articleMapper.getUserArticles(userId, state, offset, pageSize);
+            
+            // 查询用户文章总数
+            Long total = articleMapper.countUserArticles(userId, state);
+            
+            // 返回分页结果
+            return new PageBean<>(articleList, total, page, pageSize);
+        } catch (Exception e) {
+            log.error("获取用户文章列表失败: ", e);
+            throw new RuntimeException("获取文章列表失败，请稍后重试");
+        }
+    }
 }
 

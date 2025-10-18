@@ -22,6 +22,7 @@ public class WebConfig implements WebMvcConfigurer {
                 "/api/email/send-code",
                 "/api/email/verify",
                 "/article/home",
-                "/search");
+                "/search",
+                "/article/*/comments"); // 添加获取文章评论列表接口到不拦截路径
     }
 }
