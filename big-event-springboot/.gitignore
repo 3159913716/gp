@@ -1,6 +1,6 @@
 target/
 功能文档.md
-新增接口文档.md
+接口文档.md
 原接口文档.md
 !.mvn/wrapper/maven-wrapper.jar
 !**/src/main/**/target/

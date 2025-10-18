@@ -1,12 +1,12 @@
 <!--
-     我的关注管理组件：
-      实现对我的关注的用户的管理
+     我的粉丝管理组件：
+      实现对我的粉丝用户的管理
 -->
 
 <template>
   <div class="container"> 
-    <!-- 关注用户接口数据展示 -->
-    <div class="follow-table" v-show="success && list.length != 0">
+    <!-- 粉丝用户列表数据展示 -->
+    <div class="follow-table" v-show="fansList.length > 0">
         <div class="table-header">
             <div class="title-cell">用户昵称</div>
             <div class="img-cell">用户头像</div>
@@ -14,96 +14,114 @@
             <div class="time-cell">操作</div>
         </div>
         <div class="table-content">
-            <div class="table-row" v-for="item in list" :key="item.userId">
-                <div class="title-cell">{{ item.nickname}}</div>
+            <div class="table-row" v-for="item in fansList" :key="item.id">
+                <div class="title-cell">{{ item.nickname || item.username }}</div>
                 <div class="img-cell"><img :src="item.userPic" alt="用户头像" class="user-img"></div>
                 <div class="author-cell">{{ item.followTime }}</div>
                 <div class="time-cell">
-                    <el-button type="danger" size="mini" @click="removeFollow(item.userId)" class="delete-btn">取消关注</el-button>
+                    <el-button type="primary" size="mini" @click="viewUserProfile(item.id)" class="view-btn">查看资料</el-button>
+                    <el-button type="success" size="mini" @click="followBack(item.id)" class="follow-btn" v-if="!isFollowing(item.id)">回关</el-button>
+                    <el-button type="info" size="mini" disabled class="followed-btn" v-else>已关注</el-button>
                 </div>
             </div>
         </div>
-        <!-- 新增分页组件 -->
-        <div class="pagination">
-          <el-pagination
-            @size-change="handleSizeChange"
-            @current-change="handleCurrentChange"
-            :current-page="page"
-            :page-sizes="[5, 10, 20, 50]"
-            :page-size="pageSize"
-            layout="total, sizes, prev, pager, next, jumper"
-            :total="total"
-          ></el-pagination>
-        </div>
     </div>
     <!-- 空数据状态 -->
-    <div class="empty-state" v-show="!success || list.length === 0">
-        <div>暂无关注的用户</div>
+    <div class="empty-state" v-show="fansList.length === 0 && !loading">
+        <div>暂无粉丝</div>
+    </div>
+    <!-- 加载状态 -->
+    <div class="loading-state" v-if="loading">
+        <el-icon class="is-loading"><Loading /></el-icon>
+        <div class="loading-text">加载中...</div>
     </div>
   </div>
 </template>
 
 <script>
 import request from '@/utils/request.js';
-import { WarningFilled } from '@element-plus/icons-vue'; // 引入Element Plus图标
+import { Loading } from '@element-plus/icons-vue'; // 引入Element Plus图标
+import { useTokenStore } from '@/stores/token.js';
 
 export default {
- components: { WarningFilled }, // 注册图标组件
+ components: { Loading }, // 注册图标组件
   // 数据定义
   data() {
     return {
-        success: false,
-        message: "获取成功",
-        list: [
-            {
-            userId: 0,
-            username: "",
-            nickname: "",
-            userPic: "",
-            role: 1,
-            followTime: ""
-            }
-        ],
-    };
+      loading: false,
+      error: false,
+      fansList: [], // 粉丝列表数组，直接对应接口返回的data字段
+      followingIds: []
+    }
   },
   
   // 组件挂载后调用接口
   mounted() {
-     this.fetchOrders()
+    this.fetchFans();
   },
   
   // 方法定义
   methods: {
-    
-    // 调用第二个接口：获取关注作者列表
-    async fetchOrders() {    
-        try {
-            const response = await request.get('/user/following');
-            this.list = response.data.list;
-            this.total = response.data.total;
-        } catch (error) {
-            console.error('获取关注作者列表失败:', error);
+    // 调用接口：获取粉丝列表
+    async fetchFans() {
+      this.loading = true;
+      this.error = false;
+      
+      try {
+        // 调用真实接口，使用request实例自动携带token
+        const response = await request.get('/user/followers');
+        
+        // 处理接口返回数据
+        if (response.data.success) {
+          this.fansList = response.data.data; // 直接使用一个数组接收data字段
+        } else {
+          this.error = true;
+          console.error('获取粉丝列表失败:', response.data.message);
         }
+      } catch (error) {
+        console.error('获取粉丝列表失败:', error);
+        this.error = true;
+      } finally {
+        this.loading = false;
+      }
     },
     
-    // 取消收藏方法（原有逻辑补充）
-    removeFollow(id) {
-      this.$confirm('确定要取消关注这个作者吗？', '提示', {
+    // 查看用户资料
+    viewUserProfile(Id) {
+      this.$message.info(`查看用户ID ${Id} 的资料`);
+      // 实际项目中可以跳转到用户详情页面
+      this.$router.push(`/user/${Id}`);
+    },
+    
+    // 回关用户
+    followBack(Id) {
+      this.$confirm('确定要关注这个用户吗？', '提示', {
         confirmButtonText: '确定',
         cancelButtonText: '取消',
-        type: 'warning'
+        type: 'info'
       }).then(async () => {
         try {
-          await request.post(`/user/${id}/follow`);
-          this.list = this.list.filter(item => item.userId !== id);
-          this.$message.success('取消关注成功');
+          // 调用关注接口，使用request实例自动携带token
+          await request.post(`/user/follow/${Id}`);
+          
+          // 更新已关注列表
+          this.followingIds.push(Id);
+          this.$message.success('关注成功');
         } catch (err) {
-          this.$message.error('取消关注失败，请稍后重试');
+          this.$message.error('关注失败，请稍后重试');
         }
       }).catch(() => {
         this.$message.info('已取消操作');
       });
-    }
+    },
+    
+    // 判断是否已关注用户
+    isFollowing(Id) {
+      return this.followingIds.includes(Id);
+    },
+    
+    // 由于接口未提供分页参数，这里移除分页相关方法
+    
   }
 };
 </script>
@@ -209,10 +227,11 @@ export default {
   font-size: 12px;
 }
 .time-cell {
-  flex: 1.5;
+  flex: 2;
   display: flex;
   justify-content: center;
-  min-width: 80px;
+  min-width: 150px;
+  gap: 8px;
 }
 
 /* 头像样式 */
@@ -224,17 +243,22 @@ export default {
   border: 1px solid #ebeef5;
 }
 
-/* 取消关注按钮样式调整 */
-.delete-btn {
+/* 按钮样式 */
+.view-btn, .follow-btn, .followed-btn {
   padding: 4px 12px;
   border-radius: 4px;
   font-size: 12px;
   transition: all 0.2s;
 }
-.delete-btn:hover {
+
+.view-btn:hover {
   opacity: 0.8;
   transform: scale(1.05);
-  background: #fef0f0;
+}
+
+.follow-btn:hover {
+  opacity: 0.8;
+  transform: scale(1.05);
 }
 
 /* 空数据状态 */
@@ -289,7 +313,7 @@ export default {
   border-color: transparent;
 }
 
-/* 新增分页样式 */
+/* 分页样式 */
 .pagination {
   padding: 15px;
   display: flex;
@@ -319,6 +343,11 @@ export default {
   .img-cell {
     flex: 1.5;
   }
+  
+  .time-cell {
+    flex: 2;
+    justify-content: flex-end;
+  }
 }
 
 /* 响应式适配 - 小屏幕 */
@@ -331,7 +360,7 @@ export default {
   .table-header, .table-row {
     padding: 0 10px;
     height: auto;
-    min-height: 60px;
+    min-height: 80px;
     flex-wrap: wrap;
   }
   
@@ -349,9 +378,10 @@ export default {
   
   .time-cell {
     order: 2;
-    flex: 1;
+    flex: 100%;
     justify-content: flex-end;
     min-width: 100px;
+    margin-top: 8px;
   }
   
   .pagination {
@@ -392,9 +422,9 @@ export default {
     height: 32px;
   }
   
-  .delete-btn {
+  .view-btn, .follow-btn, .followed-btn {
     font-size: 11px;
-    padding: 3px 8px;
+    padding: 3px 6px;
   }
   
   .empty-state {

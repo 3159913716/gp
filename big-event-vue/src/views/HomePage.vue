@@ -1,5 +1,6 @@
 <script setup>
 import { ref, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { ElTabs, ElTabPane, ElCard, ElAvatar, ElPagination, ElTag } from 'element-plus'
 import { articleListService } from '@/api/article.js'
 
@@ -98,14 +99,17 @@ const handlePageChange = (num, size) => {
   loadArticles()
 }
 
+// 路由实例
+const router = useRouter()
+
 // 跳转到文章详情
 const goToArticleDetail = (articleId) => {
-  window.location.href = `#/article/${articleId}`
+  router.push(`/article/${articleId}`)
 }
 
 // 跳转到分类页面
 const goToCategory = (categoryId) => {
-  window.location.href = `#/category/${categoryId}`
+  router.push(`/category/${categoryId}`)
 }
 
 onMounted(() => {
@@ -349,6 +353,18 @@ onMounted(() => {
   -webkit-line-clamp: 4;
   -webkit-box-orient: vertical;
   overflow: hidden;
+}
+
+/* 确保内容区域有足够的最小高度 */
+.content-wrapper {
+  min-height: 500px;
+}
+
+/* 确保分页显示在底部 */
+.pagination {
+  margin-top: 40px;
+  text-align: center;
+  margin-bottom: 20px;
 }
 
 .read-more {

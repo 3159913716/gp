@@ -7,7 +7,7 @@ import { useRouter } from 'vue-router'
 // 引入Element Plus的消息提示和消息框组件
 import { ElMessage, ElMessageBox } from 'element-plus'
 // 引入Element Plus的图标组件用于菜单和下拉菜单
-import { Management, Promotion, UserFilled, User, Crop, EditPen, SwitchButton, CaretBottom } from '@element-plus/icons-vue'
+import { Setting,Management, Promotion, UserFilled, User, Crop, EditPen, SwitchButton, CaretBottom } from '@element-plus/icons-vue'
 // 引入默认头像图片
 import avatar from '@/assets/default.png'
 // 引入获取用户信息的API服务
@@ -86,8 +86,17 @@ const handleCommand = (command) => {
       router 启用路由模式
        -->
       <el-menu active-text-color="#ffd04b" background-color="#232323" text-color="#fff" router>
+
+        <!-- 用户中心菜单项 -->
+        <el-menu-item index="/admin/ucenter/mine">
+          <el-icon>
+            <UserFilled /><!-- 我的图标 -->
+          </el-icon>
+          <span>我的</span>
+        </el-menu-item>
+
         <!-- 文章分类菜单项 -->
-        <el-menu-item index="/article/category">
+        <el-menu-item index="/admin/article/category">
           <el-icon>
             <Management /> <!-- 管理图标 -->
           </el-icon>
@@ -95,7 +104,7 @@ const handleCommand = (command) => {
         </el-menu-item>
 
         <!-- 文章管理菜单项 -->
-        <el-menu-item index="/article/manage">
+        <el-menu-item index="/admin/article/manage">
           <el-icon>
             <Promotion /> <!-- 推广图标 -->
           </el-icon>
@@ -103,17 +112,17 @@ const handleCommand = (command) => {
         </el-menu-item>
 
         <!-- 个人中心子菜单 -->
-        <el-sub-menu index="user-center">
+        <el-sub-menu index="/admin/user-center">
           <!-- 子菜单标题 -->
           <template #title>
             <el-icon>
-              <UserFilled /> <!-- 用户图标 -->
+              <Setting /> <!-- 设置图标 -->
             </el-icon>
-            <span>个人中心</span>
+            <span>设置</span>
           </template>
 
           <!-- 基本资料菜单项 -->
-          <el-menu-item index="/user/info">
+          <el-menu-item index="/admin/user/info">
             <el-icon>
               <User /> <!-- 用户图标 -->
             </el-icon>
@@ -121,7 +130,7 @@ const handleCommand = (command) => {
           </el-menu-item>
 
           <!-- 更换头像菜单项 -->
-          <el-menu-item index="/user/avatar">
+          <el-menu-item index="/admin/user/avatar">
             <el-icon>
               <Crop /> <!-- 裁剪图标 -->
             </el-icon>
@@ -129,7 +138,7 @@ const handleCommand = (command) => {
           </el-menu-item>
 
           <!-- 重置密码菜单项 -->
-          <el-menu-item index="/user/resetPassword">
+          <el-menu-item index="/admin/user/resetPassword">
             <el-icon>
               <EditPen /> <!-- 编辑图标 -->
             </el-icon>
@@ -144,7 +153,8 @@ const handleCommand = (command) => {
       <!-- 顶部头部区域 -->
       <el-header>
         <!-- 显示当前登录用户昵称 -->
-        <div>用户：<strong>{{ userInfoStore.info.nickname }}</strong></div>
+        <div>用户：<strong>{{userInfoStore?.info?.username || 
+          '未登录用户'  }}</strong></div>
 
         <!-- 用户操作下拉菜单 -->
         <!-- // 下拉菜单位置（右下）

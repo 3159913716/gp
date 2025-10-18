@@ -27,12 +27,23 @@ const userInfoStore = useUserInfoStore() // 使用用户信息存储实例
  * 功能：从API获取当前登录用户的信息并存储到Pinia store中
  */
 const getUserInfo = async () => {
-  // 调用用户信息API服务
-  const result = await userInfoService()
-  // 将获取到的用户信息存入Pinia store
-  userInfoStore.setInfo(result.data)
+  try {
+    console.log('开始获取用户信息')
+    // 调用用户信息API服务
+    const result = await userInfoService()
+    console.log('用户信息API返回结果:', result)
+    // 将获取到的用户信息存入Pinia store
+    userInfoStore.setInfo(result.data)
+    console.log('设置用户信息后store中的数据:', userInfoStore.info)
+  } catch (error) {
+    console.error('获取用户信息失败:', error)
+    console.error('错误详情:', error.response ? error.response.data : error.message)
+    ElMessage.error('获取用户信息失败，请刷新页面重试')
+  }
 }
 // 组件挂载时立即获取用户信息
+console.log('组件挂载，准备获取用户信息')
+console.log('初始userInfoStore状态:', userInfoStore.info)
 getUserInfo()
 
 /*
@@ -143,14 +154,24 @@ const handleCommand = (command) => {
 
     <!-- 右侧主内容区域 -->
     <el-container>
-      <!-- 顶部头部区域 -->
+      <!-- 顶部头部区域 - 包含用户名、导航栏和头像 -->
       <el-header>
-        <!-- 显示当前登录用户昵称 -->
-        <div>用户：<strong>{{ userInfoStore.info.nickname }}</strong></div>
+        <!-- 用户信息区域 - 只显示用户名 -->
+        <div class="username-display">用户：<strong>{{ 
+          userInfoStore?.info?.username || 
+          '未登录用户' 
+        }}</strong></div>
+        
+        <!-- 导航栏区域 -->
+        <div class="nav-wrapper">
+          <router-link to="/" class="nav-item">首页</router-link>
+          <router-link to="/category/1" class="nav-item">技术资讯</router-link>
+          <router-link to="/category/2" class="nav-item">行业动态</router-link>
+          <router-link to="/category/3" class="nav-item">经验分享</router-link>
+          <router-link to="/category/4" class="nav-item">教程学习</router-link>
+        </div>
 
-        <!-- 用户操作下拉菜单 -->
-        <!-- // 下拉菜单位置（右下）
-          // 菜单项选择事件处理 -->
+        <!-- 用户头像和下拉菜单 -->
         <el-dropdown placement="bottom-end" @command="handleCommand">
           <!-- 下拉菜单触发器 -->
           <span class="el-dropdown__box">
@@ -212,31 +233,53 @@ const handleCommand = (command) => {
     }
   }
 
-  /* 头部区域样式 */
-  .el-header {
-    background-color: #fff; // 白色背景
-    display: flex;
-    align-items: center; // 垂直居中
-    justify-content: space-between; // 两端对齐
+  /* 头部区域样式 - 包含用户名、导航栏和头像 */
+   .el-header {
+     background-color: #fff; // 白色背景
+     display: flex;
+     align-items: center; // 垂直居中
+     justify-content: space-between; // 两端对齐
+     padding: 0 20px; // 添加内边距
+     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1); // 添加阴影效果
+     height: 60px; // 设置高度
 
-    /* 下拉菜单容器样式 */
-    .el-dropdown__box {
-      display: flex;
-      align-items: center; // 垂直居中
+     /* 用户名显示样式 */
+     .username-display {
+       font-size: 14px;
+       color: #606266;
+       margin-right: 20px;
+     }
 
-      /* 下拉图标样式 */
-      .el-icon {
-        color: #999; // 灰色
-        margin-left: 10px; // 左侧间距
+     /* 导航栏样式 - 与HomeLayout保持一致，确保水平居中 */
+      .nav-wrapper {
+        display: flex;
+        align-items: center;
+        justify-content: center; // 水平居中对齐
+        gap: 30px;
+        flex: 1; // 让导航栏占据剩余空间
+        flex-wrap: nowrap; // 防止换行
+        overflow: visible; // 允许内容完整显示
       }
 
-      /* 激活和聚焦状态样式 */
-      &:active,
-      &:focus {
-        outline: none; // 去除轮廓
-      }
-    }
-  }
+     /* 下拉菜单容器样式 */
+     .el-dropdown__box {
+       display: flex;
+       align-items: center; // 垂直居中
+       margin-left: 20px;
+
+       /* 下拉图标样式 */
+       .el-icon {
+         color: #999; // 灰色
+         margin-left: 10px; // 左侧间距
+       }
+
+       /* 激活和聚焦状态样式 */
+       &:active,
+       &:focus {
+         outline: none; // 去除轮廓
+       }
+     }
+   }
 
   /* 底部区域样式 */
   .el-footer {
@@ -245,6 +288,48 @@ const handleCommand = (command) => {
     justify-content: center; // 水平居中
     font-size: 14px; // 字体大小
     color: #666; // 字体颜色
+  }
+  
+  /* 导航栏样式 - 与HomeLayout保持一致 */
+  .nav-item {
+    font-size: 16px;
+    color: #333;
+    text-decoration: none;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    padding: 8px 0;
+    white-space: nowrap;
+    position: relative;
+  }
+  
+  .nav-item:hover {
+    color: #1890ff;
+    transform: translateY(-2px);
+  }
+  
+  .nav-item:hover::after {
+    width: 100%;
+  }
+  
+  .nav-item::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 0;
+    height: 2px;
+    background-color: #1890ff;
+    transition: width 0.3s ease;
+  }
+  
+  /* 活动状态样式 */
+  .nav-item.router-link-active {
+    color: #1890ff;
+  }
+  
+  .nav-item.router-link-active::after {
+    width: 100%;
+    background-color: #1890ff;
   }
 }
 </style>
