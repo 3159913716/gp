@@ -43,6 +43,7 @@ import UcenterMineVue from '@/views/ucenter/UcenterMine.vue';
 import UcenterAuthorVue from '@/views/ucenter/UcenterAuthor.vue';
 import UcenterArticle_collectVue from '@/views/ucenter/UcenterArticle_collect.vue';
 import UcenterUser_followVue from '@/views/ucenter/UcenterUser_follow.vue';
+import UcenterFansVue from '@/views/ucenter/UcenterFans.vue';
 
 import UserLayoutVue from '@/views/UserLayout.vue';
 /**
@@ -84,7 +85,7 @@ const router = createRouter({
       path: '/admin',
       component: UserLayoutVue,
       redirect: '/admin/ucenter/mine',
-      meta: { requiresAuth: false },
+      meta: { requiresAuth: true },
       children: [
         // 文章管理子路由
         { path: '/admin/article/category', component: ArticleCategoryVue, meta: { requiresAuth: true } },
@@ -99,10 +100,11 @@ const router = createRouter({
         { path: '/admin/ucenter/mine', 
           component: UcenterMineVue,
           redirect: '/admin/ucenter/collect',
-          meta: { requiresAuth: false }, 
+          meta: { requiresAuth: true }, 
           children:[
-            { path: '/admin/ucenter/collect', component: UcenterArticle_collectVue, meta: { requiresAuth: false } },
+            { path: '/admin/ucenter/collect', component: UcenterArticle_collectVue, meta: { requiresAuth: true } },
             { path: '/admin/ucenter/follow', component: UcenterUser_followVue, meta: { requiresAuth: true } },
+            { path: '/admin/ucenter/fans', component: UcenterFansVue, meta: { requiresAuth: true } },
           ]
           },
         //作者中心

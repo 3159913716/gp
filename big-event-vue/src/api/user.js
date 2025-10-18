@@ -134,3 +134,35 @@ export const userUpdatePasswordService = (pwdModel) => {
   
   return request.patch('/user/updatePwd', params);
 }
+
+/**
+ * 发送邮箱验证码服务
+ * @param {Object} emailData 邮箱数据对象
+ *        - email: 邮箱地址
+ *        - type: 验证码类型(register/forgot)
+ * @returns {Promise} 包含发送结果的Promise
+ * API路径：POST /api/email/send-code
+ * 内容类型：application/json
+ */
+export const sendEmailCodeService = (emailData) => {
+  /**
+   * 使用JSON格式发送数据：
+   * 1. 符合后端API要求
+   * 2. 保持与其他API调用一致
+   */
+  return request.post('/api/email/send-code', emailData);
+}
+
+/**
+ * 验证邮箱验证码服务
+ * @param {Object} verifyData 验证数据对象
+ *        - email: 邮箱地址
+ *        - code: 验证码(6位数字)
+ *        - type: 验证码类型(register/forgot)
+ * @returns {Promise} 包含验证结果的Promise
+ * API路径：POST /api/email/verify
+ * 内容类型：application/json
+ */
+export const verifyEmailCodeService = (verifyData) => {
+  return request.post('/api/email/verify', verifyData);
+}
