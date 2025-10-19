@@ -4,11 +4,12 @@
         "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.zhao.mapper.ArticleLikeMapper">
     
-    <!-- 根据文章ID和用户ID查询点赞记录 -->
+    <!-- 根据文章ID和用户ID查询有效的点赞记录（未删除） -->
     <select id="findByArticleIdAndUserId" resultType="com.zhao.pojo.ArticleLike">
         select * from article_like
         where article_id = #{articleId}
         and user_id = #{userId}
+        and is_deleted = 0
     </select>
     
     <!-- 插入点赞记录 -->

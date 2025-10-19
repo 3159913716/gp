@@ -1,6 +1,7 @@
 package com.zhao.controller;
 
 import com.zhao.pojo.Article;
+import com.zhao.pojo.ArticleDetailVO;
 import com.zhao.pojo.ArticleHomeVO;
 import com.zhao.pojo.PageBean;
 import com.zhao.pojo.Result;
@@ -56,6 +57,23 @@ public class ArticleController {
     public Result<Article> detail(Integer id) {
         Article article = articleService.findById(id);
         return Result.success(article);
+    }
+    
+    /**
+     * 获取文章详情页信息（支持未登录访问）
+     * @param id 文章ID
+     * @return 文章详情页信息，包含点赞收藏状态（自动从token获取用户信息）
+     */
+    @GetMapping("/detail-page")
+    public Result<ArticleDetailVO> detailPage(@RequestParam Integer id) {
+        try {
+            // 调用service层获取文章详情，service内部会处理用户登录状态
+            ArticleDetailVO articleDetailVO = articleService.getArticleDetail(id);
+            return Result.success(articleDetailVO);
+        } catch (Exception e) {
+            log.error("获取文章详情失败: ", e);
+            return Result.error("获取文章详情失败，请稍后重试");
+        }
     }
     
     @PutMapping

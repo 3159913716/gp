@@ -1,6 +1,7 @@
 package com.zhao.service;
 
 import com.zhao.pojo.Article;
+import com.zhao.pojo.ArticleDetailVO;
 import com.zhao.pojo.ArticleHomeVO;
 import com.zhao.pojo.PageBean;
 
@@ -53,4 +54,11 @@ public interface ArticleService {
      * @return 分页后的文章列表
      */
     PageBean<Article> getUserArticles(Integer page, Integer pageSize, String state);
+    
+    /**
+     * 获取文章详情页信息
+     * @param id 文章ID
+     * @return 文章详情页信息，自动从token中获取用户ID（如果存在）
+     */
+    ArticleDetailVO getArticleDetail(Integer id);
 }
