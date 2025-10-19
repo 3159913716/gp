@@ -38,8 +38,8 @@ public class ArticleCollectServiceImpl implements ArticleCollectService {
             throw new RuntimeException("只能收藏已发布的文章");
         }
 
-        // 2. 查询用户是否已收藏
-        ArticleCollect existingCollect = articleCollectMapper.findByArticleIdAndUserId(articleId, userId);
+        // 2. 查询用户是否有任何状态的收藏记录（包括已删除的）
+        ArticleCollect existingCollect = articleCollectMapper.findByArticleIdAndUserIdAnyStatus(articleId, userId);
 
         boolean collected = false;
 

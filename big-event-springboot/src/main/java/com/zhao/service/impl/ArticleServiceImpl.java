@@ -3,15 +3,26 @@ package com.zhao.service.impl;
 import com.github.pagehelper.Page;
 import com.github.pagehelper.PageHelper;
 import com.zhao.mapper.ArticleMapper;
+import com.zhao.mapper.ArticleLikeMapper;
+import com.zhao.mapper.ArticleCollectMapper;
 import com.zhao.pojo.Article;
+import com.zhao.pojo.ArticleDetailVO;
 import com.zhao.pojo.ArticleHomeVO;
+import com.zhao.pojo.ArticleLike;
+import com.zhao.pojo.ArticleCollect;
 import com.zhao.pojo.PageBean;
 import com.zhao.service.ArticleService;
+import com.zhao.utils.JwtUtil;
 import com.zhao.utils.ThreadLocalUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.ValueOperations;
 import org.springframework.stereotype.Service;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
 
+import jakarta.servlet.http.HttpServletRequest;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
@@ -21,9 +32,18 @@ import org.springframework.util.StringUtils;
 @Service
 @Slf4j
 public class ArticleServiceImpl implements ArticleService {
-
+    
     @Autowired
     private ArticleMapper articleMapper;
+    
+    @Autowired
+    private ArticleLikeMapper articleLikeMapper;
+    
+    @Autowired
+    private ArticleCollectMapper articleCollectMapper;
+    
+    @Autowired
+    private StringRedisTemplate stringRedisTemplate;
 
     private static final String PUBLISHED_STATE = "已发布";
 
@@ -193,6 +213,90 @@ public class ArticleServiceImpl implements ArticleService {
         } catch (Exception e) {
             log.error("获取用户文章列表失败: ", e);
             throw new RuntimeException("获取文章列表失败，请稍后重试");
+        }
+    }
+    
+    @Override
+    public ArticleDetailVO getArticleDetail(Integer id) {
+        try {
+            // 1. 查询文章基本信息
+            Article article = articleMapper.findById(id);
+            if (article == null) {
+                throw new RuntimeException("文章不存在");
+            }
+            
+            // 2. 构造文章详情VO对象
+            ArticleDetailVO articleDetailVO = new ArticleDetailVO();
+            articleDetailVO.setId(article.getId());
+            articleDetailVO.setTitle(article.getTitle());
+            articleDetailVO.setContent(article.getContent());
+            articleDetailVO.setCoverImg(article.getCoverImg());
+            articleDetailVO.setState(article.getState());
+            articleDetailVO.setCategoryId(article.getCategoryId());
+            articleDetailVO.setCreateTime(article.getCreateTime());
+            articleDetailVO.setUpdateTime(article.getUpdateTime());
+            articleDetailVO.setLikeCount(article.getLikeCount() != null ? article.getLikeCount() : 0);
+            articleDetailVO.setCollectCount(article.getCollectCount() != null ? article.getCollectCount() : 0);
+            
+            // 3. 获取用户ID - 首先尝试从ThreadLocal获取，如果没有则尝试从请求头解析token
+            Integer userId = null;
+            try {
+                // 优先从ThreadLocal获取（如果拦截器已处理）
+                Map<String, Object> userMap = ThreadLocalUtil.get();
+                if (userMap != null) {
+                    userId = (Integer) userMap.get("id");
+                }
+                
+                // 如果ThreadLocal中没有用户信息，尝试从当前请求头中获取token并解析
+                if (userId == null) {
+                    HttpServletRequest request = ((ServletRequestAttributes) RequestContextHolder.getRequestAttributes()).getRequest();
+                    String token = request.getHeader("Authorization");
+                    if (token != null && !token.trim().isEmpty()) {
+                        // 处理Bearer前缀
+                        if (token.startsWith("Bearer ") || token.startsWith("bearer ")) {
+                            token = token.substring(7).trim();
+                        }
+                        
+                        // 尝试解析token
+                        if (!token.isEmpty()) {
+                            // 验证token是否在redis中存在且未过期
+                            ValueOperations<String, String> operations = stringRedisTemplate.opsForValue();
+                            String redisToken = operations.get(token);
+                            if (redisToken != null) {
+                                Map<String, Object> claims = JwtUtil.parseToken(token);
+                                if (claims != null && claims.containsKey("id")) {
+                                    userId = (Integer) claims.get("id");
+                                }
+                            }
+                        }
+                    }
+                }
+            } catch (Exception e) {
+                // 用户未登录或token无效，userId保持为null
+                log.debug("用户未登录或token无效访问文章详情: {}", e.getMessage());
+            }
+            
+            // 4. 如果获取到了userId，查询用户对该文章的点赞和收藏状态
+            if (userId != null) {
+                // 查询点赞状态
+                ArticleLike articleLike = articleLikeMapper.findByArticleIdAndUserId(id, userId);
+                boolean liked = articleLike != null && articleLike.getIsDeleted() == 0;
+                articleDetailVO.setLiked(liked);
+                
+                // 查询收藏状态
+                ArticleCollect articleCollect = articleCollectMapper.findByArticleIdAndUserId(id, userId);
+                boolean collected = articleCollect != null && articleCollect.getIsDeleted() == 0;
+                articleDetailVO.setCollected(collected);
+            } else {
+                // 未登录用户，点赞收藏状态默认为false
+                articleDetailVO.setLiked(false);
+                articleDetailVO.setCollected(false);
+            }
+            
+            return articleDetailVO;
+        } catch (Exception e) {
+            log.error("获取文章详情失败: ", e);
+            throw new RuntimeException("获取文章详情失败，请稍后重试");
         }
     }
 }

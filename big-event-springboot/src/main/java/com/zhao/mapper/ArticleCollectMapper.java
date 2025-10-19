@@ -11,12 +11,20 @@ import java.util.List;
 public interface ArticleCollectMapper {
 
     /**
-     * 根据文章ID和用户ID查询收藏记录
+     * 根据文章ID和用户ID查询收藏记录（只查询未删除的）
      * @param articleId 文章ID
      * @param userId 用户ID
      * @return 收藏记录
      */
     ArticleCollect findByArticleIdAndUserId(@Param("articleId") Integer articleId, @Param("userId") Integer userId);
+    
+    /**
+     * 根据文章ID和用户ID查询所有状态的收藏记录（包括已删除的）
+     * @param articleId 文章ID
+     * @param userId 用户ID
+     * @return 收藏记录
+     */
+    ArticleCollect findByArticleIdAndUserIdAnyStatus(@Param("articleId") Integer articleId, @Param("userId") Integer userId);
 
     /**
      * 插入收藏记录
