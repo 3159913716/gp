@@ -156,6 +156,15 @@ const handleCommand = (command) => {
         <div>用户：<strong>{{userInfoStore?.info?.username || 
           '未登录用户'  }}</strong></div>
 
+        <!-- 导航栏区域 -->
+        <div class="nav-wrapper">
+          <router-link to="/" class="nav-item">首页</router-link>
+          <router-link to="/category/1" class="nav-item">技术资讯</router-link>
+          <router-link to="/category/2" class="nav-item">行业动态</router-link>
+          <router-link to="/category/3" class="nav-item">经验分享</router-link>
+          <router-link to="/category/4" class="nav-item">教程学习</router-link>
+        </div>
+
         <!-- 用户操作下拉菜单 -->
         <!-- // 下拉菜单位置（右下）
           // 菜单项选择事件处理 -->
@@ -226,11 +235,15 @@ const handleCommand = (command) => {
     display: flex;
     align-items: center; // 垂直居中
     justify-content: space-between; // 两端对齐
+    padding: 0 20px; // 添加内边距
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1); // 添加阴影效果
+    height: 60px; // 设置高度
 
     /* 下拉菜单容器样式 */
     .el-dropdown__box {
       display: flex;
       align-items: center; // 垂直居中
+      margin-left: 20px;
 
       /* 下拉图标样式 */
       .el-icon {
@@ -244,6 +257,58 @@ const handleCommand = (command) => {
         outline: none; // 去除轮廓
       }
     }
+  }
+
+  /* 导航栏样式 */
+  .nav-wrapper {
+    display: flex;
+    align-items: center;
+    justify-content: center; // 水平居中对齐
+    gap: 30px;
+    flex: 1; // 让导航栏占据剩余空间
+    flex-wrap: nowrap; // 防止换行
+    overflow: visible; // 允许内容完整显示
+  }
+
+  .nav-item {
+    font-size: 16px;
+    color: #333;
+    text-decoration: none;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    padding: 8px 0;
+    white-space: nowrap;
+    position: relative;
+  }
+  
+  .nav-item:hover {
+    color: #1890ff;
+    transform: translateY(-2px);
+  }
+  
+  .nav-item:hover::after {
+    width: 100%;
+  }
+  
+  .nav-item::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 0;
+    height: 2px;
+    background-color: #1890ff;
+    transition: width 0.3s ease;
+  }
+  
+  /* 活动状态样式 */
+  .nav-item.router-link-active {
+    color: #1890ff;
+  }
+  
+  .nav-item.router-link-active::after {
+    width: 100%;
+    background-color: #1890ff;
   }
 
   /* 底部区域样式 */
