@@ -166,3 +166,25 @@ export const sendEmailCodeService = (emailData) => {
 export const verifyEmailCodeService = (verifyData) => {
   return request.post('/api/email/verify', verifyData);
 }
+
+/**
+ * 获取作者申请状态
+ * @returns {Promise} 包含申请状态信息的Promise
+ * API路径：GET /user/author-apply/status
+ * 注意：需要有效的认证token
+ */
+export const getAuthorApplyStatusService = () => {
+  // 不需要参数，直接调用GET请求
+  return request.get('/user/author-apply/status');
+}
+
+/**
+ * 取消作者申请
+ * @returns {Promise} 包含取消结果的Promise
+ * API路径：DELETE /user/author-apply
+ * 注意：需要有效的认证token
+ */
+export const cancelAuthorApplyService = () => {
+  // 不需要参数，直接调用DELETE请求
+  return request.delete('/user/author-apply');
+}

@@ -14,16 +14,17 @@ import { createRouter, createWebHistory } from 'vue-router'
 // 导入Element Plus消息组件用于路由守卫中的提示
 import { ElMessage } from 'element-plus'
 
-// 导入Pinia token store用于认证状态管理
+// 导入Pinia store用于状态管理
 import { useTokenStore } from '@/stores/token.js'
+import useUserInfoStore from '@/stores/userInfo.js'
+
+// 导入API服务
+import { userInfoService } from '@/api/user.js'
 
 // 导入视图组件 - 按模块分组
 
 // 登录视图组件
 import LoginVue from '@/views/Login.vue';
-
-// 应用主布局视图组件
-import LayoutVue from '@/views/Layout.vue';
 
 // 前台布局和首页组件
 import HomeLayoutVue from '@/views/HomeLayout.vue';
@@ -40,18 +41,31 @@ import UserResetPasswordVue from '@/views/user/UserResetPassword.vue';
 
 //用户中心相关视图
 import UcenterMineVue from '@/views/ucenter/UcenterMine.vue';
-import UcenterAuthorVue from '@/views/ucenter/UcenterAuthor.vue';
 import UcenterArticle_collectVue from '@/views/ucenter/UcenterArticle_collect.vue';
 import UcenterUser_followVue from '@/views/ucenter/UcenterUser_follow.vue';
 import UcenterFansVue from '@/views/ucenter/UcenterFans.vue';
 
+//成为作者相关视图
+import UcenterAuthorVue from '@/views/author/UcenterAuthor.vue';
+
+//用户布局视图
 import UserLayoutVue from '@/views/UserLayout.vue';
+
+// 作者主布局视图组件
+import LayoutVue from '@/views/Layout.vue';
 /**
  * 创建路由实例
  * 
  * @property {Object} history - 使用HTML5 History模式的路由历史记录管理器
  * @property {Array} routes - 定义所有路由路径与组件的映射关系
  */
+// 定义角色常量
+const ROLE = {
+  ADMIN: 0,    // 管理员角色
+  AUTHOR: 1,   // 作者角色
+  USER: 2      // 普通用户角色
+}
+
 const router = createRouter({
   /**
    * 使用Web History API
@@ -80,23 +94,20 @@ const router = createRouter({
       ]
     },
     
-    // === 主应用路由（需认证）===
+    // === 动态路由占位符（将根据用户角色动态匹配）===
     {
       path: '/admin',
-      component: UserLayoutVue,
+      // 组件将在路由守卫中动态决定
+      component: LayoutVue, // 临时默认组件，会被路由守卫处理
       redirect: '/admin/ucenter/mine',
       meta: { requiresAuth: true },
       children: [
-        // 文章管理子路由
-        { path: '/admin/article/category', component: ArticleCategoryVue, meta: { requiresAuth: true } },
-        { path: '/admin/article/manage', component: ArticleManageVue, meta: { requiresAuth: true } },
-        
-        // 用户管理子路由
+        // 用户管理子路由（所有角色共用）
         { path: '/admin/user/avatar', component: UserAvatarVue, meta: { requiresAuth: true } },
         { path: '/admin/user/info', component: UserInfoVue, meta: { requiresAuth: true } },
         { path: '/admin/user/resetPassword', component: UserResetPasswordVue, meta: { requiresAuth: true } },
 
-        //个人中心
+        //个人中心（所有角色共用）
         { path: '/admin/ucenter/mine', 
           component: UcenterMineVue,
           redirect: '/admin/ucenter/collect',
@@ -106,9 +117,14 @@ const router = createRouter({
             { path: '/admin/ucenter/follow', component: UcenterUser_followVue, meta: { requiresAuth: true } },
             { path: '/admin/ucenter/fans', component: UcenterFansVue, meta: { requiresAuth: true } },
           ]
-          },
-        //作者中心
-        { path: '/admin/ucenter/author', component: UcenterAuthorVue, meta: { requiresAuth: true } },
+        },
+        
+        // 作者相关路由（所有角色可见，但功能会根据角色控制）
+        { path: '/admin/author/author', component: UcenterAuthorVue, meta: { requiresAuth: true } },
+        
+        // 文章管理子路由（主要针对作者角色）
+        { path: '/admin/article/category', component: ArticleCategoryVue, meta: { requiresAuth: true } },
+        { path: '/admin/article/manage', component: ArticleManageVue, meta: { requiresAuth: true } },
       ]
     },
   ],
@@ -122,9 +138,10 @@ const router = createRouter({
  * @param {Route} from - 当前导航正要离开的路由
  * @param {Function} next - 回调函数，控制路由的放行或重定向
  */
-router.beforeEach((to, from, next) => {
-  // 从Pinia store获取认证token
+router.beforeEach(async (to, from, next) => {
+  // 从Pinia store获取认证token和用户信息
   const tokenStore = useTokenStore()
+  const userInfoStore = useUserInfoStore()
   const isAuthenticated = !!tokenStore.token  // !!确保转为布尔值
   
   /**
@@ -149,17 +166,81 @@ router.beforeEach((to, from, next) => {
   // 情况2: 用户已登录但尝试访问登录页
   else if (to.path === '/login' && isAuthenticated) {
     /**
-     * 重定向到管理员首页
-     * 避免已登录用户重复访问登录页，并直接跳转到管理界面
+     * 根据用户角色重定向到不同的首页
+     * 确保获取最新的用户信息
      */
-    next('/admin/article/manage')
+    await ensureUserInfoLoaded(userInfoStore, tokenStore)
+    const userRole = userInfoStore.info.role
+    
+    if (userRole === ROLE.AUTHOR) {
+      next('/admin/article/manage') // 作者跳转到文章管理
+    } else {
+      next('/admin/ucenter/mine') // 普通用户跳转到个人中心
+    }
   }
   
-  // 情况3: 正常访问有权限的页面
+  // 情况3: 需要认证且用户已登录 - 根据角色处理路由
+  else if (requiresAuth && isAuthenticated) {
+    // 确保用户信息已加载
+    await ensureUserInfoLoaded(userInfoStore, tokenStore)
+    
+    // 获取用户角色
+    const userRole = userInfoStore.info.role
+    
+    // 处理/admin路径的特殊逻辑 - 根据角色动态选择布局
+    if (to.path.startsWith('/admin')) {
+      // 获取路由配置中/admin路径的路由记录
+      const adminRoute = router.getRoutes().find(route => route.path === '/admin')
+      
+      if (adminRoute) {
+        // 根据用户角色设置布局组件
+        if (userRole === ROLE.AUTHOR) {
+          adminRoute.components = { default: LayoutVue } // 作者使用LayoutVue
+        } else {
+          adminRoute.components = { default: UserLayoutVue } // 普通用户使用UserLayoutVue
+        }
+      }
+      
+      // 根据角色控制访问权限（可选）
+      if (userRole !== ROLE.AUTHOR && (to.path.startsWith('/admin/article/category') || to.path.startsWith('/admin/article/manage'))) {
+        // 非作者角色尝试访问文章管理相关路由
+        ElMessage.warning('您没有权限访问此页面')
+        next('/admin/ucenter/mine')
+        return
+      }
+    }
+    
+    // 正常放行
+    next()
+  }
+  
+  // 情况4: 正常访问无需认证的页面
   else {
     next()  // 放行路由导航
   }
 });
+
+/**
+ * 确保用户信息已加载
+ * 如果本地存储没有用户信息，则从服务器获取
+ * 
+ * @param {Object} userInfoStore - 用户信息store
+ * @param {Object} tokenStore - token store
+ * @returns {Promise<void>}
+ */
+async function ensureUserInfoLoaded(userInfoStore, tokenStore) {
+  // 如果用户信息为空且有token，则获取用户信息
+  if (tokenStore.token && Object.keys(userInfoStore.info).length === 0) {
+    try {
+      const result = await userInfoService()
+      userInfoStore.setInfo(result.data)
+    } catch (error) {
+      console.error('获取用户信息失败:', error)
+      // 获取失败时清除token并重定向到登录页
+      redirectToLogin()
+    }
+  }
+}
 
 /**
  * 强制跳转到登录页的辅助函数
