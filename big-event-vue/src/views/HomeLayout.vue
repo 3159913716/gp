@@ -4,6 +4,8 @@ import { useRouter, useRoute } from 'vue-router'
 import { useTokenStore } from '@/stores/token.js'
 import useUserInfoStore from '@/stores/userInfo.js'
 import { ElDropdown, ElDropdownMenu, ElDropdownItem } from 'element-plus'
+import { articleCategoryListService } from '@/api/article.js'
+import { ElMessageBox } from 'element-plus'
 
 // 路由和状态管理
 const router = useRouter()
@@ -21,12 +23,14 @@ const isMobile = computed(() => window.innerWidth < 768)
 const isLoggedIn = computed(() => !!tokenStore.token)
 
 // 分类列表（模拟数据）
-const categories = ref([
-  { id: 1, categoryName: '技术资讯' },
-  { id: 2, categoryName: '行业动态' },
-  { id: 3, categoryName: '经验分享' },
-  { id: 4, categoryName: '教程学习' }
-])
+const categories = ref([])
+// 默认分类兜底数据（请求失败时使用）
+const defaultCategories = [
+  { id: 1, categoryName: '技术资讯', categoryAlias: 'tech' },
+  { id: 2, categoryName: '行业动态', categoryAlias: 'industry' },
+  { id: 3, categoryName: '经验分享', categoryAlias: 'experience' },
+  { id: 4, categoryName: '教程学习', categoryAlias: 'tutorial' }
+]
 
 // 生命周期钩子
 onMounted(() => {
@@ -39,6 +43,9 @@ onMounted(() => {
   
   // 初始化进度条效果
   simulatePageLoad()
+  
+  // 加载导航分类（限制4个）
+  loadNavCategories()
 })
 
 onUnmounted(() => {
@@ -140,23 +147,70 @@ const handleLogin = () => {
 }
 
 // 处理登出（添加错误处理）
-const handleLogout = () => {
+const clearUserCaches = () => {
   try {
+    const keys = Object.keys(localStorage)
+    keys.forEach(k => {
+      if (k.startsWith('article:interactions:')) {
+        localStorage.removeItem(k)
+      }
+    })
+  } catch (e) {
+    console.warn('清理本地缓存失败:', e?.message || e)
+  }
+}
+const handleLogout = async () => {
+  try {
+    await ElMessageBox.confirm('确定要退出登录吗？', '提示', {
+      type: 'warning',
+      confirmButtonText: '是',
+      cancelButtonText: '否',
+      showClose: true,
+      closeOnClickModal: false
+    })
     tokenStore.removeToken()
-    userInfoStore.removeUserInfo()
-    router.push('/')
+    // 修正为实际存在的方法名
+    if (typeof userInfoStore.removeInfo === 'function') {
+      userInfoStore.removeInfo()
+    }
+    // 清理与用户相关的前端缓存
+    clearUserCaches()
+    // 路由跳转到首页后，强制刷新页面以完全重渲染
+    await router.replace('/')
+    setTimeout(() => {
+      window.location.reload()
+    }, 0)
   } catch (error) {
-    console.error('登出失败:', error)
-    // 即使出错也清除本地状态并跳转
-    tokenStore.removeToken()
-    userInfoStore.removeUserInfo()
-    router.push('/')
+    // 用户取消或关闭弹窗，留在当前页面
+    if (error !== 'cancel' && error !== 'close') {
+      console.error('登出确认/处理失败:', error)
+    }
   }
 }
 
 // 跳转到个人中心
 const goToProfile = () => {
   router.push('/admin/')
+}
+
+// 加载导航分类（只取前4个）
+const loadNavCategories = async () => {
+  try {
+    const res = await articleCategoryListService()
+    const payload = res?.data ?? res
+    const list = Array.isArray(payload?.items)
+      ? payload.items
+      : (Array.isArray(payload?.list) ? payload.list : (Array.isArray(payload) ? payload : []))
+    categories.value = list.slice(0, 4).map(c => ({
+      id: c.id,
+      categoryName: c.categoryName ?? c.category_name ?? '',
+      categoryAlias: c.categoryAlias ?? c.category_alias ?? ''
+    }))
+  } catch (e) {
+    console.error('加载导航分类失败:', e?.message || e)
+    // 使用默认分类兜底展示，避免导航为空
+    categories.value = defaultCategories.slice(0,4)
+  }
 }
 </script>
 

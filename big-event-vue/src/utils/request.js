@@ -57,7 +57,8 @@ instance.interceptors.request.use(
        * 使用Bearer Token认证方案
        * 格式：Authorization: Bearer <token>
        */
-      config.headers.Authorization = tokenStore.token;
+      const raw = tokenStore.token
+      config.headers.Authorization = raw.startsWith('Bearer ') ? raw : `Bearer ${raw}`;
     } 
     
     // 返回处理后的配置对象
@@ -100,28 +101,32 @@ instance.interceptors.response.use(
    * @returns {Promise} 拒绝的Promise
    */
   err => {
-    /**
-     * 处理401 Unauthorized状态码
-     * 表示认证失败（token过期或无效）
-     */
     if (err.response && err.response.status === 401) {
-      // 获取token store实例
+      const url = (err.config && err.config.url) || ''
+      const method = (err.config && err.config.method || 'GET').toUpperCase()
+      // 扩展公开接口白名单：
+      // 首页文章列表 /article、详情 /article/detail、搜索 /search、评论（GET） /article/:id/comments 与 /article/comment/list
+      // 新增：分类列表 /category（首页导航需要）以及多种可能的公开文章端点
+      const isPublicEndpoint = 
+        /^\/article(?:\?.*)?$/.test(url) ||
+        /^\/article\/detail/.test(url) || 
+        /^\/search/.test(url) || 
+        /^\/article\/\d+\/comments/.test(url) ||
+        (method === 'GET' && /^\/article\/comment(?:\/list)?/.test(url)) ||
+        (method === 'GET' && /^\/category(?:\?.*)?$/.test(url)) ||
+        /^\/article\/list/.test(url) ||
+        /^\/article\/home/.test(url) ||
+        /^\/home\/article/.test(url) ||
+        /^\/article\/published/.test(url) ||
+        /^\/article\/public/.test(url)
       const tokenStore = useTokenStore();
-      
-      // 清除本地存储的token
-      tokenStore.removeToken()
-      
-      /**
-       * 重定向到登录页
-       * 使用命名路由导航确保路由一致性
-       */
-      router.push({ name: 'Login' });
-      
-      // 显示错误提示信息
-      ElMessage.error('认证失败，请重新登录');
+      const hasToken = !!tokenStore.token
+      if (!isPublicEndpoint && hasToken) {
+        tokenStore.removeToken()
+        router.push({ name: 'Login' });
+        ElMessage.error('认证失败，请重新登录');
+      }
     }
-    
-    // 将错误传递给调用方处理
     return Promise.reject(err);
   }
 )

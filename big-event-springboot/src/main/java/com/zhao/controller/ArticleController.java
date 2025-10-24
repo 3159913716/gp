@@ -37,6 +37,16 @@ public class ArticleController {
     }
 
     /**
+     * 公开的文章详情接口（无需登录即可访问）
+     * @param id 文章ID
+     * @return 文章详情信息
+     */
+    @GetMapping("/public-detail/{id}")
+    public Result<Article> publicDetail(@PathVariable Integer id) {
+        Article article = articleService.findById(id);
+        return Result.success(article);
+    }
+    /**
      * @param pageNum 当前页码
      * @param pageSize 每页条数
      * @param categoryId 不是必须的参数使用@RequestParam(required = false)

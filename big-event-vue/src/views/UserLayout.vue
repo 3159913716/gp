@@ -68,7 +68,7 @@ const handleCommand = (command) => {
         // 用户点击确认后的处理
         tokenStore.removeToken() // 清除token
         userInfoStore.removeInfo() // 清除用户信息
-        router.push('/login') // 跳转到登录页
+        router.push('/') // 跳转到首页
         ElMessage.success('退出成功!') // 显示成功消息
       })
       .catch(() => {
@@ -107,7 +107,7 @@ const handleCommand = (command) => {
         </el-menu-item>
          
         <!-- 作者中心菜单项 -->
-        <el-menu-item index="/admin/ucenter/author">
+        <el-menu-item index="/admin/author/author">
           <el-icon>
              <EditPen /><!-- 成为作者图标 -->
           </el-icon>

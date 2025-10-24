@@ -18,15 +18,17 @@ export default defineConfig({
   //配置代理
   server:{
     proxy:{
-      //获取路径中包含了/api的请求
-      '/api':{
-        // 后台服务所在的源
+      // 优先匹配邮箱验证码相关接口，保持后端路径中的 /api 前缀不被重写
+      '/api/email':{
         target:'http://localhost:8080',
-        //修改源
-        changeOrigin:true, 
-        //把路径中的/api替换为''
-        rewrite:(path)=>path.replace(/^\/api/,'') 
-
+        changeOrigin:true
+        // 不设置 rewrite，确保请求为 http://localhost:8080/api/email/**
+      },
+      // 其他接口维持原有重写规则
+      '/api':{
+        target:'http://localhost:8080',
+        changeOrigin:true,
+        rewrite:(path)=>path.replace(/^\/api/,'')
       }
     }
   }

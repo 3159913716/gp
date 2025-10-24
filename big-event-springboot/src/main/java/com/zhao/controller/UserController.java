@@ -52,7 +52,7 @@ public class UserController {
      */
     @PostMapping("/register")
     //校验参数是否符合要求
-    public Result register(@Pattern(regexp = "^\\S{5,16}$") String username, @Pattern(regexp = "^\\S{5,16}$") String password) {
+    public Result register(@Pattern(regexp = "^\\S{5,17}$") String username, @Pattern(regexp = "^\\S{5,17}$") String password) {
 
 
         //查询用户
@@ -73,7 +73,7 @@ public class UserController {
      * 登录接口
      */
     @PostMapping("/login")
-    public Result<String> login(@Pattern(regexp = "^\\S{5,16}$") String username, @Pattern(regexp = "^\\S{5,16}$") String password) {
+    public Result<String> login(@Pattern(regexp = "^\\S{5,17}$") String username, @Pattern(regexp = "^\\S{5,17}$") String password) {
 
         //根据用户名查询用户
         User loginUser = userService.findByUserName(username);

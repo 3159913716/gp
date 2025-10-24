@@ -1,8 +1,13 @@
 <script setup>
-import { ref, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, onMounted, onUnmounted, watch } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
 import { ElTabs, ElTabPane, ElCard, ElAvatar, ElPagination, ElTag } from 'element-plus'
-import { articleListService } from '@/api/article.js'
+import articleHomeApi from '@/api/articlehome.js'
+import defaultCover from '@/assets/default.png'
+import coverImgAsset from '@/assets/cover.jpg'
+import logoImgAsset from '@/assets/logo.png'
+import avatarImgAsset from '@/assets/avatar.jpg'
+import { articleCategoryListService } from '@/api/article.js'
 
 console.log('HomePage.vue 组件加载')
 
@@ -11,14 +16,20 @@ const activeSort = ref('latest')
 
 // 文章列表数据
 const articles = ref([])
+// 当前选择的分类ID（从路由读取）
+const selectedCategoryId = ref(null)
+// 新增：搜索关键词（从路由读取）
+const selectedKeyword = ref('')
 
 // 热门分类数据（模拟）
-const hotCategories = ref([
-  { id: 1, categoryName: '技术资讯', articleCount: 128 },
-  { id: 2, categoryName: '行业动态', articleCount: 96 },
-  { id: 3, categoryName: '经验分享', articleCount: 85 },
-  { id: 4, categoryName: '教程学习', articleCount: 72 }
-])
+const hotCategories = ref([])
+// 默认分类兜底数据（请求失败时使用）
+const defaultCategories = [
+  { id: 1, categoryName: '技术资讯', categoryAlias: 'tech' },
+  { id: 2, categoryName: '行业动态', categoryAlias: 'industry' },
+  { id: 3, categoryName: '经验分享', categoryAlias: 'experience' },
+  { id: 4, categoryName: '教程学习', categoryAlias: 'tutorial' }
+]
 
 // 最新文章数据（模拟）
 const latestArticles = ref([
@@ -34,56 +45,117 @@ const pageNum = ref(1)
 const pageSize = ref(10)
 const total = ref(0)
 
-// 加载文章列表
-const loadArticles = async () => {
-  try {
-    console.log('加载文章列表，排序方式:', activeSort.value)
-    const params = {
-      pageNum: pageNum.value,
-      pageSize: pageSize.value,
-      // 根据排序方式调整参数
-      orderBy: activeSort.value === 'latest' ? 'createTime' : 'likeCount',
-      orderType: activeSort.value === 'latest' ? 'desc' : 'desc'
-    }
-    
-    // 由于是模拟环境，我们使用模拟数据
-    // const response = await articleListService(params)
-    // articles.value = response.data.items
-    // total.value = response.data.total
-    
-    // 模拟数据
-    articles.value = generateMockArticles(params.pageNum, params.pageSize)
-    total.value = 120 // 模拟总条数
-    console.log('文章列表加载完成，共', articles.value.length, '条数据')
-  } catch (error) {
-    console.error('加载文章列表失败:', error)
-  }
-}
-
-// 生成模拟文章数据
-const generateMockArticles = (pageNum, pageSize) => {
+// 生成模拟文章数据（兜底展示）
+const generateMockArticles = (page, size) => {
   const mockArticles = []
-  const startId = (pageNum - 1) * pageSize + 1
-  
-  for (let i = 0; i < pageSize; i++) {
+  const startId = (page - 1) * size + 1
+  for (let i = 0; i < size; i++) {
     const id = startId + i
     mockArticles.push({
       id,
       title: `大事件资讯第${id}期 - 前端开发技术前沿动态`,
-      coverImg: id % 3 === 0 ? '@/assets/cover.jpg' : (id % 3 === 1 ? '@/assets/logo.png' : '@/assets/default.png'),
+      coverImg: id % 3 === 0 ? coverImgAsset : (id % 3 === 1 ? logoImgAsset : defaultCover),
       content: '这是一篇关于前端开发技术的精彩文章，包含了最新的技术动态、实战经验分享和行业趋势分析...',
       categoryId: (id % 4) + 1,
       categoryName: ['技术资讯', '行业动态', '经验分享', '教程学习'][id % 4],
       author: `作者${id % 10 + 1}`,
-      avatar: '@/assets/avatar.jpg',
-      createTime: `2024-01-${20 - id % 15}`,
+      avatar: avatarImgAsset,
+      createTime: `2024-01-${String(20 - (id % 15)).padStart(2, '0')}`,
       readCount: Math.floor(Math.random() * 1000) + 100,
       likeCount: Math.floor(Math.random() * 200) + 10,
       commentCount: Math.floor(Math.random() * 50) + 5
     })
   }
-  
   return mockArticles
+}
+
+// 加载文章列表（接入真实接口，失败兜底为模拟数据）
+const loadArticles = async () => {
+  try {
+    const keyword = selectedKeyword.value?.trim()
+    // 1) 搜索模式：优先根据关键词检索
+    if (keyword) {
+      console.log('搜索模式，关键词:', keyword)
+      const res = await articleHomeApi.searchArticles({ keyword, page: pageNum.value, pageSize: pageSize.value, state: '已发布' })
+      const payload = res?.data ?? res
+      const list = Array.isArray(payload?.list)
+        ? payload.list
+        : (Array.isArray(payload?.items) ? payload.items : (Array.isArray(payload?.item) ? payload.item : []))
+      const mapped = list.map(item => ({
+        id: item.id,
+        title: item.title,
+        content: item.content,
+        categoryName: item.categoryName ?? item.category_name ?? '',
+        categoryId: item.categoryId ?? item.category_id ?? null,
+        coverImg: item.coverImg ?? item.cover_img ?? defaultCover,
+        author: item.author?.username ?? item.authorName ?? (item.create_user ? `作者${item.create_user}` : ''),
+        avatar: item.author?.avatar ?? item.authorAvatar ?? '',
+        createTime: item.createTime ?? item.create_time ?? '',
+        readCount: item.viewCount ?? item.read_count ?? 0,
+        likeCount: item.likeCount ?? item.like_count ?? 0,
+        commentCount: item.commentCount ?? item.comment_count ?? 0
+      }))
+      articles.value = mapped
+      total.value = Number(payload?.total ?? mapped.length)
+      console.log('搜索结果加载完成，共', articles.value.length, '条数据')
+      return
+    }
+
+    // 2) 常规模式：按分类或默认列表
+    console.log('加载文章列表，排序方式:', activeSort.value, '分类ID:', selectedCategoryId.value)
+    const params = {
+      pageNum: pageNum.value,
+      pageSize: pageSize.value,
+      // 分类筛选（若未选择则不传）
+      categoryId: selectedCategoryId.value ?? undefined,
+      // 强制首页最新文章只显示已发布内容（与角色无关）
+      state: '已发布'
+    }
+
+    const res = await articleHomeApi.getHomeArticles(params)
+    // 兼容不同返回结构：{ code, data: { item | items, total } }
+    const payload = res?.data ?? res
+    const list = Array.isArray(payload?.item)
+      ? payload.item
+      : (Array.isArray(payload?.items) ? payload.items : [])
+
+    // 将接口字段映射到现有渲染结构（兼容驼峰/下划线）
+    const mapped = list.map(item => ({
+      id: item.id,
+      title: item.title,
+      content: item.content,
+      categoryName: item.categoryName ?? item.category_name ?? '',
+      categoryId: item.categoryId ?? item.category_id ?? null,
+      coverImg: item.coverImg ?? item.cover_img ?? defaultCover,
+      author: item.author?.username ?? item.authorName ?? (item.create_user ? `作者${item.create_user}` : ''),
+      avatar: item.author?.avatar ?? item.authorAvatar ?? '',
+      createTime: item.createTime ?? item.create_time ?? '',
+      readCount: item.viewCount ?? item.read_count ?? 0,
+      likeCount: item.likeCount ?? item.like_count ?? 0,
+      commentCount: item.commentCount ?? item.comment_count ?? 0
+    }))
+
+    // 本地兜底筛选（后端若未按分类过滤）
+    const filtered = selectedCategoryId.value != null
+      ? mapped.filter(a => a.categoryId === selectedCategoryId.value)
+      : mapped
+
+    articles.value = filtered
+    total.value = Number(payload?.total ?? filtered.length)
+    console.log('文章列表加载完成，共', articles.value.length, '条数据')
+  } catch (error) {
+    console.error('加载文章列表失败，切换到模拟数据:', error?.message || error)
+    // 兜底：使用本地预设的模拟数据展示
+    let mock = generateMockArticles(pageNum.value, pageSize.value)
+    const keyword = selectedKeyword.value?.trim()
+    if (keyword) {
+      mock = mock.filter(a => String(a.title).includes(keyword) || String(a.content).includes(keyword))
+    } else if (selectedCategoryId.value != null) {
+      mock = mock.filter(a => a.categoryId === selectedCategoryId.value)
+    }
+    articles.value = mock
+    total.value = 120
+  }
 }
 
 // 处理排序切换
@@ -92,28 +164,134 @@ const handleSortChange = () => {
   loadArticles()
 }
 
-// 处理分页变化
-const handlePageChange = (num, size) => {
-  pageNum.value = num
+// 分页事件分别处理
+const handleSizeChange = (size) => {
   pageSize.value = size
+  pageNum.value = 1
+  loadArticles()
+}
+
+const handleCurrentChange = (num) => {
+  pageNum.value = num
   loadArticles()
 }
 
 // 路由实例
 const router = useRouter()
+const route = useRoute()
+
+// 同步路由中的分类ID到本地状态
+const syncCategoryFromRoute = () => {
+  const raw = route.params?.id ?? route.query?.categoryId
+  const num = Number(raw)
+  selectedCategoryId.value = Number.isFinite(num) ? num : null
+}
+// 新增：同步路由中的搜索关键词到本地状态
+const syncKeywordFromRoute = () => {
+  selectedKeyword.value = String(route.query?.keyword || '').trim()
+}
+// 监听路由中分类ID变化，保持首页最新文章模块按分类展示
+watch(() => route.params.id, () => {
+  syncCategoryFromRoute()
+  // 分类切换时清除搜索状态
+  selectedKeyword.value = ''
+  activeSort.value = 'latest'
+  pageNum.value = 1
+  loadArticles()
+})
+// 同时监听查询参数中的categoryId（兼容从其他位置跳转）
+watch(() => route.query.categoryId, () => {
+  syncCategoryFromRoute()
+  // 清除搜索状态
+  selectedKeyword.value = ''
+  activeSort.value = 'latest'
+  pageNum.value = 1
+  loadArticles()
+})
+// 新增：监听搜索关键词变化，按关键词检索并展示
+watch(() => route.query.keyword, () => {
+  syncKeywordFromRoute()
+  activeSort.value = 'latest'
+  pageNum.value = 1
+  loadArticles()
+})
 
 // 跳转到文章详情
 const goToArticleDetail = (articleId) => {
   router.push(`/article/${articleId}`)
 }
 
-// 跳转到分类页面
+// 跳转到分类页面（无ID时忽略）
 const goToCategory = (categoryId) => {
+  if (!categoryId && categoryId !== 0) return
   router.push(`/category/${categoryId}`)
 }
 
+// 加载右侧“最新文章”板块（仅标题与创建日期）
+const loadLatestArticles = async () => {
+  try {
+    const res = await articleHomeApi.getHomeArticles({ pageNum: 1, pageSize: 5, state: '已发布' })
+    const payload = res?.data ?? res
+    const list = Array.isArray(payload?.item)
+      ? payload.item
+      : (Array.isArray(payload?.items) ? payload.items : (Array.isArray(payload?.list) ? payload.list : []))
+
+    latestArticles.value = list.map(item => ({
+      id: item.id,
+      title: item.title,
+      createTime: item.createTime ?? item.create_time ?? ''
+    }))
+  } catch (error) {
+    console.error('加载最新文章失败:', error?.message || error)
+    latestArticles.value = []
+  }
+}
+// 加载右侧热门分类（只取前4个）
+const loadHotCategories = async () => {
+  try {
+    const res = await articleCategoryListService()
+    const payload = res?.data ?? res
+    const list = Array.isArray(payload?.items)
+      ? payload.items
+      : (Array.isArray(payload?.list) ? payload.list : (Array.isArray(payload) ? payload : []))
+    hotCategories.value = list.slice(0, 4).map(c => ({
+      id: c.id,
+      categoryName: c.categoryName ?? c.categoryName ?? '',
+      categoryAlias: c.categoryAlias ?? c.category_alias ?? ''
+      // articleCount 可选：若后端提供则展示
+    }))
+  } catch (e) {
+    console.error('加载热门分类失败:', e?.message || e)
+    // 使用默认分类兜底展示
+    hotCategories.value = defaultCategories.slice(0,4)
+  }
+}
+// 返回顶部按钮显示控制
+const showBackToTop = ref(false)
+const handleScroll = () => {
+  const scrollTop = window.pageYOffset || document.documentElement.scrollTop || document.body.scrollTop || 0
+  const windowHeight = window.innerHeight || document.documentElement.clientHeight
+  const docHeight = Math.max(document.documentElement.scrollHeight, document.body.scrollHeight)
+  // 接近页面底部时显示返回顶部按钮（阈值 10px）
+  showBackToTop.value = scrollTop + windowHeight >= docHeight - 10
+}
+const scrollToTop = () => {
+  window.scrollTo({ top: 0, behavior: 'smooth' })
+}
+
 onMounted(() => {
+  syncCategoryFromRoute()
+  syncKeywordFromRoute()
   loadArticles()
+  loadLatestArticles()
+  loadHotCategories()
+  // 监听滚动以控制返回顶部按钮显示
+  window.addEventListener('scroll', handleScroll, { passive: true })
+  handleScroll()
+})
+
+onUnmounted(() => {
+  window.removeEventListener('scroll', handleScroll)
 })
 </script>
 
@@ -134,26 +312,29 @@ onMounted(() => {
             v-for="article in articles" 
             :key="article.id" 
             class="article-card"
+            role="link"
+            tabindex="0"
+            @keyup.enter="goToArticleDetail(article.id)"
             @click="goToArticleDetail(article.id)"
           >
             <div class="article-header">
-              <h3 class="article-title">{{ article.title }}</h3>
+              <h3 class="article-title clickable" @click.stop="goToArticleDetail(article.id)" title="查看详情">{{ article.title }}</h3>
               <ElTag 
                 :effect="'light'" 
                 class="category-tag"
-                @click.stop="goToCategory(article.categoryId)"
+                @click.stop="article.categoryId !== undefined && article.categoryId !== null && goToCategory(article.categoryId)"
               >
                 {{ article.categoryName }}
               </ElTag>
             </div>
             
             <div class="article-content">
-              <div class="article-cover" v-if="article.coverImg">
+              <div class="article-cover" v-if="article.coverImg" @click.stop="goToArticleDetail(article.id)">
                 <img :src="article.coverImg" :alt="article.title" class="cover-img">
               </div>
               <div class="article-summary">
                 {{ article.content }}
-                <span class="read-more">阅读全文</span>
+                <span class="read-more" @click.stop="goToArticleDetail(article.id)">阅读全文</span>
               </div>
             </div>
             
@@ -164,15 +345,15 @@ onMounted(() => {
                 <span class="publish-time">{{ article.createTime }}</span>
               </div>
               <div class="article-stats">
-                <span class="stat-item">
+                <span class="stat-item" aria-label="阅读数">
                   <i class="el-icon-view"></i>
                   {{ article.readCount }}
                 </span>
-                <span class="stat-item">
+                <span class="stat-item" aria-label="点赞数">
                   <i class="el-icon-thumb-up"></i>
                   {{ article.likeCount }}
                 </span>
-                <span class="stat-item">
+                <span class="stat-item" aria-label="评论数">
                   <i class="el-icon-comment"></i>
                   {{ article.commentCount }}
                 </span>
@@ -189,8 +370,8 @@ onMounted(() => {
             :page-sizes="[5, 10, 20, 50]"
             layout="total, sizes, prev, pager, next, jumper"
             :total="total"
-            @size-change="handlePageChange"
-            @current-change="handlePageChange"
+            @size-change="handleSizeChange"
+            @current-change="handleCurrentChange"
           />
         </div>
       </div>
@@ -208,7 +389,7 @@ onMounted(() => {
               @click="goToCategory(category.id)"
             >
               <span class="category-name">{{ category.categoryName }}</span>
-              <span class="article-count">{{ category.articleCount }} 篇</span>
+              <span v-if="category.articleCount !== undefined && category.articleCount !== null" class="article-count">{{ category.articleCount }} 篇</span>
             </div>
           </div>
         </div>
@@ -240,7 +421,16 @@ onMounted(() => {
             </p>
           </div>
         </div>
+      <div class="sidebar-bottom"></div>
       </aside>
+
+      <div 
+        v-show="showBackToTop" 
+        class="back-to-top" 
+        @click="scrollToTop" 
+        aria-label="返回顶部"
+        title="返回顶部"
+      >↑</div>
     </div>
   </div>
 </template>
@@ -315,6 +505,14 @@ onMounted(() => {
   line-height: 1.4;
 }
 
+/* 标题可点击样式 */
+.article-title.clickable {
+  cursor: pointer;
+  color: #1890ff;
+}
+.article-title.clickable:hover {
+  text-decoration: underline;
+}
 .category-tag {
   margin-left: 15px;
 }
@@ -584,5 +782,34 @@ onMounted(() => {
     align-items: flex-start;
     gap: 10px;
   }
+}
+.back-to-top {
+  position: fixed;
+  right: 32px;
+  bottom: 96px;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background: linear-gradient(135deg, #1890ff 0%, #40a9ff 100%);
+  color: #fff;
+  font-size: 20px;
+  cursor: pointer;
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.15);
+  animation: floatIn .35s ease-out;
+  transition: transform .2s ease, box-shadow .2s ease;
+  z-index: 1000;
+}
+
+.back-to-top:hover {
+  transform: translateY(-2px) scale(1.06);
+  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.18);
+}
+
+@keyframes floatIn {
+  from { opacity: 0; transform: translateY(8px) scale(0.96); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
 }
 </style>
