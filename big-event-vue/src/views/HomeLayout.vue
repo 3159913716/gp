@@ -3,15 +3,19 @@ import { ref, onMounted, computed, watch, onUnmounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useTokenStore } from '@/stores/token.js'
 import useUserInfoStore from '@/stores/userInfo.js'
-import { ElDropdown, ElDropdownMenu, ElDropdownItem } from 'element-plus'
+import { ElDropdown, ElDropdownMenu, ElDropdownItem, ElAvatar } from 'element-plus'
 import { articleCategoryListService } from '@/api/article.js'
 import { ElMessageBox } from 'element-plus'
+import avatar from '@/assets/default.png'
+import { userInfoService } from '@/api/user.js'
 
 // 路由和状态管理
 const router = useRouter()
 const route = useRoute()
 const tokenStore = useTokenStore()
 const userInfoStore = useUserInfoStore()
+const isFetchingUserInfo = ref(false)
+const hasLoadedUserInfo = ref(false)
 
 // 响应式数据
 const searchKeyword = ref('')
@@ -46,6 +50,8 @@ onMounted(() => {
   
   // 加载导航分类（限制4个）
   loadNavCategories()
+  // 登录后首屏主动拉取用户信息，避免头像回退默认
+  loadUserInfoIfNeeded()
 })
 
 onUnmounted(() => {
@@ -212,6 +218,35 @@ const loadNavCategories = async () => {
     categories.value = defaultCategories.slice(0,4)
   }
 }
+
+// 首屏及登录后拉取用户信息，确保头像及时可用
+const loadUserInfoIfNeeded = async () => {
+  if (!tokenStore.token) return
+  if (hasLoadedUserInfo.value || isFetchingUserInfo.value) return
+  const info = userInfoStore.info || {}
+  const needFetch = !info || Object.keys(info).length === 0 || !info.userPic || !info.username
+  if (!needFetch) { hasLoadedUserInfo.value = true; return }
+  try {
+    isFetchingUserInfo.value = true
+    const res = await userInfoService()
+    if (res && res.data) {
+      userInfoStore.setInfo(res.data)
+      hasLoadedUserInfo.value = true
+    }
+  } catch (e) {
+    console.warn('首次加载用户信息失败:', e?.message || e)
+  } finally {
+    isFetchingUserInfo.value = false
+  }
+}
+
+// 监听token变化，登录成功后立即拉取用户信息
+watch(() => tokenStore.token, (newToken, oldToken) => {
+  if (newToken && newToken !== oldToken) {
+    hasLoadedUserInfo.value = false
+    loadUserInfoIfNeeded()
+  }
+})
 </script>
 
 <template>
@@ -265,12 +300,7 @@ const loadNavCategories = async () => {
           <template v-if="isLoggedIn">
             <ElDropdown>
               <span class="user-dropdown">
-                <img 
-                  :src="userInfoStore.info?.avatar || '@/assets/avatar.jpg'" 
-                  alt="用户头像" 
-                  class="avatar"
-                  loading="lazy"
-                >
+              <ElAvatar :src="userInfoStore.info?.userPic ? userInfoStore.info.userPic : avatar" />
                 <span class="username">{{ userInfoStore.info?.username || '用户' }}</span>
               </span>
               <template #dropdown>

@@ -41,39 +41,39 @@ const instance = axios.create({
  * 在发送请求前统一处理配置
  */
 instance.interceptors.request.use(
-  /**
-   * 请求成功拦截处理函数
-   * @param {Object} config 请求配置对象
-   * @returns {Object} 修改后的请求配置
-   */
   (config) => {
-    // 从Pinia存储获取token store实例
     const tokenStore = useTokenStore();
-    
-    // 检查是否存在有效token
-    if (tokenStore.token) {
-      /**
-       * 在请求头中添加Authorization字段
-       * 使用Bearer Token认证方案
-       * 格式：Authorization: Bearer <token>
-       */
+    const hasToken = !!tokenStore.token
+
+    const url = config.url || ''
+    const method = (config.method || 'GET').toUpperCase()
+    // 公开端点：列表/搜索/分类等（详情端点不视为公开，以便登录态携带认证）
+    const isPublicEndpoint = 
+      /^\/article(?:\?.*)?$/.test(url) ||
+      /^\/search/.test(url) || 
+      /^\/article\/\d+\/comments/.test(url) ||
+      (method === 'GET' && /^\/article\/comment(?:\/list)?/.test(url)) ||
+      // 分类端点不再视为公开，以便在登录态下附带认证头
+      // (method === 'GET' && /^\/category(?:\?.*)?$/.test(url)) ||
+      /^\/article\/list/.test(url) ||
+      /^\/article\/home/.test(url) ||
+      /^\/home\/article/.test(url) ||
+      /^\/article\/published/.test(url) ||
+      /^\/article\/public/.test(url) ||
+      /^\/public-detail\//.test(url) ||
+      /^\/article\/detail-page/.test(url)
+
+    if (hasToken && !isPublicEndpoint) {
       const raw = tokenStore.token
       config.headers.Authorization = raw.startsWith('Bearer ') ? raw : `Bearer ${raw}`;
-    } 
-    
-    // 返回处理后的配置对象
+    } else {
+      if (config.headers && 'Authorization' in config.headers) {
+        delete config.headers.Authorization
+      }
+    }
     return config;
   },
-  
-  /**
-   * 请求错误拦截处理函数
-   * @param {Error} err 请求错误对象
-   * @returns {Promise} 拒绝的Promise
-   */
-  (err) => {
-    // 直接将错误传递给后续处理
-    return Promise.reject(err)
-  }
+  (err) => Promise.reject(err)
 )
 
 /**
@@ -104,21 +104,21 @@ instance.interceptors.response.use(
     if (err.response && err.response.status === 401) {
       const url = (err.config && err.config.url) || ''
       const method = (err.config && err.config.method || 'GET').toUpperCase()
-      // 扩展公开接口白名单：
-      // 首页文章列表 /article、详情 /article/detail、搜索 /search、评论（GET） /article/:id/comments 与 /article/comment/list
-      // 新增：分类列表 /category（首页导航需要）以及多种可能的公开文章端点
+      // 与请求阶段保持一致：不把详情端点视为公开
       const isPublicEndpoint = 
         /^\/article(?:\?.*)?$/.test(url) ||
-        /^\/article\/detail/.test(url) || 
         /^\/search/.test(url) || 
         /^\/article\/\d+\/comments/.test(url) ||
         (method === 'GET' && /^\/article\/comment(?:\/list)?/.test(url)) ||
-        (method === 'GET' && /^\/category(?:\?.*)?$/.test(url)) ||
+        // 分类端点不再视为公开
+        // (method === 'GET' && /^\/category(?:\?.*)?$/.test(url)) ||
         /^\/article\/list/.test(url) ||
         /^\/article\/home/.test(url) ||
         /^\/home\/article/.test(url) ||
         /^\/article\/published/.test(url) ||
-        /^\/article\/public/.test(url)
+        /^\/article\/public/.test(url) ||
+        /^\/public-detail\//.test(url) ||
+        /^\/article\/detail-page/.test(url)
       const tokenStore = useTokenStore();
       const hasToken = !!tokenStore.token
       if (!isPublicEndpoint && hasToken) {

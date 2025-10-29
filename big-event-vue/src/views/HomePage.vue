@@ -61,12 +61,27 @@ const generateMockArticles = (page, size) => {
       author: `作者${id % 10 + 1}`,
       avatar: avatarImgAsset,
       createTime: `2024-01-${String(20 - (id % 15)).padStart(2, '0')}`,
-      readCount: Math.floor(Math.random() * 1000) + 100,
+      // 移除阅读量相关字段
       likeCount: Math.floor(Math.random() * 200) + 10,
       commentCount: Math.floor(Math.random() * 50) + 5
     })
   }
   return mockArticles
+}
+
+// 根据当前排序选项对文章列表进行排序
+const sortArticles = (list) => {
+  if (!Array.isArray(list)) return []
+  if (activeSort.value === 'hot') {
+    // 热门：按点赞数从大到小
+    return [...list].sort((a, b) => Number(b.likeCount || 0) - Number(a.likeCount || 0))
+  }
+  // 最新：按发布时间从新到旧
+  return [...list].sort((a, b) => {
+    const ta = new Date(a.createTime || 0).getTime()
+    const tb = new Date(b.createTime || 0).getTime()
+    return tb - ta
+  })
 }
 
 // 加载文章列表（接入真实接口，失败兜底为模拟数据）
@@ -91,12 +106,13 @@ const loadArticles = async () => {
         author: item.author?.username ?? item.authorName ?? (item.create_user ? `作者${item.create_user}` : ''),
         avatar: item.author?.avatar ?? item.authorAvatar ?? '',
         createTime: item.createTime ?? item.create_time ?? '',
-        readCount: item.viewCount ?? item.read_count ?? 0,
+        // 移除阅读量：viewCount/read_count
         likeCount: item.likeCount ?? item.like_count ?? 0,
         commentCount: item.commentCount ?? item.comment_count ?? 0
       }))
-      articles.value = mapped
-      total.value = Number(payload?.total ?? mapped.length)
+      const sorted = sortArticles(mapped)
+      articles.value = sorted
+      total.value = Number(payload?.total ?? sorted.length)
       console.log('搜索结果加载完成，共', articles.value.length, '条数据')
       return
     }
@@ -130,7 +146,7 @@ const loadArticles = async () => {
       author: item.author?.username ?? item.authorName ?? (item.create_user ? `作者${item.create_user}` : ''),
       avatar: item.author?.avatar ?? item.authorAvatar ?? '',
       createTime: item.createTime ?? item.create_time ?? '',
-      readCount: item.viewCount ?? item.read_count ?? 0,
+      // 移除阅读量字段
       likeCount: item.likeCount ?? item.like_count ?? 0,
       commentCount: item.commentCount ?? item.comment_count ?? 0
     }))
@@ -140,8 +156,9 @@ const loadArticles = async () => {
       ? mapped.filter(a => a.categoryId === selectedCategoryId.value)
       : mapped
 
-    articles.value = filtered
-    total.value = Number(payload?.total ?? filtered.length)
+    const sorted = sortArticles(filtered)
+    articles.value = sorted
+    total.value = Number(payload?.total ?? sorted.length)
     console.log('文章列表加载完成，共', articles.value.length, '条数据')
   } catch (error) {
     console.error('加载文章列表失败，切换到模拟数据:', error?.message || error)
@@ -153,7 +170,8 @@ const loadArticles = async () => {
     } else if (selectedCategoryId.value != null) {
       mock = mock.filter(a => a.categoryId === selectedCategoryId.value)
     }
-    articles.value = mock
+    const sorted = sortArticles(mock)
+    articles.value = sorted
     total.value = 120
   }
 }
@@ -345,16 +363,12 @@ onUnmounted(() => {
                 <span class="publish-time">{{ article.createTime }}</span>
               </div>
               <div class="article-stats">
-                <span class="stat-item" aria-label="阅读数">
-                  <i class="el-icon-view"></i>
-                  {{ article.readCount }}
-                </span>
                 <span class="stat-item" aria-label="点赞数">
-                  <i class="el-icon-thumb-up"></i>
+                  <i class="el-icon-thumb"></i>
                   {{ article.likeCount }}
                 </span>
                 <span class="stat-item" aria-label="评论数">
-                  <i class="el-icon-comment"></i>
+                  <i class="el-icon-chat-dot-square"></i>
                   {{ article.commentCount }}
                 </span>
               </div>

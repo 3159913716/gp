@@ -21,8 +21,15 @@ export default {
     const tokenStore = useTokenStore();
     const normalized = {
       pageNum: params.pageNum ?? params.page ?? defaultParams.pageNum,
+      // 同步提供常见别名，兼容仅识别 page 的后端
+      page: params.page ?? params.pageNum ?? defaultParams.pageNum,
       pageSize: params.pageSize ?? defaultParams.pageSize,
+      // 常见别名：page_size / limit
+      page_size: params.pageSize ?? defaultParams.pageSize,
+      limit: params.pageSize ?? defaultParams.pageSize,
       categoryId: params.categoryId ?? undefined,
+      // 兼容后端下划线命名
+      category_id: params.categoryId ?? undefined,
       state: params.state ?? (tokenStore?.token ? undefined : '已发布')
     }
     // 优先使用通用 /article 列表
@@ -62,32 +69,59 @@ export default {
     const isGuest = !tokenStore?.token;
     const baseParams = isGuest ? { state: '已发布' } : {};
 
-    // 采用多级回退策略，尽可能命中公开端点（仅 GET）
-    // 1) 常规：GET /article/detail?id=...
+    // 登录用户优先走受保护的详情端点，避免误打列表接口
+    // if (!isGuest) {
+    //   try {
+    //     // 1) 常规详情：/article/detail?id=...
+    //     return await request.get('/article/detail', { params: { id } })
+    //   } catch (e1) {
+    //     try {
+    //       // 2) 其他别名：/article/detail/{id}
+    //       return await request.get(`/article/detail/${id}`)
+    //     } catch (e2) {
+    //       try {
+    //         // 3) REST 风格：/article/{id}
+    //         return await request.get(`/article/${id}`)
+    //       } catch (e3) {
+    //         try {
+    //           // 4) 备用：/home/article/detail?id=...
+    //           return await request.get('/home/article/detail', { params: { id } })
+    //         } catch (e4) {
+    //           // 5) 最后兜底，避免后端对 /article 读取 pageNum 造成NPE：带上分页参数
+    //           return await request.get('/article', { params: { id, pageNum: 1, pageSize: 1 } })
+    //         }
+    //       }
+    //     }
+    //   }
+    // }
+
+    // 未登录用户优先尝试公开端点
     try {
-      return await request.get('/article/detail', { params: { id, ...baseParams } })
-    } catch (e1) {
-      // 2) 通用查询：GET /article?id=...
+      // 1) 显式公开详情：/public-detail/{id}
+      return await request.get(`/public-detail/${id}`)
+    } catch (pub1) {
       try {
-        return await request.get('/article', { params: { id, ...baseParams } })
-      } catch (e2) {
-        // 3) REST：GET /article/{id}
+        // 2) 公开详情别名：/article/detail-page?id=...
+        return await request.get('/article/detail-page', { params: { id } })
+      } catch (pub2) {
         try {
-          return await request.get(`/article/${id}`, { params: baseParams })
-        } catch (e3) {
-          // 4) 公开详情：/article/public/detail 或 /article/published/detail
+          // 3) 常规：/article/detail?id=... （附加状态限制）
+          return await request.get('/article/detail', { params: { id, ...baseParams } })
+        } catch (e1) {
           try {
-            return await request.get('/article/public/detail', { params: { id } })
-          } catch (e4) {
+            // 4) 其他别名：/article/detail/{id}
+            return await request.get(`/article/detail/${id}`, { params: baseParams })
+          } catch (e2) {
             try {
-              return await request.get('/article/published/detail', { params: { id } })
-            } catch (e5) {
-              // 5) 其他别名：/home/article/detail、/article/detail/{id}
+              // 5) REST：/article/{id}
+              return await request.get(`/article/${id}`, { params: baseParams })
+            } catch (e3) {
               try {
-                return await request.get('/home/article/detail', { params: { id } })
-              } catch (e6) {
-                // 注意：仍保持 GET，不再尝试 POST，避免后端 405
-                return await request.get(`/article/detail/${id}`, { params: baseParams })
+                // 6) 备用：/home/article/detail?id=...
+                return await request.get('/home/article/detail', { params: { id, ...baseParams } })
+              } catch (e4) {
+                // 7) 最后兜底，避免后端对 /article 读取 pageNum 造成NPE：带上分页参数
+                return await request.get('/article', { params: { id, pageNum: 1, pageSize: 1, ...baseParams } })
               }
             }
           }
@@ -166,6 +200,11 @@ export default {
     const defaultParams = { page: 1, pageSize: 10 };
     const tokenStore = useTokenStore();
     const requestParams = { ...defaultParams, ...params };
+    // 同步提供别名，兼容列表页与搜索页不同命名
+    requestParams.pageNum = requestParams.page ?? requestParams.pageNum;
+    requestParams.page = requestParams.page ?? requestParams.pageNum;
+    requestParams.page_size = requestParams.pageSize ?? requestParams.page_size;
+    requestParams.limit = requestParams.pageSize ?? requestParams.limit;
     if (!tokenStore?.token && requestParams.state == null) {
       requestParams.state = '已发布'
     }

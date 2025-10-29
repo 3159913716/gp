@@ -59,7 +59,7 @@ const article = ref({
   categoryId: null,
   categoryName: '',
   createTime: '',
-  viewCount: 0,
+  // 移除阅读量字段 viewCount
   likeCount: 0,
   commentCount: 0,
   isLiked: false,
@@ -148,18 +148,11 @@ const toggleFavorite = async () => {
 }
 
 // 生成模拟文章详情（兜底）
-const generateMockDetail = (id) => {
+const generateMockDetail = (id = 1) => {
   return {
     id,
-    title: `大事件资讯第${id}期 - 前端开发技术前沿动态（模拟）`,
-    contentHtml: `<p>这是一篇关于前端开发技术的精彩文章，包含了最新的技术动态、实战经验分享和行业趋势分析。为了保证在接口不可用时仍能正常浏览，我们提供了模拟内容作为兜底展示。</p>
-      <h3>主要内容</h3>
-      <ul>
-        <li>新技术动态与实践案例</li>
-        <li>工程化与性能优化建议</li>
-        <li>行业趋势与生态观察</li>
-      </ul>
-      <p>如果你看到这段文字，说明当前接口暂不可用或网络异常。待接口恢复后，页面将自动展示真实文章内容。</p>`,
+    title: `大事件资讯第${id}期 - 前端技术热点洞察（模拟）`,
+    contentHtml: `<p>这是一段模拟的文章HTML内容，用于占位展示。</p>\n<p>包含富文本格式、图片、列表等演示。</p>\n<p>用于在接口不可用时提供一致的用户体验。</p>\n<hr>\n<h3>内容要点</h3>\n<ul>\n  <li>新技术动态与实践案例</li>\n  <li>工程化与性能优化建议</li>\n  <li>行业趋势与生态观察</li>\n</ul>\n<p>如果你看到这段文字，说明当前接口暂不可用或网络异常。待接口恢复后，页面将自动展示真实文章内容。</p>`,
     contentText: '这是一篇关于前端开发技术的精彩文章（模拟）',
     coverImg: defaultCover,
     authorName: `作者${(id % 10) + 1}`,
@@ -167,7 +160,7 @@ const generateMockDetail = (id) => {
     categoryId: null,
     categoryName: ['技术资讯', '行业动态', '经验分享', '教程学习'][id % 4],
     createTime: `2024-01-${String(20 - (id % 15)).padStart(2, '0')}`,
-    viewCount: Math.floor(Math.random() * 1000) + 300,
+    // 移除阅读量 viewCount
     likeCount: Math.floor(Math.random() * 200) + 30,
     commentCount: Math.floor(Math.random() * 50) + 8
   }
@@ -179,17 +172,15 @@ const normalizeDetail = (data) => {
   return {
     id: data.id ?? articleId.value,
     title: data.title ?? '',
-    // 同时支持contentHtml/content与content_html
     contentHtml: data.contentHtml ?? data.content_html ?? '',
     contentText: data.content ?? data.content_text ?? '',
-    // 覆盖图片：兼容 coverImg 与 cover_img
     coverImg: data.coverImg ?? data.cover_img ?? defaultCover,
     authorName: data.author?.username ?? data.authorName ?? (data.create_user ? `作者${data.create_user}` : ''),
     authorAvatar: data.author?.avatar ?? data.authorAvatar ?? avatarImgAsset,
     categoryId: data.categoryId ?? data.category_id ?? null,
     categoryName: data.categoryName ?? data.category_name ?? '',
     createTime: data.createTime ?? data.create_time ?? data.publishTime ?? '',
-    viewCount: data.viewCount ?? data.readCount ?? data.read_count ?? 0,
+    // 移除阅读量字段：viewCount/readCount/read_count
     likeCount: data.likeCount ?? data.like_count ?? 0,
     commentCount: data.commentCount ?? data.comment_count ?? 0,
     isLiked: data.isLiked ?? data.is_liked ?? false,
@@ -405,12 +396,16 @@ const loadComments = async () => {
     const normalized = normalizeComments(payload)
     comments.value = normalized.list
     commentsTotal.value = normalized.total
+    // 同步顶部统计的评论数与列表总数一致
+    article.value.commentCount = Math.max(0, Number(commentsTotal.value || 0))
   } catch (err) {
     console.error('加载评论失败，切换到模拟数据:', err?.message || err)
     commentsError.value = err?.message || '评论获取失败，已切换为模拟内容'
     const mock = generateMockComments(articleId.value, commentsPage.value, commentsPageSize.value)
     comments.value = mock.list
     commentsTotal.value = mock.total
+    // 同步顶部统计的评论数
+    article.value.commentCount = Math.max(0, Number(commentsTotal.value || 0))
   } finally {
     commentsLoading.value = false
   }
@@ -460,9 +455,8 @@ watch(() => route.params.id, () => {
                 <span class="time">{{ article.createTime }}</span>
               </div>
               <div class="stats">
-                <span>阅读 {{ article.viewCount }}</span>
                 <span>点赞 {{ article.likeCount }}</span>
-                <span>评论 {{ article.commentCount }}</span>
+                <span>评论 {{ commentsTotal }}</span>
               </div>
             </div>
           </div>
