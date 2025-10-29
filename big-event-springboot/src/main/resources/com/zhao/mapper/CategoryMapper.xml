@@ -14,6 +14,33 @@
                  )
     </insert>
 
+
+    <select id="findAllWithArticleCount" resultType="com.zhao.pojo.CategoryVO">
+        SELECT
+            c.id,
+            c.category_name AS categoryName,
+            c.category_alias AS categoryAlias,
+            c.create_user AS createUser,
+            c.create_time AS createTime,
+            c.update_time AS updateTime,
+            COUNT(a.id) AS articleCount
+        FROM
+            category c
+                LEFT JOIN
+            article a ON c.id = a.category_id
+        GROUP BY
+            c.id
+#         ORDER BY
+#             c.create_time DESC
+    </select>
+
+
+
+    <!-- 查询指定用户创建的分类ID列表 -->
+    <select id="findUserCategoryIds" parameterType="java.lang.Integer" resultType="java.lang.Integer">
+        SELECT id FROM category WHERE create_user = #{userId}
+    </select>
+
     <!-- 查询用户创建的文章分类列表 -->
     <select id="list" resultType="com.zhao.pojo.Category">
         select * from category where create_user=#{userId}
