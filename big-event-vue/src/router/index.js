@@ -54,6 +54,8 @@ import UserLayoutVue from '@/views/UserLayout.vue';
 
 // 作者主布局视图组件
 import LayoutVue from '@/views/Layout.vue';
+// 管理员布局
+import AdminLayoutVue from '@/views/admin/AdminLayout.vue';
 /**
  * 创建路由实例
  * 
@@ -107,6 +109,25 @@ const router = createRouter({
         { path: '/admin/user/avatar', component: UserAvatarVue, meta: { requiresAuth: true } },
         { path: '/admin/user/info', component: UserInfoVue, meta: { requiresAuth: true } },
         { path: '/admin/user/resetPassword', component: UserResetPasswordVue, meta: { requiresAuth: true } },
+          // 管理员后台 - 用户管理
+          {
+            path: '/admin/users',
+            name: 'AdminUsers',
+            component: () => import('@/views/admin/Users.vue'),
+            meta: { requiresAuth: true, role: 0 }
+          },
+          {
+            path: '/admin/applications',
+            name: 'AdminApplications',
+            component: () => import('@/views/admin/Applications.vue'),
+            meta: { requiresAuth: true, role: 0 }
+          },
+          {
+            path: '/admin/dashboard',
+            name: 'AdminDashboard',
+            component: () => import('@/views/admin/Dashboard.vue'),
+            meta: { requiresAuth: true, role: 0 }
+          },
 
         //个人中心（所有角色共用）
         { path: '/admin/ucenter/mine', 
@@ -195,7 +216,9 @@ router.beforeEach(async (to, from, next) => {
       
       if (adminRoute) {
         // 根据用户角色设置布局组件
-        if (userRole === ROLE.AUTHOR) {
+        if (userRole === ROLE.ADMIN) {
+          adminRoute.components = { default: AdminLayoutVue } // 管理员使用AdminLayout
+        } else if (userRole === ROLE.AUTHOR) {
           adminRoute.components = { default: LayoutVue } // 作者使用LayoutVue
         } else {
           adminRoute.components = { default: UserLayoutVue } // 普通用户使用UserLayoutVue
@@ -212,6 +235,15 @@ router.beforeEach(async (to, from, next) => {
     }
     
     // 正常放行
+    // 若路由声明了具体 role（如管理员 role=0），则做额外校验
+    if (to.meta && typeof to.meta.role !== 'undefined') {
+      if (userRole !== to.meta.role) {
+        ElMessage.error('无权限访问')
+        next({ name: 'FrontHome' })
+        return
+      }
+    }
+
     next()
   }
   
