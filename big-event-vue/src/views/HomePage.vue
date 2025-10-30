@@ -1,7 +1,7 @@
 <script setup>
 import { ref, onMounted, onUnmounted, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
-import { ElTabs, ElTabPane, ElCard, ElAvatar, ElPagination, ElTag } from 'element-plus'
+import { ElTabs, ElTabPane, ElCard, ElAvatar, ElPagination } from 'element-plus'
 import articleHomeApi from '@/api/articlehome.js'
 import defaultCover from '@/assets/default.png'
 import coverImgAsset from '@/assets/cover.jpg'
@@ -45,6 +45,30 @@ const pageNum = ref(1)
 const pageSize = ref(10)
 const total = ref(0)
 
+// 图片地址规范化：为空、'null'、'undefined' 等视为无效
+const normalizeImageUrl = (url) => {
+  const s = String(url || '').trim()
+  if (!s) return ''
+  const invalids = ['null', 'undefined', 'none', 'n/a', 'false', '0']
+  if (invalids.includes(s.toLowerCase())) return ''
+  return s
+}
+
+// 封面图加载失败时隐藏封面区域，避免占位
+const onCoverError = (article) => {
+  if (article) {
+    article.__hideCover = true
+    article.coverImg = ''
+  }
+}
+
+// 头像加载失败时回退默认头像
+const onAvatarError = (article) => {
+  if (article) {
+    article.avatar = avatarImgAsset
+  }
+}
+
 // 生成模拟文章数据（兜底展示）
 const generateMockArticles = (page, size) => {
   const mockArticles = []
@@ -63,7 +87,8 @@ const generateMockArticles = (page, size) => {
       createTime: `2024-01-${String(20 - (id % 15)).padStart(2, '0')}`,
       // 移除阅读量相关字段
       likeCount: Math.floor(Math.random() * 200) + 10,
-      commentCount: Math.floor(Math.random() * 50) + 5
+      commentCount: Math.floor(Math.random() * 50) + 5,
+      collectCount: Math.floor(Math.random() * 50)
     })
   }
   return mockArticles
@@ -102,9 +127,9 @@ const loadArticles = async () => {
         content: item.content,
         categoryName: item.categoryName ?? item.category_name ?? '',
         categoryId: item.categoryId ?? item.category_id ?? null,
-        coverImg: item.coverImg ?? item.cover_img ?? defaultCover,
-        author: item.author?.username ?? item.authorName ?? (item.create_user ? `作者${item.create_user}` : ''),
-        avatar: item.author?.avatar ?? item.authorAvatar ?? '',
+        coverImg: normalizeImageUrl(item.coverImg ?? item.cover_img),
+        author: item.author?.username ?? item.authorName ?? item.author_name ?? item.author ?? item.username ?? item.createUserName ?? (item.create_user ? `用户${item.create_user}` : '匿名作者'),
+        avatar: normalizeImageUrl(item.author?.avatar ?? item.authorAvatar ?? item.author_pic ?? item.userPic) || avatarImgAsset,
         createTime: item.createTime ?? item.create_time ?? '',
         // 移除阅读量：viewCount/read_count
         likeCount: item.likeCount ?? item.like_count ?? 0,
@@ -114,6 +139,7 @@ const loadArticles = async () => {
       articles.value = sorted
       total.value = Number(payload?.total ?? sorted.length)
       console.log('搜索结果加载完成，共', articles.value.length, '条数据')
+      await loadFullContentsFor(articles.value)
       return
     }
 
@@ -142,13 +168,14 @@ const loadArticles = async () => {
       content: item.content,
       categoryName: item.categoryName ?? item.category_name ?? '',
       categoryId: item.categoryId ?? item.category_id ?? null,
-      coverImg: item.coverImg ?? item.cover_img ?? defaultCover,
-      author: item.author?.username ?? item.authorName ?? (item.create_user ? `作者${item.create_user}` : ''),
-      avatar: item.author?.avatar ?? item.authorAvatar ?? '',
+      coverImg: normalizeImageUrl(item.coverImg ?? item.cover_img),
+      author: item.author?.username ?? item.authorName ?? item.author_name ?? item.author ?? item.username ?? item.createUserName ?? (item.create_user ? `用户${item.create_user}` : '匿名作者'),
+      avatar: normalizeImageUrl(item.author?.avatar ?? item.authorAvatar ?? item.author_pic ?? item.userPic) || avatarImgAsset,
       createTime: item.createTime ?? item.create_time ?? '',
       // 移除阅读量字段
       likeCount: item.likeCount ?? item.like_count ?? 0,
-      commentCount: item.commentCount ?? item.comment_count ?? 0
+      commentCount: item.commentCount ?? item.comment_count ?? 0,
+      collectCount: item.collectCount ?? item.collect_count ?? 0
     }))
 
     // 本地兜底筛选（后端若未按分类过滤）
@@ -160,6 +187,7 @@ const loadArticles = async () => {
     articles.value = sorted
     total.value = Number(payload?.total ?? sorted.length)
     console.log('文章列表加载完成，共', articles.value.length, '条数据')
+    await loadFullContentsFor(articles.value)
   } catch (error) {
     console.error('加载文章列表失败，切换到模拟数据:', error?.message || error)
     // 兜底：使用本地预设的模拟数据展示
@@ -175,6 +203,54 @@ const loadArticles = async () => {
     total.value = 120
   }
 }
+
+// 加载当前列表的全文内容（并发，错误不打断）
+const loadFullContentsFor = async (list) => {
+  if (!Array.isArray(list)) return
+  await Promise.all(list.map(async (a) => {
+    a.__fullLoading = true
+    a.__fullError = ''
+    a.__fullHtml = ''
+    a.__fullText = ''
+    try {
+      const res = await articleHomeApi.getArticleDetail(a.id)
+      const payload = res?.data ?? res
+      const detail = payload?.data ?? payload?.item ?? payload?.article ?? payload
+      a.__fullHtml = detail?.contentHtml ?? detail?.content_html ?? ''
+      a.__fullText = detail?.content ?? detail?.content_text ?? ''
+    } catch (err) {
+      a.__fullError = err?.message || '加载全文失败'
+    } finally {
+      a.__fullLoading = false
+    }
+  }))
+}
+
+// 新增：去除简单HTML标签，压缩空白
+const stripHtml = (s) => {
+  const t = String(s || '')
+    .replace(/<[^>]*>/g, ' ') // 去掉标签
+    .replace(/&nbsp;|&#160;/gi, ' ') // nbsp
+    .replace(/&lt;/gi, '<').replace(/&gt;/gi, '>').replace(/&amp;/gi, '&')
+    .replace(/\s+/g, ' ') // 压缩空白
+    .trim()
+  return t
+}
+
+// 新增：获取用于摘要的原始文本（优先接口全文）
+const getRawContent = (a) => {
+  const src = a?.__fullHtml || a?.__fullText || a?.content || ''
+  return stripHtml(src)
+}
+
+// 新增：生成最多65字的摘要文本
+const getSummary = (a) => {
+  const text = getRawContent(a)
+  return text.length <= 65 ? text : (text.slice(0, 65) + '...')
+}
+
+// 新增：判断是否显示“阅读全文”
+const shouldShowReadMore = (a) => getRawContent(a).length > 65
 
 // 处理排序切换
 const handleSortChange = () => {
@@ -337,40 +413,35 @@ onUnmounted(() => {
           >
             <div class="article-header">
               <h3 class="article-title clickable" @click.stop="goToArticleDetail(article.id)" title="查看详情">{{ article.title }}</h3>
-              <ElTag 
-                :effect="'light'" 
-                class="category-tag"
-                @click.stop="article.categoryId !== undefined && article.categoryId !== null && goToCategory(article.categoryId)"
-              >
-                {{ article.categoryName }}
-              </ElTag>
+              
             </div>
             
             <div class="article-content">
-              <div class="article-cover" v-if="article.coverImg" @click.stop="goToArticleDetail(article.id)">
-                <img :src="article.coverImg" :alt="article.title" class="cover-img">
+              <div class="article-cover" v-if="article.coverImg && !article.__hideCover" @click.stop="goToArticleDetail(article.id)">
+                <img :src="article.coverImg" :alt="article.title" class="cover-img" @error="onCoverError(article)">
               </div>
               <div class="article-summary">
-                {{ article.content }}
-                <span class="read-more" @click.stop="goToArticleDetail(article.id)">阅读全文</span>
-              </div>
+                 {{ getSummary(article) }}
+                 <span v-if="shouldShowReadMore(article)" class="read-more" @click.stop="goToArticleDetail(article.id)">阅读全文</span>
+               </div>
             </div>
             
             <div class="article-meta">
               <div class="author-info">
-                <ElAvatar :src="article.avatar" size="small" class="author-avatar"></ElAvatar>
                 <span class="author-name">{{ article.author }}</span>
                 <span class="publish-time">{{ article.createTime }}</span>
               </div>
-              <div class="article-stats">
-                <span class="stat-item" aria-label="点赞数">
-                  <i class="el-icon-thumb"></i>
-                  {{ article.likeCount }}
-                </span>
-                <span class="stat-item" aria-label="评论数">
-                  <i class="el-icon-chat-dot-square"></i>
-                  {{ article.commentCount }}
-                </span>
+              <div class="list-actions">
+                <ElButton class="action-btn like display-only" type="default">
+                  <span class="icon">👍</span>
+                  
+                  <span class="count">{{ article.likeCount }}</span>
+                </ElButton>
+                <ElButton class="action-btn fav display-only" type="default">
+                  <span class="icon">⭐</span>
+        
+                  <span class="count">{{ article.collectCount }}</span>
+                </ElButton>
               </div>
             </div>
           </ElCard>
@@ -527,10 +598,6 @@ onUnmounted(() => {
 .article-title.clickable:hover {
   text-decoration: underline;
 }
-.category-tag {
-  margin-left: 15px;
-}
-
 .article-content {
   display: flex;
   gap: 20px;
@@ -556,13 +623,37 @@ onUnmounted(() => {
   transform: scale(1.05);
 }
 
-.article-summary {
+.article-full-content {
   flex: 1;
   color: #606266;
   line-height: 1.7;
   font-size: 14px;
   display: -webkit-box;
-  -webkit-line-clamp: 4;
+  -webkit-line-clamp: 6;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.read-more {
+  color: #1890ff;
+  margin-left: 5px;
+  font-weight: 500;
+}
+.full-loading {
+  color: #909399;
+}
+.full-error {
+  color: #f56c6c;
+}
+.full-html :deep(img) {
+  max-width: 100%;
+  height: auto;
+}
+.full-html :deep(p) {
+  margin: 0 0 10px 0;
+}
+.full-text {
+  display: -webkit-box;
+  -webkit-line-clamp: 6;
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
@@ -622,6 +713,27 @@ onUnmounted(() => {
   color: #909399;
 }
 
+/* 新增：列表展示用的点赞/收藏胶囊按钮（纯展示，无交互） */
+.list-actions {
+  display: flex;
+  gap: 12px;
+}
+.list-actions .action-btn {
+  border-radius: 20px;
+  padding: 6px 12px;
+  height: 32px;
+  pointer-events: none; /* 仅展示，不可点击 */
+}
+.list-actions .action-btn .icon {
+  font-size: 16px;
+  margin-right: 6px;
+}
+.list-actions .action-btn .count {
+  margin-left: 6px;
+  color: #909399;
+  font-size: 12px;
+}
+
 /* 分页 */
 .pagination {
   margin-top: 40px;
@@ -632,6 +744,8 @@ onUnmounted(() => {
 .sidebar {
   width: 320px;
   flex-shrink: 0;
+  /* 让右侧卡片顶部与左侧文章列表（排除排序标签）顶部对齐 */
+  margin-top: 56px;
 }
 
 .sidebar-section {
@@ -759,6 +873,8 @@ onUnmounted(() => {
     width: 100%;
     display: flex;
     gap: 20px;
+    /* 竖排布局时取消顶部对齐偏移 */
+    margin-top: 0;
   }
   
   .sidebar-section {
@@ -785,10 +901,6 @@ onUnmounted(() => {
     flex-direction: column;
     align-items: flex-start;
     gap: 10px;
-  }
-  
-  .category-tag {
-    margin-left: 0;
   }
   
   .article-meta {

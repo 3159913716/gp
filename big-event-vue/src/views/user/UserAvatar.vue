@@ -82,7 +82,8 @@ const updateAvatar = async () => {
 </script>
 
 <template>
-  <!-- 
+<div class="container">
+   <!-- 
     Element Plus卡片组件：
     class="page-container" - 自定义样式类
   -->
@@ -156,6 +157,7 @@ const updateAvatar = async () => {
       </el-col>
     </el-row>
   </el-card>
+</div>
 </template>
 
 <!-- 
@@ -163,6 +165,18 @@ const updateAvatar = async () => {
   使用深度选择器(:deep())修改Element组件内部样式
 -->
 <style lang="scss" scoped>
+/* 容器样式 */
+.container {
+  display: flex;
+  flex-direction: column; /* 子元素垂直排列 */
+  width: 100%;
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 20px;
+  box-sizing: border-box;
+  font-size: 16px;
+}
+
 /* 头像上传组件样式 */
 .avatar-uploader {
 

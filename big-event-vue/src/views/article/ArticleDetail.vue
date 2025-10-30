@@ -47,7 +47,31 @@ const saveInteraction = () => {
 const loading = ref(false)
 const errorMsg = ref('')
 
-// 文章详情数据
+// 图片地址规范化：空/无效关键字视为无效
+const normalizeImageUrl = (url) => {
+  const s = String(url || '').trim()
+  if (!s) return ''
+  const invalids = ['null', 'undefined', 'none', 'n/a', 'false', '0']
+  if (invalids.includes(s.toLowerCase())) return ''
+  return s
+}
+
+// 新增：基础 HTML 清洗工具（移除标签与常见实体，压缩空白）
+const stripHtml = (s) => {
+  const t = String(s || '')
+    .replace(/<[^>]*>/g, ' ') // 去掉标签
+    .replace(/&nbsp;|&#160;/gi, ' ') // nbsp
+    .replace(/&lt;/gi, '<').replace(/&gt;/gi, '>').replace(/&amp;/gi, '&')
+    .replace(/\s+/g, ' ') // 压缩空白
+    .trim()
+  return t
+}
+
+// 新增：详情页展示用的纯文本内容
+const contentPlainText = computed(() => {
+  const raw = article.value?.contentHtml || article.value?.contentText || ''
+  return stripHtml(raw)
+})
 const article = ref({
   id: null,
   title: '',
@@ -67,18 +91,37 @@ const article = ref({
   isCollected: false
 })
 
+// 封面图加载失败：隐藏封面区域避免空占位
+const onCoverError = () => {
+  if (article.value) {
+    article.value.__hideCover = true
+    article.value.coverImg = ''
+  }
+}
+// 作者头像加载失败：回退默认头像
+const onAuthorAvatarError = () => {
+  if (article.value) {
+    article.value.authorAvatar = avatarImgAsset
+  }
+}
+// 评论头像加载失败：回退默认头像
+const onCommentAvatarError = (c) => {
+  if (c?.user) {
+    c.user.avatar = avatarImgAsset
+  }
+}
+
 // 点赞与收藏（接入后端接口）
 const liked = ref(false)
-const favorited = ref(false)
+const favorited = ref(route.query.isCollected === 'true') // 从URL参数设置初始收藏状态
 const localLikeCount = ref(0)
-const localCollectCount = ref(0)
+const localCollectCount = ref(Number(route.query.collectCount) || 0) // 从URL参数设置初始收藏数
 const likeLoading = ref(false)
 const favoriteLoading = ref(false)
 const toggleLike = async () => {
   if (likeLoading.value) return
   const tokenStore = useTokenStore()
   if (!tokenStore?.token) {
-    ElMessage.warning('请先登录后再点赞')
     const redirect = encodeURIComponent(location.pathname + location.search)
     router.push({ name: 'Login', query: { redirect } })
     return
@@ -114,34 +157,58 @@ const toggleFavorite = async () => {
   if (favoriteLoading.value) return
   const tokenStore = useTokenStore()
   if (!tokenStore?.token) {
-    ElMessage.warning('请先登录后再收藏')
     const redirect = encodeURIComponent(location.pathname + location.search)
     router.push({ name: 'Login', query: { redirect } })
     return
   }
+  
+  // 记录操作前的状态
+  const prevFavorited = favorited.value
+  const prevCount = localCollectCount.value
+  const isFromCollectList = route.query.fromCollect === 'true'
+  
+  // 先直接切换收藏状态，提供即时反馈
+  favorited.value = !favorited.value
+  
+  // 根据收藏状态变化更新收藏数
+  if (favorited.value) {
+    // 收藏操作：收藏数+1
+    localCollectCount.value = prevCount + 1
+  } else {
+    // 取消收藏：收藏数-1（但不小于0）
+    localCollectCount.value = Math.max(0, prevCount - 1)
+  }
+  
+  // 确保article对象中的收藏数也同步更新
+  article.value.collectCount = localCollectCount.value
+  
+  // 保存状态到本地存储
+  saveInteraction()
+  
   favoriteLoading.value = true
   try {
+    // 调用后端接口完成收藏/取消收藏操作
     const resp = await sendCommentApi.toggleArticleCollect(articleId.value)
-    const payload = resp?.data ?? resp
-    const data = payload?.data ?? payload
-    const prevFavorited = favorited.value
-    const isCollectedRaw = data?.isCollected ?? data?.is_collected ?? data?.collected
-    const nextFavorited = (isCollectedRaw !== undefined) ? Boolean(isCollectedRaw) : !prevFavorited
-    const countMaybe = data?.collectCount ?? data?.collect_count ?? data?.count
-    const prevCount = localCollectCount.value
-    const nextCount = (countMaybe !== undefined) ? Number(countMaybe) : (prevCount + (nextFavorited ? 1 : -1))
-    favorited.value = nextFavorited
-    localCollectCount.value = Math.max(0, Number.isFinite(nextCount) ? nextCount : prevCount)
-    // 同步顶部统计（非负）
-    article.value.collectCount = localCollectCount.value
-    saveInteraction()
+    
+    // 清除URL参数中的收藏状态，避免状态混乱
+    const newQuery = { ...route.query }
+    delete newQuery.isCollected
+    delete newQuery.collectCount
+    router.replace({ query: newQuery })
+    
+    // 如果从收藏列表进入，设置刷新标志以便返回收藏列表时刷新
+    if (isFromCollectList) {
+      localStorage.setItem('needRefreshCollectList', 'true')
+    }
+    
   } catch (err) {
-    // 失败时乐观更新，保证操作反馈
-    favorited.value = !favorited.value
-    localCollectCount.value = Math.max(0, localCollectCount.value + (favorited.value ? 1 : -1))
-    article.value.collectCount = localCollectCount.value
+    // 接口调用失败，恢复到操作前的状态
+    console.error('文章收藏接口调用失败：', err?.message || err)
+    favorited.value = prevFavorited
+    localCollectCount.value = prevCount
+    article.value.collectCount = prevCount
     saveInteraction()
-    console.warn('文章收藏接口调用异常：', err?.message || err)
+    ElMessage.error('操作失败，请稍后重试')
   } finally {
     favoriteLoading.value = false
   }
@@ -174,9 +241,9 @@ const normalizeDetail = (data) => {
     title: data.title ?? '',
     contentHtml: data.contentHtml ?? data.content_html ?? '',
     contentText: data.content ?? data.content_text ?? '',
-    coverImg: data.coverImg ?? data.cover_img ?? defaultCover,
-    authorName: data.author?.username ?? data.authorName ?? (data.create_user ? `作者${data.create_user}` : ''),
-    authorAvatar: data.author?.avatar ?? data.authorAvatar ?? avatarImgAsset,
+    coverImg: normalizeImageUrl(data.coverImg ?? data.cover_img),
+    authorName: data.author?.username ?? data.authorName ?? data.author_name ?? data.author ?? data.username ?? data.createUserName ?? (data.create_user ? `用户${data.create_user}` : '匿名作者'),
+    authorAvatar: normalizeImageUrl(data.author?.avatar ?? data.authorAvatar ?? data.author_pic ?? data.userPic) || avatarImgAsset,
     categoryId: data.categoryId ?? data.category_id ?? null,
     categoryName: data.categoryName ?? data.category_name ?? '',
     createTime: data.createTime ?? data.create_time ?? data.publishTime ?? '',
@@ -189,23 +256,27 @@ const normalizeDetail = (data) => {
   }
 }
 
+// 新增：从列表项解析作者信息（与首页保持一致）
+const resolveAuthorFromItem = (item) => {
+  const name = item?.author?.username ?? item?.authorName ?? item?.author_name ?? item?.author ?? item?.username ?? item?.createUserName ?? (item?.create_user ? `用户${item.create_user}` : '匿名作者')
+  const avatar = normalizeImageUrl(item?.author?.avatar ?? item?.authorAvatar ?? item?.author_pic ?? item?.userPic) || avatarImgAsset
+  return { name, avatar }
+}
+
 // 加载文章详情
 const loadDetail = async () => {
   loading.value = true
   errorMsg.value = ''
   try {
-    const res = await articleHomeApi.getArticleDetail(articleId.value)
-    let data = res?.data || res?.item || res?.article || res
+    // 使用公共文章详情接口
+    const res = await request.get(`/article/public-detail/${articleId.value}`)
+    let data = res?.data || res
 
-    // 若主接口未返回有效数据，尝试备用接口：GET /article?id={id}
+    // 若主接口未返回有效数据，尝试备用接口
     if (!data || (!data.id && !data.title && !data.content && !data.contentHtml)) {
       try {
-        const tokenStore = useTokenStore()
-        const alt = await request.get('/article', { params: { id: articleId.value, ...(tokenStore?.token ? {} : { state: '已发布' }) } })
-        const payload = alt?.data ?? alt
-        // 兼容多种字段：item/items/list 或直接对象
-        data = payload?.item || (Array.isArray(payload?.items) ? payload.items[0] : null) ||
-               (Array.isArray(payload?.list) ? payload.list[0] : null) || payload
+        const alt = await articleHomeApi.getArticleDetail(articleId.value)
+        data = alt?.data || alt?.item || alt?.article || alt
       } catch (e) {
         // 备用接口失败不抛出，后续走兜底
         console.warn('备用接口加载失败:', e?.message || e)
@@ -221,11 +292,20 @@ const loadDetail = async () => {
     article.value.likeCount = Math.max(0, Number(article.value.likeCount || 0))
     article.value.collectCount = Math.max(0, Number(article.value.collectCount || 0))
 
+    // 优先使用URL参数中的收藏状态（如果有）
+    const urlIsCollected = route.query.isCollected === 'true'
+    const urlCollectCount = Number(route.query.collectCount)
+    
     liked.value = (apiIsLikedRaw !== undefined) ? Boolean(apiIsLikedRaw) : Boolean(persisted.liked ?? article.value.isLiked)
-    favorited.value = (apiIsCollectedRaw !== undefined) ? Boolean(apiIsCollectedRaw) : Boolean(persisted.favorited ?? article.value.isCollected)
+    // 如果从URL参数知道是收藏状态，则直接设置为已收藏
+    favorited.value = urlIsCollected ? true : 
+                     (apiIsCollectedRaw !== undefined) ? Boolean(apiIsCollectedRaw) : 
+                     Boolean(persisted.favorited ?? article.value.isCollected)
 
     localLikeCount.value = Math.max(0, Number((persisted.likeCount ?? article.value.likeCount) || 0))
-    localCollectCount.value = Math.max(0, Number((persisted.collectCount ?? article.value.collectCount) || 0))
+    // 如果URL参数中有收藏数，则优先使用
+    localCollectCount.value = !isNaN(urlCollectCount) && urlCollectCount > 0 ? urlCollectCount : 
+                            Math.max(0, Number((persisted.collectCount ?? article.value.collectCount) || 0))
 
     // 同步顶部统计为当前展示值
     article.value.likeCount = localLikeCount.value
@@ -241,6 +321,45 @@ const loadDetail = async () => {
       } catch (e) {
         // 分类查询失败不影响正文展示
         console.warn('分类名称补充失败:', e?.message || e)
+      }
+    }
+
+    // 新增：若详情页作者缺失或为匿名，尝试从列表接口补齐（与首页一致）
+    if (!article.value.authorName || article.value.authorName === '匿名作者') {
+      try {
+        const listRes = await articleHomeApi.getHomeArticles({ pageNum: 1, pageSize: 50, state: '已发布' })
+        const payload = listRes?.data ?? listRes
+        const list = Array.isArray(payload?.item) ? payload.item : (Array.isArray(payload?.items) ? payload.items : [])
+        const found = Array.isArray(list) ? list.find(it => Number(it?.id) === Number(articleId.value)) : null
+        if (found) {
+          const { name, avatar } = resolveAuthorFromItem(found)
+          if (name) article.value.authorName = name
+          if (avatar) article.value.authorAvatar = avatar
+        }
+      } catch (e) {
+        console.warn('从列表接口补齐作者失败:', e?.message || e)
+      }
+    }
+
+    // 进一步兜底：根据标题搜索一次
+    if (!article.value.authorName || article.value.authorName === '匿名作者') {
+      const kw = String(article.value.title || '').trim()
+      if (kw) {
+        try {
+          const sRes = await articleHomeApi.searchArticles({ keyword: kw, page: 1, pageSize: 10, state: '已发布' })
+          const payload = sRes?.data ?? sRes
+          const list = Array.isArray(payload?.list)
+            ? payload.list
+            : (Array.isArray(payload?.items) ? payload.items : (Array.isArray(payload?.item) ? payload.item : []))
+          const found = Array.isArray(list) ? list.find(it => Number(it?.id) === Number(articleId.value)) || list[0] : null
+          if (found) {
+            const { name, avatar } = resolveAuthorFromItem(found)
+            if (name) article.value.authorName = name
+            if (avatar) article.value.authorAvatar = avatar
+          }
+        } catch (e) {
+          console.warn('搜索接口补齐作者失败:', e?.message || e)
+        }
       }
     }
   } catch (err) {
@@ -370,9 +489,9 @@ const normalizeComments = (data) => {
       content: c.content ?? '',
       createTime: c.createTime ?? c.create_time ?? '',
       user: {
-        id: c.user?.id ?? c.user_id ?? 0,
-        username: c.user?.username ?? '游客',
-        avatar: c.user?.avatar ?? avatarImgAsset
+        id: c.user?.id ?? c.user_id ?? c.userId ?? c.uid ?? c.userInfo?.id ?? 0,
+        username: c.user?.username ?? c.user?.nickname ?? c.userInfo?.nickname ?? c.userInfo?.username ?? c.nickname ?? c.userName ?? c.user_name ?? '游客',
+        avatar: normalizeImageUrl(c.user?.avatar ?? c.user?.userPic ?? c.userInfo?.userPic ?? c.userInfo?.avatar ?? c.userPic ?? c.user_pic ?? c.avatarUrl ?? c.avatar) || avatarImgAsset
       },
       likeCount: c.likeCount ?? c.comment_like_count ?? 0,
       isLiked: c.isLiked ?? false,
@@ -432,6 +551,19 @@ onMounted(() => {
   loadComments()
 })
 
+// 返回上一页或收藏列表
+const handleBack = () => {
+  // 检查是否从收藏列表进入
+  const fromCollect = route.query.fromCollect === 'true'
+  if (fromCollect) {
+    // 直接返回到收藏列表页面
+    router.push('/admin/ucenter/collect')
+  } else {
+    // 否则使用浏览器的返回功能
+    window.history.back()
+  }
+}
+
 // 路由参数变化时，重新加载详情
 watch(() => route.params.id, () => {
   commentsPage.value = 1
@@ -446,10 +578,14 @@ watch(() => route.params.id, () => {
       <ElCard class="detail-card">
         <template #header>
           <div class="detail-header">
-            <h2 class="title">{{ article.title }}</h2>
+            <div class="header-top">
+              <button class="back-btn" @click="handleBack">
+                ← 返回
+              </button>
+              <h2 class="title">{{ article.title }}</h2>
+            </div>
             <div class="meta">
               <div class="author">
-                <ElAvatar :src="article.authorAvatar" size="small" class="author-avatar" />
                 <span class="author-name">{{ article.authorName }}</span>
                 <ElTag class="category-tag" size="small" :effect="'light'" @click="goToCategory">{{ article.categoryName }}</ElTag>
                 <span class="time">{{ article.createTime }}</span>
@@ -464,13 +600,12 @@ watch(() => route.params.id, () => {
 
         <div v-if="loading" class="loading">正在加载文章内容...</div>
         <div v-else>
-          <div v-if="article.coverImg" class="cover">
-            <img :src="article.coverImg" :alt="article.title" />
+          <div v-if="article.coverImg && !article.__hideCover" class="cover">
+            <img :src="article.coverImg" :alt="article.title" @error="onCoverError" />
           </div>
 
-          <!-- 优先渲染HTML内容，其次为纯文本 -->
-          <div v-if="article.contentHtml" class="content" v-html="article.contentHtml"></div>
-          <div v-else class="content">{{ article.contentText }}</div>
+          <!-- 内容统一做基础 HTML 清洗后以纯文本展示 -->
+          <div class="content">{{ contentPlainText }}</div>
         </div>
 
         <!-- 操作按钮：点赞 / 收藏（前端本地状态） -->
@@ -498,10 +633,11 @@ watch(() => route.params.id, () => {
             <ElInput
               v-model="newComment"
               type="textarea"
-              :rows="4"
+              :autosize="{ minRows: 3, maxRows: 10 }"
               :maxlength="MAX_COMMENT_LEN"
               show-word-limit
               placeholder="请输入评论内容（最多200字）"
+              class="comment-textarea"
             />
             <div class="editor-actions">
               <ElButton type="primary" :disabled="!canSubmitComment || submittingComment" @click="submitComment">发布评论</ElButton>
@@ -512,7 +648,7 @@ watch(() => route.params.id, () => {
           <template v-else>
             <template v-if="comments.length">
               <div v-for="c in comments" :key="c.id" class="comment-item">
-                <ElAvatar :src="c.user.avatar" size="small" />
+                <ElAvatar :src="c.user.avatar" size="small" @error="onCommentAvatarError(c)" />
                 <div class="c-body">
                   <div class="c-meta">
                     <span class="c-user">{{ c.user.username }}</span>
@@ -568,11 +704,44 @@ watch(() => route.params.id, () => {
   gap: 8px;
 }
 
+.header-top {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.back-btn {
+  padding: 6px 12px;
+  border: 1px solid #dcdfe6;
+  border-radius: 4px;
+  background-color: #fff;
+  color: #606266;
+  cursor: pointer;
+  font-size: 14px;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.back-btn:hover {
+  color: #409EFF;
+  border-color: #c6e2ff;
+  background-color: #ecf5ff;
+}
+
+title {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 600;
+  color: #303133;
+}
+
 .title {
   margin: 0;
   font-size: 22px;
   font-weight: 600;
   color: #303133;
+  flex: 1;
+  word-break: break-word;
 }
 
 .meta {
@@ -645,39 +814,105 @@ watch(() => route.params.id, () => {
   font-size: 16px;
   color: #303133;
 }
+/* 统一评论项样式 */
 .comment-item {
   display: flex;
-  gap: 10px;
-  padding: 10px 0;
-  border-bottom: 1px dashed #f0f2f5;
+  gap: 12px;
+  padding: 12px 10px;
+  border-bottom: 1px solid #ebeef5;
 }
-.c-body { flex: 1; }
+.comment-item:last-child {
+  border-bottom: none;
+}
+/* 头像统一尺寸与形状 */
+.comment-item :deep(.el-avatar) {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 2px solid #fff;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.06);
+}
+/* 主体与元信息 */
+.c-body {
+  flex: 1;
+}
 .c-meta {
   display: flex;
-  gap: 10px;
-  color: #909399;
-  font-size: 13px;
+  align-items: center;
+  gap: 8px;
 }
-.c-user { color: #606266; font-weight: 500; }
-.c-time { }
-.c-like { }
-.c-like-btn {
-  padding: 0 8px;
-  height: 24px;
-  border-radius: 14px;
-}
-.c-like-btn .icon { margin-right: 4px; }
-.c-like-btn .count { color: #606266; font-size: 12px; }
-.c-content {
-  margin-top: 4px;
-  color: #303133;
+.c-user {
   font-size: 14px;
-  line-height: 1.6;
+  font-weight: 600;
+  color: #303133;
 }
-.comments-pagination {
+.c-user:hover {
+  color: #409eff;
+}
+.c-time {
+  font-size: 12px;
+  color: #909399;
+}
+/* 操作区右对齐 */
+.c-like {
+  margin-left: auto;
+}
+.c-like-btn {
+  border-radius: 16px;
+  padding: 2px 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.c-like-btn .icon {
+  font-size: 14px;
+}
+.c-like-btn .count {
+  font-size: 12px;
+  color: #909399;
+}
+/* 内容排版统一 */
+.c-content {
+  margin-top: 6px;
+  font-size: 14px;
+  color: #606266;
+  line-height: 1.7;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+/* 响应式：在窄屏下减小间距与头像尺寸，并让元信息换行 */
+@media (max-width: 768px) {
+  .comment-item {
+    gap: 10px;
+    padding: 10px 8px;
+  }
+  .comment-item :deep(.el-avatar) {
+    width: 32px;
+    height: 32px;
+  }
+  .c-meta {
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .c-user {
+    font-size: 13px;
+  }
+  .c-time {
+    font-size: 12px;
+  }
+}
+/* 评论编辑区：禁用拖拽放大并提供足够默认输入空间 */
+.comment-editor :deep(.el-textarea__inner) {
+  resize: none;
+  line-height: 1.6;
+  border-radius: 6px;
+}
+.comment-editor .editor-actions {
   margin-top: 8px;
-  display: flex;
-  justify-content: flex-end;
+}
+/* 修复误插入的模板内容，保留样式作用域 */
+.editor-actions {
+  margin-top: 8px;
 }
 .comments-loading {
   padding: 16px 0;

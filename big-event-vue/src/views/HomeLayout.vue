@@ -149,7 +149,7 @@ const handleCategoryClick = (categoryId) => {
 
 // 处理登录
 const handleLogin = () => {
-  router.push('/admin/ucenter/mine')
+  router.push({ name: 'Login', query: { redirect: '/admin/ucenter/mine' } })
 }
 
 // 处理登出（添加错误处理）
@@ -301,7 +301,7 @@ watch(() => tokenStore.token, (newToken, oldToken) => {
             <ElDropdown>
               <span class="user-dropdown">
               <ElAvatar :src="userInfoStore.info?.userPic ? userInfoStore.info.userPic : avatar" />
-                <span class="username">{{ userInfoStore.info?.username || '用户' }}</span>
+                <span class="username">{{ userInfoStore.info?.nickname || userInfoStore.info?.username || '用户' }}</span>
               </span>
               <template #dropdown>
                 <ElDropdownMenu>
