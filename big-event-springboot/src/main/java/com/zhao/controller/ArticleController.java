@@ -30,6 +30,11 @@ public class ArticleController {
     @Autowired
     private ArticleCollectService articleCollectService;
 
+    /**
+     * 添加文章
+     * @param article 文章信息
+     * @return 操作结果
+     */
     @PostMapping
     public Result add(@RequestBody @Validated(Article.Add.class) Article article) {
         articleService.add(article);
@@ -46,12 +51,15 @@ public class ArticleController {
         Article article = articleService.findById(id);
         return Result.success(article);
     }
+  
     /**
+     * 获取文章列表（支持分页、分类筛选和状态筛选）
      * @param pageNum 当前页码
      * @param pageSize 每页条数
-     * @param categoryId 不是必须的参数使用@RequestParam(required = false)
-     * @param state 不是必须的参数使用@RequestParam(required = false)
-     * */
+     * @param categoryId 分类ID（可选）
+     * @param state 文章状态（可选）
+     * @return 文章列表和分页信息
+     */
     @GetMapping
     public Result<PageBean<Article>> list(
             Integer pageNum,
@@ -63,6 +71,11 @@ public class ArticleController {
         return Result.success(pb);
     }
 
+    /**
+     * 获取文章详情
+     * @param id 文章ID
+     * @return 文章详情信息
+     */
     @GetMapping("/detail")
     public Result<Article> detail(Integer id) {
         Article article = articleService.findById(id);
@@ -86,12 +99,22 @@ public class ArticleController {
         }
     }
     
+    /**
+     * 更新文章
+     * @param article 文章信息
+     * @return 操作结果
+     */
     @PutMapping
     public Result update(@RequestBody @Validated(Article.Update.class) Article article) {
         articleService.update(article);
         return Result.success();
     }
     
+    /**
+     * 删除文章
+     * @param id 文章ID
+     * @return 操作结果
+     */
     @DeleteMapping
     public Result delete(Integer id) {
         articleService.delete(id);
