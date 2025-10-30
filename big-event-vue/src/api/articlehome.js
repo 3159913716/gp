@@ -33,7 +33,7 @@ export default {
       state: params.state ?? (tokenStore?.token ? undefined : '已发布')
     }
     // 优先使用通用 /article 列表
-    return request.get('/article', { params: normalized }).catch(async (e1) => {
+    return request.get('/article/home', { params: normalized }).catch(async (e1) => {
       // 逐级回退以适配不同后端命名
       try {
         return await request.get('/article/list', { params: normalized })
@@ -98,7 +98,7 @@ export default {
     // 未登录用户优先尝试公开端点
     try {
       // 1) 显式公开详情：/public-detail/{id}
-      return await request.get(`/public-detail/${id}`)
+      return await request.get('/article/detail-page', { params: { id } })
     } catch (pub1) {
       try {
         // 2) 公开详情别名：/article/detail-page?id=...

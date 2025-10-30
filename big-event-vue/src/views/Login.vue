@@ -389,8 +389,8 @@ onUnmounted(() => {
           </el-button>
         </el-form-item>
         
-        <!-- 注册链接 -->
-        <el-form-item class="flex">
+        <!-- 注册 / 返回首页 -->
+        <el-form-item class="form-footer">
           <el-link 
             type="info" 
             @click="isRegister = true; clearRegisterData()"
@@ -446,6 +446,23 @@ onUnmounted(() => {
       display: flex;
       align-items: center;
       gap: 12px;
+    }
+
+    /* 登录页底部链接：左侧注册，右侧返回首页 */
+    .form-footer :deep(.el-form-item__content) {
+      width: 100%;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .form-footer :deep(.el-link) {
+      font-size: 14px;
+      color: #909399;
+    }
+
+    .form-footer :deep(.el-link:hover) {
+      color: #409eff;
     }
   }
 }

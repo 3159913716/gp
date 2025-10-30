@@ -149,7 +149,7 @@ const handleCategoryClick = (categoryId) => {
 
 // 处理登录
 const handleLogin = () => {
-  router.push('/admin/ucenter/mine')
+  router.push({ name: 'Login', query: { redirect: '/admin/ucenter/mine' } })
 }
 
 // 处理登出（添加错误处理）

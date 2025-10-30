@@ -172,7 +172,7 @@ const updateUserInfo = async () => {
           ref="formRef"
         >
           <!-- 登录名称字段（只读） -->
-          <el-form-item label="登录名称">
+          <el-form-item label="登录邮箱">
             <!-- 
               禁用状态输入框：
               v-model - 双向绑定用户名字段
