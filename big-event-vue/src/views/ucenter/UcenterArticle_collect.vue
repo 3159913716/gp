@@ -16,8 +16,8 @@
       </div>
       <div class="table-content">
         <div class="table-row" v-for="item in list" :key="item.id">
-          <div class="title-cell">{{ item.title }}</div>
-          <div class="img-cell"><img :src="item.coverImg || '/src/assets/default.png'" alt="封面图" class="cover-img"></div>
+          <div class="title-cell" @click="navigateToArticle(item.id)">{{ item.title }}</div>
+          <div class="img-cell"><img :src="item.coverImg || '/src/assets/default.png'" alt="封面图" class="cover-img" @click="navigateToArticle(item.id)"></div>
           <div class="author-cell">{{ item.author }}</div>
           <div class="time-cell">{{ item.collectTime }}</div>
           <div class="action-cell">
@@ -66,12 +66,51 @@ export default {
   
   // 组件挂载后调用接口
   mounted() {
-    this.fetchOrders()
+    this.checkAndRefreshList()
   },
   
   // 方法定义
   methods: {
+    // 导航到文章详情页
+    navigateToArticle(id) {
+      // 从收藏列表获取文章数据，传递收藏状态信息
+      const article = this.list.find(item => item.id === id);
+      const collectCount = article?.collectCount || 1; // 确保收藏数不为零
+      
+      // 记录来源为收藏列表并传递收藏状态
+      this.$router.push({ 
+        path: `/article/${id}`,
+        query: { 
+          fromCollect: 'true',
+          isCollected: 'true',
+          collectCount: collectCount.toString()
+        }
+      });
+    },
 
+    // 检查是否需要刷新列表
+    checkAndRefreshList() {
+      try {
+        // 检查是否存在需要刷新的标志
+        const needRefresh = localStorage.getItem('needRefreshCollectList')
+        if (needRefresh === 'true') {
+          console.log('检测到收藏状态变更，刷新收藏列表...')
+          // 清除标志
+          localStorage.removeItem('needRefreshCollectList')
+          // 重置页码并刷新列表
+          this.page = 1
+          this.fetchOrders()
+        } else {
+          // 正常加载列表
+          this.fetchOrders()
+        }
+      } catch (error) {
+        console.error('检查刷新标志失败:', error)
+        // 出错时仍然尝试加载列表
+        this.fetchOrders()
+      }
+    },
+    
     // 调用接口：获取收藏文章列表
     async fetchOrders() {    
         try {
@@ -238,6 +277,21 @@ export default {
   text-overflow: ellipsis;
   color: #303133;
   font-size: 14px;
+  cursor: pointer;
+  transition: color 0.2s;
+}
+
+.title-cell:hover {
+  color: #409EFF;
+}
+
+.img-cell img {
+  cursor: pointer;
+  transition: transform 0.2s;
+}
+
+.img-cell img:hover {
+  transform: scale(1.05);
 }
 
 .img-cell {

@@ -142,6 +142,12 @@ public class UserController {
         return Result.success();
     }
 
+    /**
+     * 更新用户密码
+     * @param params 包含旧密码、新密码和确认密码的参数
+     * @param token 用户认证令牌
+     * @return 操作结果
+     */
     @PatchMapping("/updatePwd")
     public Result updatePwd(@RequestBody Map<String, String> params, @RequestHeader("Authorization") String token) {
 
@@ -292,6 +298,11 @@ public class UserController {
         return Result.error("身份证号格式不正确，请输入有效的18位身份证号");
     }
     
+    /**
+     * 提交作者申请
+     * @param apply 申请信息
+     * @return 操作结果
+     */
     @PostMapping("/author-apply")
     public Result submitAuthorApply(@RequestBody @Valid AuthorApply apply) {
         try {
@@ -336,11 +347,11 @@ public class UserController {
     }
     
     /**
-     * 获取我的文章列表
+     * 获取当前用户的文章列表
      * 需要作者权限
      * @param page 当前页码，默认1
      * @param pageSize 每页大小，默认10
-     * @param state 文章状态（可选）
+     * @param state 文章状态（可选，草稿或已发布）
      * @return 包含文章列表和总数的分页数据
      */
     @GetMapping("/articles")

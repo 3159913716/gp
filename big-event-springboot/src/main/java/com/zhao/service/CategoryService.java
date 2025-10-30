@@ -1,6 +1,7 @@
 package com.zhao.service;
 
 import com.zhao.pojo.Category;
+import com.zhao.pojo.CategoryVO;
 
 import java.util.List;
 
@@ -8,6 +9,11 @@ public interface CategoryService {
 
     //新增加分类
     void add(Category category);
+
+
+    // 获取分类列表（考虑是否有token）
+    List<CategoryVO> getCategoryList(Integer userId);
+
 
     //文章分类列表查询
     List<Category> list();

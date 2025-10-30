@@ -113,9 +113,9 @@ const onCommentAvatarError = (c) => {
 
 // 点赞与收藏（接入后端接口）
 const liked = ref(false)
-const favorited = ref(false)
+const favorited = ref(route.query.isCollected === 'true') // 从URL参数设置初始收藏状态
 const localLikeCount = ref(0)
-const localCollectCount = ref(0)
+const localCollectCount = ref(Number(route.query.collectCount) || 0) // 从URL参数设置初始收藏数
 const likeLoading = ref(false)
 const favoriteLoading = ref(false)
 const toggleLike = async () => {
@@ -161,29 +161,54 @@ const toggleFavorite = async () => {
     router.push({ name: 'Login', query: { redirect } })
     return
   }
+  
+  // 记录操作前的状态
+  const prevFavorited = favorited.value
+  const prevCount = localCollectCount.value
+  const isFromCollectList = route.query.fromCollect === 'true'
+  
+  // 先直接切换收藏状态，提供即时反馈
+  favorited.value = !favorited.value
+  
+  // 根据收藏状态变化更新收藏数
+  if (favorited.value) {
+    // 收藏操作：收藏数+1
+    localCollectCount.value = prevCount + 1
+  } else {
+    // 取消收藏：收藏数-1（但不小于0）
+    localCollectCount.value = Math.max(0, prevCount - 1)
+  }
+  
+  // 确保article对象中的收藏数也同步更新
+  article.value.collectCount = localCollectCount.value
+  
+  // 保存状态到本地存储
+  saveInteraction()
+  
   favoriteLoading.value = true
   try {
+    // 调用后端接口完成收藏/取消收藏操作
     const resp = await sendCommentApi.toggleArticleCollect(articleId.value)
-    const payload = resp?.data ?? resp
-    const data = payload?.data ?? payload
-    const prevFavorited = favorited.value
-    const isCollectedRaw = data?.isCollected ?? data?.is_collected ?? data?.collected
-    const nextFavorited = (isCollectedRaw !== undefined) ? Boolean(isCollectedRaw) : !prevFavorited
-    const countMaybe = data?.collectCount ?? data?.collect_count ?? data?.count
-    const prevCount = localCollectCount.value
-    const nextCount = (countMaybe !== undefined) ? Number(countMaybe) : (prevCount + (nextFavorited ? 1 : -1))
-    favorited.value = nextFavorited
-    localCollectCount.value = Math.max(0, Number.isFinite(nextCount) ? nextCount : prevCount)
-    // 同步顶部统计（非负）
-    article.value.collectCount = localCollectCount.value
-    saveInteraction()
+    
+    // 清除URL参数中的收藏状态，避免状态混乱
+    const newQuery = { ...route.query }
+    delete newQuery.isCollected
+    delete newQuery.collectCount
+    router.replace({ query: newQuery })
+    
+    // 如果从收藏列表进入，设置刷新标志以便返回收藏列表时刷新
+    if (isFromCollectList) {
+      localStorage.setItem('needRefreshCollectList', 'true')
+    }
+    
   } catch (err) {
-    // 失败时乐观更新，保证操作反馈
-    favorited.value = !favorited.value
-    localCollectCount.value = Math.max(0, localCollectCount.value + (favorited.value ? 1 : -1))
-    article.value.collectCount = localCollectCount.value
+    // 接口调用失败，恢复到操作前的状态
+    console.error('文章收藏接口调用失败：', err?.message || err)
+    favorited.value = prevFavorited
+    localCollectCount.value = prevCount
+    article.value.collectCount = prevCount
     saveInteraction()
-    console.warn('文章收藏接口调用异常：', err?.message || err)
+    ElMessage.error('操作失败，请稍后重试')
   } finally {
     favoriteLoading.value = false
   }
@@ -243,18 +268,15 @@ const loadDetail = async () => {
   loading.value = true
   errorMsg.value = ''
   try {
-    const res = await articleHomeApi.getArticleDetail(articleId.value)
-    let data = res?.data || res?.item || res?.article || res
+    // 使用公共文章详情接口
+    const res = await request.get(`/article/public-detail/${articleId.value}`)
+    let data = res?.data || res
 
-    // 若主接口未返回有效数据，尝试备用接口：GET /article?id={id}
+    // 若主接口未返回有效数据，尝试备用接口
     if (!data || (!data.id && !data.title && !data.content && !data.contentHtml)) {
       try {
-        const tokenStore = useTokenStore()
-        const alt = await request.get('/article', { params: { id: articleId.value, ...(tokenStore?.token ? {} : { state: '已发布' }) } })
-        const payload = alt?.data ?? alt
-        // 兼容多种字段：item/items/list 或直接对象
-        data = payload?.item || (Array.isArray(payload?.items) ? payload.items[0] : null) ||
-               (Array.isArray(payload?.list) ? payload.list[0] : null) || payload
+        const alt = await articleHomeApi.getArticleDetail(articleId.value)
+        data = alt?.data || alt?.item || alt?.article || alt
       } catch (e) {
         // 备用接口失败不抛出，后续走兜底
         console.warn('备用接口加载失败:', e?.message || e)
@@ -270,11 +292,20 @@ const loadDetail = async () => {
     article.value.likeCount = Math.max(0, Number(article.value.likeCount || 0))
     article.value.collectCount = Math.max(0, Number(article.value.collectCount || 0))
 
+    // 优先使用URL参数中的收藏状态（如果有）
+    const urlIsCollected = route.query.isCollected === 'true'
+    const urlCollectCount = Number(route.query.collectCount)
+    
     liked.value = (apiIsLikedRaw !== undefined) ? Boolean(apiIsLikedRaw) : Boolean(persisted.liked ?? article.value.isLiked)
-    favorited.value = (apiIsCollectedRaw !== undefined) ? Boolean(apiIsCollectedRaw) : Boolean(persisted.favorited ?? article.value.isCollected)
+    // 如果从URL参数知道是收藏状态，则直接设置为已收藏
+    favorited.value = urlIsCollected ? true : 
+                     (apiIsCollectedRaw !== undefined) ? Boolean(apiIsCollectedRaw) : 
+                     Boolean(persisted.favorited ?? article.value.isCollected)
 
     localLikeCount.value = Math.max(0, Number((persisted.likeCount ?? article.value.likeCount) || 0))
-    localCollectCount.value = Math.max(0, Number((persisted.collectCount ?? article.value.collectCount) || 0))
+    // 如果URL参数中有收藏数，则优先使用
+    localCollectCount.value = !isNaN(urlCollectCount) && urlCollectCount > 0 ? urlCollectCount : 
+                            Math.max(0, Number((persisted.collectCount ?? article.value.collectCount) || 0))
 
     // 同步顶部统计为当前展示值
     article.value.likeCount = localLikeCount.value
@@ -520,6 +551,19 @@ onMounted(() => {
   loadComments()
 })
 
+// 返回上一页或收藏列表
+const handleBack = () => {
+  // 检查是否从收藏列表进入
+  const fromCollect = route.query.fromCollect === 'true'
+  if (fromCollect) {
+    // 直接返回到收藏列表页面
+    router.push('/admin/ucenter/collect')
+  } else {
+    // 否则使用浏览器的返回功能
+    window.history.back()
+  }
+}
+
 // 路由参数变化时，重新加载详情
 watch(() => route.params.id, () => {
   commentsPage.value = 1
@@ -534,7 +578,12 @@ watch(() => route.params.id, () => {
       <ElCard class="detail-card">
         <template #header>
           <div class="detail-header">
-            <h2 class="title">{{ article.title }}</h2>
+            <div class="header-top">
+              <button class="back-btn" @click="handleBack">
+                ← 返回
+              </button>
+              <h2 class="title">{{ article.title }}</h2>
+            </div>
             <div class="meta">
               <div class="author">
                 <span class="author-name">{{ article.authorName }}</span>
@@ -655,11 +704,44 @@ watch(() => route.params.id, () => {
   gap: 8px;
 }
 
+.header-top {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.back-btn {
+  padding: 6px 12px;
+  border: 1px solid #dcdfe6;
+  border-radius: 4px;
+  background-color: #fff;
+  color: #606266;
+  cursor: pointer;
+  font-size: 14px;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.back-btn:hover {
+  color: #409EFF;
+  border-color: #c6e2ff;
+  background-color: #ecf5ff;
+}
+
+title {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 600;
+  color: #303133;
+}
+
 .title {
   margin: 0;
   font-size: 22px;
   font-weight: 600;
   color: #303133;
+  flex: 1;
+  word-break: break-word;
 }
 
 .meta {

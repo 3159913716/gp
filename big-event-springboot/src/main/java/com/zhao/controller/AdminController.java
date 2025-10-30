@@ -172,7 +172,7 @@ public class AdminController {
     }
     
     /**
-     * 获取用户列表
+     * 获取用户列表（管理员功能）
      * @param page 页码
      * @param pageSize 每页大小
      * @param role 用户角色（可选）
@@ -210,7 +210,8 @@ public class AdminController {
 
 
 
-    /** 获取数据统计
+    /**
+     * 获取数据统计（管理员功能）
      * @return 统计数据
      */
     @GetMapping("/statistics")

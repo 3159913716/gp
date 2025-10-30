@@ -12,7 +12,8 @@
   FormInstance - Element Plus表单实例类型
   useRouter - Vue路由实例
 */
-import { ref } from 'vue'
+import { ref, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
+import { useRoute } from 'vue-router'
 import { ElMessage, type FormInstance } from 'element-plus'
 import useUserInfoStore from '@/stores/userInfo.js'
 import { useRouter } from 'vue-router'
@@ -27,8 +28,10 @@ import { userUpdatePasswordService } from '@/api/user.js'
   formRef - Element Plus表单引用，带类型声明
 */
 const router = useRouter()
+const route = useRoute()
 const userInfoStore = useUserInfoStore()
 const formRef = ref<FormInstance>()  // 带类型声明的表单引用
+const formKey = ref(0)  // 用于强制重新渲染表单
 
 /* 
   密码表单模型：
@@ -40,6 +43,20 @@ const formRef = ref<FormInstance>()  // 带类型声明的表单引用
 // 添加验证码倒计时状态
 const countdown = ref(0)
 let timer = null
+
+// 密码可见性控制变量
+const showNewPwd = ref(false)
+const showRePwd = ref(false)
+
+// 切换新密码可见性
+const toggleNewPwdVisibility = () => {
+  showNewPwd.value = !showNewPwd.value
+}
+
+// 切换确认密码可见性
+const toggleRePwdVisibility = () => {
+  showRePwd.value = !showRePwd.value
+}
 
 const pwdModel = ref({
   oldPwd: '',
@@ -182,11 +199,6 @@ const rules = {
   // 原密码验证规则
   oldPwd: [
     {
-      required: true,
-      message: '请输入原密码',
-      trigger: 'blur'
-    },
-    {
       pattern: /^\S{6,16}$/,  // 6-16位非空字符
       message: '密码长度必须是6-16位的非空字符串',
       trigger: 'blur'
@@ -258,9 +270,17 @@ const rules = {
 
 /* 
   表单重置方法：
-  清空所有密码字段
+  清空所有密码字段并重置表单验证状态
 */
 const resetForm = () => {
+  // 清理倒计时定时器
+  if (timer) {
+    clearInterval(timer)
+    timer = null
+    countdown.value = 0
+  }
+  
+  // 先清空表单数据
   pwdModel.value = {
     oldPwd: '',
     newPwd: '',
@@ -268,7 +288,32 @@ const resetForm = () => {
     email: '',
     code: ''
   }
+  
+  // 重置表单验证状态 - 使用Element Plus的标准方法
+  if (formRef.value) {
+    formRef.value.resetFields()
+  }
 }
+
+// 监听路由变化，确保每次导航到该页面时都重置表单
+watch(() => route.path, (newPath) => {
+  if (newPath === '/user/resetPassword') {
+    resetForm()
+  }
+})
+
+// 组件挂载时自动重置表单
+onMounted(() => {
+  resetForm()
+})
+
+// 组件卸载前清理定时器，防止内存泄漏
+onBeforeUnmount(() => {
+  if (timer) {
+    clearInterval(timer)
+    timer = null
+  }
+})
 
 /* 
   表单提交处理：
@@ -330,7 +375,8 @@ const submitForm = async () => {
 </script>
 
 <template>
-  <!-- Element Plus卡片容器 -->
+  <div class="container">
+     <!-- Element Plus卡片容器 -->
   <el-card>
     <!-- 
       表单组件：
@@ -341,28 +387,18 @@ const submitForm = async () => {
       ref - 表单实例引用
       class="demo-ruleForm" - 样式类名
     -->
+    <!-- 添加随机ID和额外的防自动填充措施 -->
     <el-form style="max-width: 600px" :model="pwdModel" status-icon :rules="rules" label-width="auto" ref="formRef"
-      class="demo-ruleForm">
-      <!-- 原密码表单项 -->
-      <el-form-item label="原密码" prop="oldPwd">
-        <!-- 
-          密码输入框：
-          v-model - 双向绑定原密码字段
-          type="password" - 密码输入类型
-          autocomplete="off" - 关闭自动填充
-        -->
-        <el-input v-model="pwdModel.oldPwd" type="password" autocomplete="off" placeholder="请输入原密码" />
-      </el-form-item>
-
+      class="demo-ruleForm" autocomplete="off" :key="formKey">
       <!-- 邮箱表单项 -->
       <el-form-item label="邮箱" prop="email">
-        <el-input v-model="pwdModel.email" type="text" autocomplete="off" placeholder="请输入邮箱" />
+        <el-input v-model="pwdModel.email" type="text" autocomplete="new-email" placeholder="请输入邮箱" />
       </el-form-item>
       
       <!-- 验证码表单项 -->
       <el-form-item label="验证码" prop="code">
         <div style="display: flex; gap: 10px;">
-          <el-input v-model="pwdModel.code" type="text" autocomplete="off" placeholder="请输入验证码" style="flex: 1;" />
+          <el-input v-model="pwdModel.code" type="text" autocomplete="one-time-code" placeholder="请输入验证码" style="flex: 1;" />
           <!-- 
             发送验证码按钮：
             type="primary" - 主按钮样式
@@ -381,12 +417,26 @@ const submitForm = async () => {
 
       <!-- 新密码表单项 -->
       <el-form-item label="新密码" prop="newPwd">
-        <el-input v-model="pwdModel.newPwd" type="password" autocomplete="off" placeholder="6-16位非空字符" />
+        <el-input 
+          v-model="pwdModel.newPwd" 
+          :type="showNewPwd ? 'text' : 'password'" 
+          autocomplete="new-password" 
+          placeholder="6-16位非空字符" 
+          show-password
+          @click:password-toggle="toggleNewPwdVisibility"
+        />
       </el-form-item>
 
       <!-- 确认密码表单项 -->
       <el-form-item label="确认新密码" prop="rePwd">
-        <el-input v-model="pwdModel.rePwd" type="password" autocomplete="off" placeholder="请再次输入新密码" />
+        <el-input 
+          v-model="pwdModel.rePwd" 
+          :type="showRePwd ? 'text' : 'password'" 
+          autocomplete="new-password" 
+          placeholder="请再次输入新密码" 
+          show-password
+          @click:password-toggle="toggleRePwdVisibility"
+        />
       </el-form-item>
 
       <!-- 表单操作按钮 -->
@@ -406,4 +456,20 @@ const submitForm = async () => {
       </el-form-item>
     </el-form>
   </el-card>
+  </div>
+ 
 </template>
+
+<style lang="scss" scoped>
+/* 容器样式 */
+.container {
+  display: flex;
+  flex-direction: column; /* 子元素垂直排列 */
+  width: 100%;
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 20px;
+  box-sizing: border-box;
+  font-size: 16px;
+}
+</style>

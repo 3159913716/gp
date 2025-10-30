@@ -24,7 +24,6 @@
       </div>
      <div class="news-container">
             <div class="plan-title">创作者激励计划</div>
-            <!-- 轮播图组件 -->
             <div class="news-slider">
               <div v-for="(item, index) in newsList" :key="index" class="news-item">
                 <div class="news_title">{{ item.title }}</div>
