@@ -324,7 +324,8 @@ articleList()          // 加载文章列表
 </script>
 
 <template>
-  <!-- 
+  <div class="container">
+     <!-- 
     Element Plus 卡片组件：
     class="page-container" - 自定义样式类名
   -->
@@ -565,6 +566,8 @@ articleList()          // 加载文章列表
       </el-form>
     </el-drawer>
   </el-card>
+  </div>
+ 
 </template>
 
 <!-- 
@@ -572,11 +575,23 @@ articleList()          // 加载文章列表
   使用SCSS预处理器，scoped属性限制样式作用域
 -->
 <style lang="scss" scoped>
+
+/* 容器样式 */
+.container {
+  display: flex;
+  flex-direction: column; /* 子元素垂直排列 */
+  width: 100%;
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 20px;
+  box-sizing: border-box;
+}
 /* 页面容器样式 */
 .page-container {
   min-height: 100%;     /* 最小高度100% */
   box-sizing: border-box; /* 边框盒模型 */
-
+  border-radius: 8px;
+  padding: 15px;
   /* 头部样式 */
   .header {
     display: flex;              /* 弹性布局 */

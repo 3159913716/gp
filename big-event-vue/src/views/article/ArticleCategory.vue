@@ -178,7 +178,8 @@ const deleteCategory = (row) => {
 </script>
 
 <template>
-  <!-- 
+  <div class="container">
+     <!-- 
     Element Plus 的卡片组件:
     class="page-container" - 自定义样式类名
   -->
@@ -304,6 +305,8 @@ const deleteCategory = (row) => {
       </template>
     </el-dialog>
   </el-card>
+  </div>
+ 
 </template>
 
 <!-- 
@@ -312,10 +315,23 @@ const deleteCategory = (row) => {
   lang="scss" 使用 SCSS 语法
 -->
 <style lang="scss" scoped>
+/* 容器样式 */
+.container {
+  display: flex;
+  flex-direction: column; /* 子元素垂直排列 */
+  width: 100%;
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 20px;
+  box-sizing: border-box;
+  font-size: 16px;
+}
+
 .page-container {
   min-height: 100%;     /* 最小高度占满父容器 */
   box-sizing: border-box; /* 盒子模型计算方式 */
-
+  border-radius: 8px;
+  padding: 15px;
   /* 头部样式 */
   .header {
     display: flex;              /* 弹性布局 */

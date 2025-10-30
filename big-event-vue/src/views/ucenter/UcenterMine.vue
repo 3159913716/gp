@@ -68,9 +68,9 @@ export default {
     
     // 获取收藏数
     try {
-      const collectResponse = await request.post(``);
+      const collectResponse = await request.post(`/user/collections`);
       if (collectResponse.success) {
-        this.data.collect = collectResponse.data.collectCount;
+        this.data.collect = collectResponse.data.total;
         console.log('获取收藏数成功:', this.data.collect);
       }
     } catch (err) {
@@ -87,9 +87,9 @@ export default {
   display: flex;
   flex-direction: column; /* 子元素垂直排列 */
   width: 100%;
-  max-width: 1200px;
+  max-width: 1400px;
   margin: 0 auto;
-  padding: 10px;
+  padding: 15px 30px;
   box-sizing: border-box;
 }
 .ucenter-mine {

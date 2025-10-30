@@ -5,8 +5,9 @@
 -->
 
 <script setup>
-// 导入Vue响应式函数和Element Plus组件
-import { ref, reactive, watch } from 'vue'
+// 导入Vue响应式函数、生命周期钩子和路由
+import { ref, reactive, watch, onMounted, onBeforeUnmount, nextTick } from 'vue'
+import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 
 // 导入Pinia状态管理
@@ -24,8 +25,16 @@ const userInfoStore = useUserInfoStore()
 /* 
   表单引用与响应式数据：
   formRef - 表单实例的引用，用于调用表单方法
+  formKey - 用于强制表单重新渲染，防止保留历史数据
 */
 const formRef = ref(null)
+const formKey = ref(0)
+
+// 路由实例
+const route = useRoute()
+
+// 路由监听器引用
+let routeUnwatch = null
 
 /* 
   初始用户信息（深拷贝）：
@@ -50,15 +59,14 @@ const isFormModified = ref(false)
 /* 
   深度监听用户信息变化：
   比较当前用户信息与初始用户信息的差异
-  任何字段的变化都会更新isFormModified状态
+  只检查昵称是否有更改
 */
 watch(
   userInfo,
   () => {
-    // 检查昵称或邮箱是否有更改
+    // 检查昵称是否有更改
     isFormModified.value =
-      userInfo.value.nickname !== initialUserInfo.nickname ||
-      userInfo.value.email !== initialUserInfo.email
+      userInfo.value.nickname !== initialUserInfo.nickname
   },
   { deep: true } // 深度监听，检测对象内部属性变化
 )
@@ -84,21 +92,36 @@ const rules = {
       trigger: 'blur'           // 触发时机：失去焦点
     }
   ],
-  // 邮箱验证规则
-  email: [
-    // 必填验证
-    { 
-      required: true, 
-      message: '请输入用户邮箱', 
-      trigger: 'blur' 
-    },
-    // 格式验证（邮箱格式）
-    { 
-      type: 'email',             // 内置邮箱类型验证
-      message: '邮箱格式不正确', 
-      trigger: 'blur' 
+  // 邮箱不再需要验证规则，因为是只读字段
+}
+
+/* 
+  重置表单函数：
+  确保表单在每次加载时都重置为初始状态
+  使用nextTick确保DOM更新后执行重置
+*/
+const resetForm = async () => {
+  // 强制表单重新渲染
+  formKey.value++
+  
+  // 等待DOM更新
+  await nextTick()
+  
+  // 重置用户信息，保留用户名和邮箱，只清空昵称
+  const username = userInfoStore.info?.username || ''
+  const email = userInfoStore.info?.email || ''
+  Object.assign(userInfo.value, { username: username, nickname: '', email: email })
+  Object.assign(initialUserInfo, { username: username, nickname: '', email: email })
+  
+  // 重置修改状态
+  isFormModified.value = false
+  
+  // 等待DOM更新后重置验证状态
+  setTimeout(() => {
+    if (formRef.value) {
+      formRef.value.clearValidate()
     }
-  ]
+  }, 0)
 }
 
 /* 
@@ -122,10 +145,8 @@ const updateUserInfo = async () => {
         */
         userInfoStore.setInfo(JSON.parse(JSON.stringify(userInfo.value)))
         
-        /* 
-          更新初始值记录：
-          同样使用深拷贝，使下一次比较正确
-        */
+        // 更新initialUserInfo以匹配更新后的状态
+        // 这样后续修改时isFormModified才能正确反映变化
         Object.assign(initialUserInfo, JSON.parse(JSON.stringify(userInfo.value)))
         
         // 重置表单修改状态
@@ -141,10 +162,34 @@ const updateUserInfo = async () => {
     }
   })
 }
+
+// 组件挂载时重置表单并监听路由变化
+onMounted(() => {
+  resetForm()
+  
+  // 监听路由变化
+  routeUnwatch = watch(
+    () => route.path,
+    (newPath) => {
+      // 当路由路径指向当前页面时，重置表单
+      if (newPath.includes('/user/info')) {
+        resetForm()
+      }
+    }
+  )
+})
+
+// 组件卸载前清理
+onBeforeUnmount(() => {
+  if (routeUnwatch) {
+    routeUnwatch()
+  }
+})
 </script>
 
 <template>
-  <!-- Element Plus卡片组件容器 -->
+  <div class="container">
+    <!-- Element Plus卡片组件容器 -->
   <el-card class="page-container">
     <!-- 卡片头部插槽 -->
     <template #header>
@@ -170,6 +215,8 @@ const updateUserInfo = async () => {
           label-width="100px" 
           size="large" 
           ref="formRef"
+          :key="formKey"
+          autocomplete="off"
         >
           <!-- 登录名称字段（只读） -->
           <el-form-item label="登录名称">
@@ -181,21 +228,22 @@ const updateUserInfo = async () => {
             <el-input v-model="userInfo.username" disabled></el-input>
           </el-form-item>
           
+          <!-- 联系邮箱字段（只读） -->
+          <el-form-item label="联系邮箱">
+            <!-- 双向绑定邮箱字段，设为只读 -->
+            <el-input v-model="userInfo.email" disabled></el-input>
+          </el-form-item>
+          
           <!-- 用户昵称字段（带验证） -->
           <el-form-item label="用户昵称" prop="nickname">
             <!-- 
               双向绑定昵称字段：
               可编辑状态
+              禁用自动填充
             -->
-            <el-input v-model="userInfo.nickname"></el-input>
+            <el-input v-model="userInfo.nickname" autocomplete="new-nickname"></el-input>
           </el-form-item>
-          
-          <!-- 用户邮箱字段（带验证） -->
-          <el-form-item label="联系邮箱" prop="email">
-            <!-- 双向绑定邮箱字段 -->
-            <el-input v-model="userInfo.email"></el-input>
-          </el-form-item>
-          
+
           <!-- 表单提交按钮 -->
           <el-form-item>
             <!-- 
@@ -216,4 +264,20 @@ const updateUserInfo = async () => {
       </el-col>
     </el-row>
   </el-card>
+  </div>
+  
 </template>
+
+<style lang="scss" scoped>
+/* 容器样式 */
+.container {
+  display: flex;
+  flex-direction: column; /* 子元素垂直排列 */
+  width: 100%;
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 20px;
+  box-sizing: border-box;
+  font-size: 16px;
+}
+</style>

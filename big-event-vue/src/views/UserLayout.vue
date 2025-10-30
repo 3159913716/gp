@@ -145,7 +145,7 @@ const handleCommand = (command) => {
             <el-icon>
               <EditPen /> <!-- 编辑图标 -->
             </el-icon>
-            <span>重置密码</span>
+            <span>修改密码</span>
           </el-menu-item>
         </el-sub-menu>
 

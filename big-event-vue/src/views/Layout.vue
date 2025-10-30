@@ -142,7 +142,7 @@ const handleCommand = (command) => {
             <el-icon>
               <EditPen /> <!-- 编辑图标 -->
             </el-icon>
-            <span>重置密码</span>
+            <span>修改密码</span>
           </el-menu-item>
         </el-sub-menu>
       </el-menu>
@@ -153,7 +153,7 @@ const handleCommand = (command) => {
       <!-- 顶部头部区域 -->
       <el-header>
         <!-- 显示当前登录用户昵称 -->
-        <div>用户：<strong>{{userInfoStore?.info?.username || 
+        <div>用户：<strong>{{userInfoStore?.info?.nickname || userInfoStore?.info?.username || 
           '未登录用户'  }}</strong></div>
 
         <!-- 导航栏区域 -->
