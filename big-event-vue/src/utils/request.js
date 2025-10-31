@@ -49,7 +49,8 @@ instance.interceptors.request.use(
     const method = (config.method || 'GET').toUpperCase()
     // 公开端点：列表/搜索/分类等（详情端点不视为公开，以便登录态携带认证）
     const isPublicEndpoint = 
-      /^\/article(?:\?.*)?$/.test(url) ||
+      // 注意：这里不包含普通的/article路径，以便作者管理文章时需要认证
+      // /^\/article(?:\?.*)?$/.test(url) ||
       /^\/search/.test(url) || 
       /^\/article\/\d+\/comments/.test(url) ||
       (method === 'GET' && /^\/article\/comment(?:\/list)?/.test(url)) ||

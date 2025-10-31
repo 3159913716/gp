@@ -25,11 +25,13 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 /* 导入文章相关API接口函数 */
 import { 
   articleCategoryListService,  // 获取分类列表
-  articleListService,          // 获取文章列表
   articleAddService,           // 添加文章
   articleDeleteService,        // 删除文章
   articleUpdateService         // 更新文章
 } from '@/api/article.js'
+
+/* 导入自定义的Axios实例（用于直接调用API） */
+import request from '@/utils/request.js'
 
 /* 导入富文本编辑器组件 */
 import { QuillEditor } from '@vueup/vue-quill'
@@ -99,7 +101,7 @@ const title = ref('')             // 抽屉标题
 const articleForm = ref(null)   // 表单实例引用
 const articleModel = ref({      // 文章表单数据
   title: '',       // 文章标题
-  categoryId: '',  // 分类ID
+  categoryId: null,  // 分类ID - 使用null避免默认选中第一个选项
   coverImg: '',    // 封面图URL
   content: '',     // 文章内容(HTML)
   state: '',       // 文章状态
@@ -158,15 +160,70 @@ const articleCategoryList = async () => {
 
 // 加载文章列表（带分页和筛选条件）
 const articleList = async () => {
-  const params = {  // 请求参数对象
-    pageNum: pageNum.value,     // 当前页码
-    pageSize: pageSize.value,   // 每页条数
-    categoryId: categoryId.value ? categoryId.value : null,  // 分类ID筛选
-    state: state.value ? state.value : null,  // 状态筛选
+  try {
+    // 构建查询参数字符串，直接拼接URL
+    let queryStr = '?pageNum=' + pageNum.value + '&pageSize=' + pageSize.value;
+    
+    // 添加可选参数
+    if (categoryId.value) {
+      queryStr += '&categoryId=' + categoryId.value;
+    }
+    if (state.value) {
+      queryStr += '&state=' + state.value;
+    }
+    
+    // 直接使用request.get调用API，手动添加Authorization头
+    const tokenStore = useTokenStore();
+    const headers = {};
+    if (tokenStore.token) {
+      const raw = tokenStore.token;
+      headers.Authorization = raw.startsWith('Bearer ') ? raw : `Bearer ${raw}`;
+    }
+    
+    console.log('发送请求:', '/article' + queryStr);
+    const response = await request.get('/article' + queryStr, { headers });
+    
+    // 处理响应数据
+    console.log('=== 完整API响应 ===', JSON.stringify(response));
+    
+    try {
+      // 根据接口文档格式处理响应
+      console.log('响应数据:', response?.data);
+      
+      if (response && response.code === 0 && response.data) {
+        // 按照接口文档的格式解析: response.data.item
+        if (response.data.item && Array.isArray(response.data.item)) {
+          articles.value = response.data.item;
+          total.value = response.data.total || articles.value.length;
+          console.log('使用response.data.item作为文章数组');
+        } else {
+          console.log('API返回数据格式不符合接口文档规范');
+          articles.value = [];
+          total.value = 0;
+        }
+        
+        console.log('最终articles数组长度:', articles.value.length);
+        console.log('最终total值:', total.value);
+        
+        // 手动触发视图更新
+        articles.value = [...articles.value];
+      } else {
+        console.log('API返回失败或格式不正确:', response);
+        articles.value = [];
+        total.value = 0;
+        ElMessage.error(response?.message || '获取文章列表失败');
+      }
+    } catch (e) {
+      console.error('处理响应数据时出错:', e);
+      articles.value = [];
+      total.value = 0;
+    }
+  } catch (error) {
+    console.error('获取文章列表失败:', error);
+    ElMessage.error('获取文章列表失败，请稍后重试');
+    articles.value = [];
+    total.value = 0;
   }
-  const result = await articleListService(params)  // 调用API
-  total.value = result.data.total   // 更新总数据量
-  articles.value = result.data.item  // 更新文章列表数据
 
   // 为每篇文章添加分类名称（通过匹配categoryId）
   for (let i = 0; i < articles.value.length; i++) {
@@ -204,18 +261,29 @@ const onCurrentChange = (num) => {
 // 清空表单并初始化添加文章的UI状态
 const clearArticelForm = () => {
   title.value = '新增文章'  // 设置抽屉标题
-  // 重置表单数据
+  
+  // 强制重置表单验证状态
+  if (articleForm.value) {
+    articleForm.value.resetFields()
+  }
+  
+  // 重置表单数据 - 使用undefined确保空状态
   articleModel.value = {
     title: '',
-    categoryId: '',
+    categoryId: null,  // 使用null避免默认选中第一个选项
     coverImg: '',
     content: '',
     state: '',
+    id: undefined
   }
+  
   // 清空富文本编辑器内容（如果已渲染）
   if (document.querySelector('.ql-editor')) {
     document.querySelector('.ql-editor').innerHTML = ''
   }
+  
+  // 强制更新视图
+  articleModel.value = { ...articleModel.value }
 }
 
 /*
@@ -241,15 +309,29 @@ const showDialog = (row) => {
   }
   visibleDrawer.value = true  // 显示抽屉
   title.value = '编辑文章'     // 设置抽屉标题
-  // 使用行数据填充表单模型
+  
+  // 先重置模型为空状态
   articleModel.value = {
-    title: row.title,          // 填充标题
-    categoryId: row.categoryId, // 填充分类ID
-    coverImg: row.coverImg,     // 填充封面图URL
-    content: row.content,       // 填充内容
-    state: row.state,           // 填充状态
-    id: row.id                  // 保存文章ID（用于后续更新）
+    title: '',
+    categoryId: '',
+    coverImg: '',
+    content: '',
+    state: '',
+    id: undefined
   }
+  
+  // 延迟填充数据，确保Vue响应式系统更新DOM
+  setTimeout(() => {
+    // 使用行数据填充表单模型
+    articleModel.value = {
+      title: row.title || '',          // 填充标题
+      categoryId: row.categoryId || '', // 填充分类ID，使用空字符串避免默认选中第一个选项
+      coverImg: row.coverImg || '',     // 填充封面图URL
+      content: row.content || '',       // 填充内容
+      state: row.state || '',           // 填充状态
+      id: row.id                        // 保存文章ID（用于后续更新）
+    }
+  }, 0)
 }
 
 /*
@@ -341,6 +423,13 @@ articleList()          // 加载文章列表
           -->
           <el-button type="primary" @click="visibleDrawer = true; clearArticelForm()">
             添加文章
+          </el-button>
+          <!-- 
+            刷新数据按钮：
+            @click - 点击事件：重新加载文章列表
+          -->
+          <el-button @click="articleList">
+            刷新数据
           </el-button>
         </div>
       </div>
