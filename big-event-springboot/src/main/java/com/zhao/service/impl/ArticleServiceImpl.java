@@ -12,20 +12,13 @@ import com.zhao.pojo.ArticleLike;
 import com.zhao.pojo.ArticleCollect;
 import com.zhao.pojo.PageBean;
 import com.zhao.service.ArticleService;
-import com.zhao.utils.JwtUtil;
-import com.zhao.utils.ThreadLocalUtil;
+import com.zhao.utils.UserContextUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.data.redis.core.StringRedisTemplate;
-import org.springframework.data.redis.core.ValueOperations;
 import org.springframework.stereotype.Service;
-import org.springframework.web.context.request.RequestContextHolder;
-import org.springframework.web.context.request.ServletRequestAttributes;
 
-import jakarta.servlet.http.HttpServletRequest;
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.Map;
 
 import org.springframework.util.StringUtils;
 
@@ -41,19 +34,15 @@ public class ArticleServiceImpl implements ArticleService {
     
     @Autowired
     private ArticleCollectMapper articleCollectMapper;
-    
-    @Autowired
-    private StringRedisTemplate stringRedisTemplate;
 
-    private static final String PUBLISHED_STATE = "已发布";
+    // private static final String PUBLISHED_STATE = "已发布";
 
     @Override
     public void add(Article article) {
         //补充属性值
         article.setCreateTime(LocalDateTime.now());
         article.setUpdateTime(LocalDateTime.now());
-        Map<String, Object> map = ThreadLocalUtil.get();
-        Integer userId = (Integer) map.get("id");
+        Integer userId = UserContextUtil.getCurrentUserId();
         article.setCreateUser(userId);
         articleMapper.add(article);
     }
@@ -65,8 +54,7 @@ public class ArticleServiceImpl implements ArticleService {
         //2.开启分页查询 PageHelper插件
         PageHelper.startPage(pageNum, pageSize);
         //调用mapper完成查询
-        Map<String, Object> map = ThreadLocalUtil.get();
-        Integer userId = (Integer) map.get("id");
+        Integer userId = UserContextUtil.getCurrentUserId();
         List<Article> as = articleMapper.list(userId, categoryId, state);
         //Page提供了方法，可以获取PageHelper分页查询后得到的总记录条数和当前页数据
         Page<Article> p = (Page<Article>) as;
@@ -196,8 +184,7 @@ public class ArticleServiceImpl implements ArticleService {
             pageSize = Math.min(pageSize, 50); // 限制最大页大小
             
             // 获取当前用户ID
-            Map<String, Object> map = ThreadLocalUtil.get();
-            Integer userId = (Integer) map.get("id");
+            Integer userId = UserContextUtil.getCurrentUserId();
             
             // 计算分页偏移量
             int offset = (page - 1) * pageSize;
@@ -224,57 +211,17 @@ public class ArticleServiceImpl implements ArticleService {
             if (article == null) {
                 throw new RuntimeException("文章不存在");
             }
-            
             // 2. 构造文章详情VO对象
             ArticleDetailVO articleDetailVO = new ArticleDetailVO();
-            articleDetailVO.setId(article.getId());
-            articleDetailVO.setTitle(article.getTitle());
-            articleDetailVO.setContent(article.getContent());
-            articleDetailVO.setCoverImg(article.getCoverImg());
-            articleDetailVO.setState(article.getState());
-            articleDetailVO.setCategoryId(article.getCategoryId());
-            articleDetailVO.setCreateTime(article.getCreateTime());
-            articleDetailVO.setUpdateTime(article.getUpdateTime());
+            // 复制基本属性
+            org.springframework.beans.BeanUtils.copyProperties(article, articleDetailVO);
+            // 处理可能为null的字段，设置默认值
             articleDetailVO.setLikeCount(article.getLikeCount() != null ? article.getLikeCount() : 0);
             articleDetailVO.setCollectCount(article.getCollectCount() != null ? article.getCollectCount() : 0);
             
-            // 3. 获取用户ID - 首先尝试从ThreadLocal获取，如果没有则尝试从请求头解析token
-            Integer userId = null;
-            try {
-                // 优先从ThreadLocal获取（如果拦截器已处理）
-                Map<String, Object> userMap = ThreadLocalUtil.get();
-                if (userMap != null) {
-                    userId = (Integer) userMap.get("id");
-                }
-                
-                // 如果ThreadLocal中没有用户信息，尝试从当前请求头中获取token并解析
-                if (userId == null) {
-                    HttpServletRequest request = ((ServletRequestAttributes) RequestContextHolder.getRequestAttributes()).getRequest();
-                    String token = request.getHeader("Authorization");
-                    if (token != null && !token.trim().isEmpty()) {
-                        // 处理Bearer前缀
-                        if (token.startsWith("Bearer ") || token.startsWith("bearer ")) {
-                            token = token.substring(7).trim();
-                        }
-                        
-                        // 尝试解析token
-                        if (!token.isEmpty()) {
-                            // 验证token是否在redis中存在且未过期
-                            ValueOperations<String, String> operations = stringRedisTemplate.opsForValue();
-                            String redisToken = operations.get(token);
-                            if (redisToken != null) {
-                                Map<String, Object> claims = JwtUtil.parseToken(token);
-                                if (claims != null && claims.containsKey("id")) {
-                                    userId = (Integer) claims.get("id");
-                                }
-                            }
-                        }
-                    }
-                }
-            } catch (Exception e) {
-                // 用户未登录或token无效，userId保持为null
-                log.debug("用户未登录或token无效访问文章详情: {}", e.getMessage());
-            }
+            // 3. 使用UserContextUtil获取用户ID，自动处理登录状态检测
+            Integer userId = UserContextUtil.getCurrentUserId();
+            log.debug("获取文章详情，用户ID: {}", userId);
             
             // 4. 如果获取到了userId，查询用户对该文章的点赞和收藏状态
             if (userId != null) {

@@ -4,20 +4,13 @@ import com.zhao.pojo.Category;
 import com.zhao.pojo.CategoryVO;
 import com.zhao.pojo.Result;
 import com.zhao.service.CategoryService;
-import com.zhao.utils.JwtUtil;
-import com.zhao.utils.ThreadLocalUtil;
-import jakarta.servlet.http.HttpServletRequest;
+import com.zhao.utils.UserContextUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.data.redis.core.StringRedisTemplate;
-import org.springframework.data.redis.core.ValueOperations;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.context.request.RequestContextHolder;
-import org.springframework.web.context.request.ServletRequestAttributes;
 
 import java.util.List;
-import java.util.Map;
 
 @RestController
 @RequestMapping("/category")
@@ -27,9 +20,6 @@ public class CategoryController {
 
     @Autowired
     private CategoryService categoryService;
-    
-    @Autowired
-    private StringRedisTemplate stringRedisTemplate;
 
 
     /**
@@ -91,44 +81,9 @@ public class CategoryController {
     @GetMapping("/list")
     public Result<List<CategoryVO>> getCategoryList() {
         try {
-            // 获取用户ID - 首先尝试从ThreadLocal获取，如果没有则尝试从请求头解析token
-            Integer userId = null;
-            try {
-                // 优先从ThreadLocal获取（如果拦截器已处理）
-                Map<String, Object> userMap = ThreadLocalUtil.get();
-                if (userMap != null) {
-                    userId = (Integer) userMap.get("id");
-                }
-                
-                // 如果ThreadLocal中没有用户信息，尝试从当前请求头中获取token并解析
-                if (userId == null) {
-                    HttpServletRequest request = ((ServletRequestAttributes) RequestContextHolder.getRequestAttributes()).getRequest();
-                    String token = request.getHeader("Authorization");
-                    if (token != null && !token.trim().isEmpty()) {
-                        // 处理Bearer前缀
-                        if (token.startsWith("Bearer ") || token.startsWith("bearer ")) {
-                            token = token.substring(7).trim();
-                        }
-                        
-                        // 尝试解析token
-                        if (!token.isEmpty()) {
-                            // 验证token是否在redis中存在且未过期
-                            ValueOperations<String, String> operations = stringRedisTemplate.opsForValue();
-                            String redisToken = operations.get(token);
-                            if (redisToken != null) {
-                                Map<String, Object> claims = JwtUtil.parseToken(token);
-                                if (claims != null && claims.containsKey("id")) {
-                                    userId = (Integer) claims.get("id");
-                                }
-                            }
-                        }
-                    }
-                }
-            } catch (Exception e) {
-                // 用户未登录或token无效，userId保持为null
-                log.debug("用户未登录或token无效访问分类列表: {}", e.getMessage());
-            }
-
+            // 使用UserContextUtil获取用户ID，自动处理登录状态检测
+            Integer userId = UserContextUtil.getCurrentUserId();
+            log.debug("获取分类列表，用户ID: {}", userId);
             List<CategoryVO> categoryList = categoryService.getCategoryList(userId);
             return Result.success(categoryList);
         } catch (Exception e) {

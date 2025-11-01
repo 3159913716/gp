@@ -49,6 +49,11 @@ const initialUserInfo = reactive(JSON.parse(JSON.stringify(userInfoStore.info)))
 */
 const userInfo = ref(JSON.parse(JSON.stringify(userInfoStore.info)))
 
+// 如果nickname为空或未定义，设置默认值
+if (!userInfo.value.nickname || userInfo.value.nickname.trim() === '') {
+  userInfo.value.nickname = userInfo.value.username || '用户' + Date.now().toString().slice(-4)
+}
+
 /* 
   表单修改状态：
   用于跟踪用户是否修改了表单内容
@@ -107,11 +112,13 @@ const resetForm = async () => {
   // 等待DOM更新
   await nextTick()
   
-  // 重置用户信息，保留用户名和邮箱，只清空昵称
+  // 重置用户信息，保留用户名和邮箱，并设置默认昵称
   const username = userInfoStore.info?.username || ''
   const email = userInfoStore.info?.email || ''
-  Object.assign(userInfo.value, { username: username, nickname: '', email: email })
-  Object.assign(initialUserInfo, { username: username, nickname: '', email: email })
+  // 设置默认昵称逻辑
+  const defaultNickname = username || '用户' + Date.now().toString().slice(-4);
+  Object.assign(userInfo.value, { username: username, nickname: defaultNickname, email: email })
+  Object.assign(initialUserInfo, { username: username, nickname: defaultNickname, email: email })
   
   // 重置修改状态
   isFormModified.value = false

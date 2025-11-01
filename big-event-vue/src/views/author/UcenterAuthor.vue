@@ -1,3 +1,5 @@
+<!-- 创作者激励计划样式已移至文件底部的style标签中 -->
+
 <template>
   <div class="author-center">
     <!-- 与弹窗同步显示的遮罩层 -->
@@ -23,11 +25,22 @@
         <el-button type="primary" @click="submitApplication" class="btn">提交申请</el-button>
       </div>
      <div class="news-container">
-            <div class="plan-title">创作者激励计划</div>
+            <div class="plan-title">
+              <span class="plan-icon">✨</span>
+              <h3>创作者激励计划</h3>
+            </div>
             <div class="news-slider">
               <div v-for="(item, index) in newsList" :key="index" class="news-item">
-                <div class="news_title">{{ item.title }}</div>
+                <div class="news_header">
+                  <span class="news_tag">新闻</span>
+                  <div class="news_title">{{ item.title }}</div>
+                </div>
                 <div class="news_desc">{{ item.desc }}</div>
+                <div class="news-footer">
+                  <el-button type="primary" size="small" plain class="learn-more-btn">
+                    了解详情
+                  </el-button>
+                </div>
               </div>
             </div>
     </div>
@@ -225,9 +238,6 @@ export default {
         {
             title:"B 站推 “SUPER UP” 计划 百亿流量锚定美妆垂类创作者",
             desc:"B 站近日正式启动时尚及美妆 UP 主专项扶持计划 “SUPER UP”，计划投入百亿流量资源，重点培育 100 位优质时尚生活方式创作者。此次扶持精准瞄准垂类赛道，特别开通 “头部作者绿色通道”，面向小红书 10 万粉以上、抖音百万粉以上的博主及行业从业者提供 1V1 对接服务。"
-        },{
-            title:"京东上线 “长阶计划” 亿级资源构建达人成长体系",
-            desc:"京东在首届商家内容大会上推出达人专项扶持 “长阶计划”，以 10 亿流量倾斜与亿级现金奖励，打造 Top100 达人矩阵。该计划构建全周期成长路径，针对不同阶段创作者设计分层激励：新人达人月完成 100 单即可获现金奖励，门槛仅为行业平均水平的五分之一。"
         }
       ]
     };
@@ -510,7 +520,7 @@ export default {
 
 /* 新闻列表容器 */
 .news-container {
-  padding: 10px 0;
+  padding: 20px 0;
   width: 100%;
   margin: 0 auto;
 }
@@ -524,16 +534,18 @@ export default {
   text-align: center;
 }
 
-/* 新闻滑块容器 */
+/* 新闻滑块容器：使用弹性布局让子元素横向排列 */
 .news-slider {
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
+  display: flex; /* 弹性布局，子元素默认横向排列 */
+  gap: 20px;     /* 子元素之间的间距为20px */
+  /* 可选：添加溢出处理（滑块通常需要横向滚动） */
+  overflow-x: auto; /* 当内容超出容器宽度时，显示水平滚动条 */
+  padding: 10px 0;  /* 上下内边距，避免内容贴边 */
 }
 
 /* 新闻项样式 */
 .news-item {
-  padding: 15px;
+  padding: 5px;
   background: #f9f9f9;
   border-radius: 8px;
   border: 1px solid #e8e8e8;
@@ -843,6 +855,195 @@ export default {
   color: #606266;
   font-size: 14px;
   line-height: 1.6;
+}
+
+/* 创作者激励计划样式 */
+.news-container {
+  margin: 2rem auto;
+  padding: 1.5rem;
+  max-width: 100%;
+  background: linear-gradient(135deg, #fff 0%, #f9f9f9 100%);
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.05);
+  overflow: hidden;
+  border: 1px solid #eaeaea;
+}
+
+.plan-title {
+  display: flex;
+  align-items: center;
+  margin-bottom: 1.5rem;
+  padding-bottom: 1rem;
+  border-bottom: 2px solid #f0f0f0;
+}
+
+.plan-icon {
+  font-size: 1.5rem;
+  margin-right: 0.8rem;
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.1); }
+  100% { transform: scale(1); }
+}
+
+.plan-title h3 {
+  margin: 0;
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: #333;
+  background: linear-gradient(90deg, #4f46e5, #7c3aed);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* 优化容器样式 */
+.news-container {
+  margin: 2rem auto;
+  padding: 2rem; /* 统一内边距 */
+  max-width: 1200px;
+  background: linear-gradient(135deg, #fff, #f8f9ff);
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.05);
+  overflow: visible;
+  border: 1px solid #eaeaea;
+  position: relative;
+  box-sizing: border-box; /* 确保内边距不会导致容器超出 */
+}
+
+/* 三列网格布局，更合理展示内容 */
+.news-slider {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1.5rem; /* 调整间距大小 */
+  justify-content: space-between; /* 确保项目均匀分布 */
+  width: 100%;
+  box-sizing: border-box;
+  padding: 0 0.5rem; /* 为左右两侧添加额外的内边距 */
+}
+
+/* 优化新闻项样式 */
+.news-item {
+  background: #fff;
+  padding: 2rem;
+  border-radius: 10px;
+  transition: all 0.3s ease;
+  border: 1px solid #e0e5ff;
+  box-shadow: 0 4px 12px rgba(79, 70, 229, 0.05);
+  min-height: 280px;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  position: relative;
+}
+
+/* 标题行样式 */
+.news_header {
+  display: flex;
+  align-items: center;
+  margin-bottom: 1rem;
+  gap: 0.6rem;
+}
+
+/* 标签样式 */
+.news_tag {
+  background: linear-gradient(135deg, #4f46e5, #7c3aed);
+  color: white;
+  padding: 0.25rem 0.75rem;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+/* 标题样式 */
+.news_title {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #333;
+  margin: 0;
+  transition: color 0.3s ease;
+  flex: 1;
+}
+
+/* 描述样式 */
+.news_desc {
+  color: #666;
+  font-size: 0.95rem;
+  line-height: 1.6;
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-bottom: 1rem;
+}
+
+/* 底部样式 */
+.news-footer {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: auto;
+}
+
+/* 按钮样式 */
+.learn-more-btn {
+  color: #4f46e5;
+  border-color: #4f46e5;
+  font-size: 0.875rem;
+  padding: 0.25rem 1rem;
+}
+
+.learn-more-btn:hover {
+  background-color: #4f46e5;
+  color: white;
+}
+
+/* 卡片悬停效果 */
+.news-item:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 12px 24px rgba(79, 70, 229, 0.12);
+  border-color: #4f46e5;
+}
+
+.news-item:hover .news_title {
+  color: #4f46e5;
+}
+
+/* 优化响应式设计 */
+@media (max-width: 1024px) {
+  .news-slider {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1.2rem;
+  }
+  .news-container {
+    margin: 1.5rem auto;
+    padding: 0 1rem;
+  }
+}
+
+@media (max-width: 768px) {
+  .news-container {
+    margin: 1rem;
+    padding: 1.2rem;
+  }
+  
+  .plan-title h3 {
+    font-size: 1.3rem;
+  }
+  
+  .news-slider {
+    grid-template-columns: 1fr;
+    gap: 1.2rem;
+  }
+  
+  .news-item {
+    min-height: 220px;
+    padding: 1.2rem;
+  }
 }
 
 /* 确保整个页面没有滚动条 */
