@@ -12,13 +12,13 @@ import request from '@/utils/request.js';
 // ==================== 文章分类相关API ====================
 
 /**
- * 获取文章分类列表
+ * 获取文章分类列表（公开端点）
  * @returns {Promise} 包含文章分类列表的Promise
- * API路径：GET /category
+ * API路径：GET /category/list
  */
 export const articleCategoryListService = () => {
   // 注意：在Pinia中定义的数据都不需要.value
-  return request.get('/category');
+  return request.get('/category/list');
 }
 
 /**

@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted, onUnmounted, watch } from 'vue'
+import { ref, onMounted, onUnmounted, watch, computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { ElTabs, ElTabPane, ElCard, ElAvatar, ElPagination } from 'element-plus'
 import articleHomeApi from '@/api/articlehome.js'
@@ -8,9 +8,14 @@ import coverImgAsset from '@/assets/cover.jpg'
 import logoImgAsset from '@/assets/logo.png'
 import avatarImgAsset from '@/assets/avatar.jpg'
 import { articleCategoryListService } from '@/api/article.js'
+import { useTokenStore } from '@/stores/token.js'
+import useUserInfoStore from '@/stores/userInfo.js'
 
 console.log('HomePage.vue 组件加载')
 
+// 新增：登录状态判断（用于分类过滤逻辑）
+const tokenStore = useTokenStore()
+const isLoggedIn = computed(() => !!tokenStore.token)
 // 排序方式：最新或热门
 const activeSort = ref('latest')
 
@@ -20,6 +25,37 @@ const articles = ref([])
 const selectedCategoryId = ref(null)
 // 新增：搜索关键词（从路由读取）
 const selectedKeyword = ref('')
+
+// 新增：本地交互持久化读取（与详情页键一致）
+const userInfoStore = useUserInfoStore()
+const getPersistKeyFor = (id) => {
+  const uid = userInfoStore?.info?.id ?? 0
+  return `article:interactions:${id}:${uid || 'anon'}`
+}
+const readInteractionFor = (id) => {
+  try {
+    const raw = localStorage.getItem(getPersistKeyFor(id))
+    return raw ? JSON.parse(raw) : {}
+  } catch {
+    return {}
+  }
+}
+const mergePersistedCounts = (list) => {
+  if (!Array.isArray(list)) return []
+  return list.map(a => {
+    const p = readInteractionFor(a.id)
+    const like = p?.likeCount
+    const collect = p?.collectCount
+    // 仅当本地存在值时覆盖接口值，保持非负
+    const next = { ...a }
+    if (like !== undefined) next.likeCount = Math.max(0, Number(like) || 0)
+    if (collect !== undefined) next.collectCount = Math.max(0, Number(collect) || 0)
+    // 兜底：确保字段存在
+    if (next.likeCount === undefined) next.likeCount = 0
+    if (next.collectCount === undefined) next.collectCount = 0
+    return next
+  })
+}
 
 // 热门分类数据（模拟）
 const hotCategories = ref([])
@@ -133,9 +169,11 @@ const loadArticles = async () => {
         createTime: item.createTime ?? item.create_time ?? '',
         // 移除阅读量：viewCount/read_count
         likeCount: item.likeCount ?? item.like_count ?? 0,
-        commentCount: item.commentCount ?? item.comment_count ?? 0
+        commentCount: item.commentCount ?? item.comment_count ?? 0,
+        collectCount: item.collectCount ?? item.collect_count ?? 0
       }))
-      const sorted = sortArticles(mapped)
+      const merged = mergePersistedCounts(mapped)
+      const sorted = sortArticles(merged)
       articles.value = sorted
       total.value = Number(payload?.total ?? sorted.length)
       console.log('搜索结果加载完成，共', articles.value.length, '条数据')
@@ -183,7 +221,8 @@ const loadArticles = async () => {
       ? mapped.filter(a => a.categoryId === selectedCategoryId.value)
       : mapped
 
-    const sorted = sortArticles(filtered)
+    const merged = mergePersistedCounts(filtered)
+    const sorted = sortArticles(merged)
     articles.value = sorted
     total.value = Number(payload?.total ?? sorted.length)
     console.log('文章列表加载完成，共', articles.value.length, '条数据')
@@ -198,7 +237,8 @@ const loadArticles = async () => {
     } else if (selectedCategoryId.value != null) {
       mock = mock.filter(a => a.categoryId === selectedCategoryId.value)
     }
-    const sorted = sortArticles(mock)
+    const merged = mergePersistedCounts(mock)
+    const sorted = sortArticles(merged)
     articles.value = sorted
     total.value = 120
   }
@@ -340,23 +380,32 @@ const loadLatestArticles = async () => {
     latestArticles.value = []
   }
 }
-// 加载右侧热门分类（只取前4个）
+// 加载右侧热门分类（只取前4个，登录用户显示自己创建的分类；未登录显示公开分类）
 const loadHotCategories = async () => {
   try {
     const res = await articleCategoryListService()
     const payload = res?.data ?? res
-    const list = Array.isArray(payload?.items)
+    let list = Array.isArray(payload?.items)
       ? payload.items
       : (Array.isArray(payload?.list) ? payload.list : (Array.isArray(payload) ? payload : []))
+
+    // 仅在已登录时按 userCreated 过滤为“当前用户创建的分类”
+    if (isLoggedIn.value) {
+      list = list.filter(c => {
+        const flag = c.userCreated ?? c.isUserCreated ?? c.is_user_created
+        return flag === true || flag === 'true' || flag === 1 || flag === '1'
+      })
+    }
+
     hotCategories.value = list.slice(0, 4).map(c => ({
       id: c.id,
-      categoryName: c.categoryName ?? c.categoryName ?? '',
+      categoryName: c.categoryName ?? c.category_name ?? '',
       categoryAlias: c.categoryAlias ?? c.category_alias ?? ''
       // articleCount 可选：若后端提供则展示
     }))
   } catch (e) {
     console.error('加载热门分类失败:', e?.message || e)
-    // 使用默认分类兜底展示
+    // 使用默认分类兜底展示（未登录场景提供基础可视内容）
     hotCategories.value = defaultCategories.slice(0,4)
   }
 }
@@ -723,6 +772,8 @@ onUnmounted(() => {
   padding: 6px 12px;
   height: 32px;
   pointer-events: none; /* 仅展示，不可点击 */
+  border: none !important; /* 取消黑色边框 */
+  background-color: #fff !important; /* 背景与卡片一致 */
 }
 .list-actions .action-btn .icon {
   font-size: 16px;

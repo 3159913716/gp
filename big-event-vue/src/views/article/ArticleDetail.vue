@@ -9,6 +9,7 @@ import request from '@/utils/request.js'
 import sendCommentApi from '@/api/sendcomment.js'
 import { useTokenStore } from '@/stores/token.js'
 import useUserInfoStore from '@/stores/userInfo.js'
+import CommentTree from '@/components/front/CommentTree.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -268,18 +269,19 @@ const loadDetail = async () => {
   loading.value = true
   errorMsg.value = ''
   try {
-    // 使用公共文章详情接口
-    const res = await request.get(`/article/public-detail/${articleId.value}`)
-    let data = res?.data || res
+    // 使用公共文章详情接口（不带显式 /api 前缀，避免命中需认证的网关）
+    const res = await articleHomeApi.getArticleDetail(articleId.value)
+    let data = res?.data || res?.item || res?.article || res
 
-    // 若主接口未返回有效数据，尝试备用接口
+    // 若主接口未返回有效数据，尝试备用公开接口：GET /article/detail-page?id={id}
     if (!data || (!data.id && !data.title && !data.content && !data.contentHtml)) {
       try {
-        const alt = await articleHomeApi.getArticleDetail(articleId.value)
-        data = alt?.data || alt?.item || alt?.article || alt
+        const alt = await request.get('/article/detail-page', { params: { id: articleId.value } })
+        const payload = alt?.data ?? alt
+        data = payload?.data ?? payload?.item ?? payload?.article ?? payload
       } catch (e) {
         // 备用接口失败不抛出，后续走兜底
-        console.warn('备用接口加载失败:', e?.message || e)
+        console.warn('备用公开接口加载失败:', e?.message || e)
       }
     }
 
@@ -296,11 +298,26 @@ const loadDetail = async () => {
     const urlIsCollected = route.query.isCollected === 'true'
     const urlCollectCount = Number(route.query.collectCount)
     
-    liked.value = (apiIsLikedRaw !== undefined) ? Boolean(apiIsLikedRaw) : Boolean(persisted.liked ?? article.value.isLiked)
-    // 如果从URL参数知道是收藏状态，则直接设置为已收藏
-    favorited.value = urlIsCollected ? true : 
-                     (apiIsCollectedRaw !== undefined) ? Boolean(apiIsCollectedRaw) : 
-                     Boolean(persisted.favorited ?? article.value.isCollected)
+    // 认证用户时优先采用接口返回的个性化状态；否则更信任本地持久化
+    const tokenStore = useTokenStore()
+    const hasAuth = !!tokenStore?.token
+    if (persisted.liked !== undefined) {
+      liked.value = Boolean(persisted.liked)
+    } else if (hasAuth && apiIsLikedRaw !== undefined) {
+      liked.value = Boolean(apiIsLikedRaw)
+    } else {
+      liked.value = Boolean(article.value.isLiked)
+    }
+    // 如果从URL参数知道是收藏状态，则直接设置为已收藏；否则与点赞一致的优先级
+    if (urlIsCollected) {
+      favorited.value = true
+    } else if (persisted.favorited !== undefined) {
+      favorited.value = Boolean(persisted.favorited)
+    } else if (hasAuth && apiIsCollectedRaw !== undefined) {
+      favorited.value = Boolean(apiIsCollectedRaw)
+    } else {
+      favorited.value = Boolean(article.value.isCollected)
+    }
 
     localLikeCount.value = Math.max(0, Number((persisted.likeCount ?? article.value.likeCount) || 0))
     // 如果URL参数中有收藏数，则优先使用
@@ -315,12 +332,40 @@ const loadDetail = async () => {
     if (!article.value.categoryName && article.value.categoryId) {
       try {
         const cRes = await articleHomeApi.getCategoryDetail(article.value.categoryId)
-        const cData = cRes?.data || cRes
-        const name = cData?.categoryName ?? cData?.category_name
-        if (name) article.value.categoryName = name
+        const cPayload = cRes?.data ?? cRes
+        const cData = cPayload?.data ?? cPayload?.item ?? cPayload
+        const name = cData?.categoryName ?? cData?.category_name ?? cData?.name ?? cData?.title ?? cData?.alias ?? cData?.category?.name ?? cData?.category?.categoryName
+        if (name) {
+          article.value.categoryName = String(name)
+        } else {
+          // 兜底：读取分类列表查找
+          try {
+            const listRes = await request.get('/category/list')
+            const lPayload = listRes?.data ?? listRes
+            const list = Array.isArray(lPayload?.data) ? lPayload.data : (Array.isArray(lPayload?.list) ? lPayload.list : (Array.isArray(lPayload) ? lPayload : []))
+            const found = list.find(it => Number(it?.id) === Number(article.value.categoryId))
+            const n2 = found?.categoryName ?? found?.category_name ?? found?.name ?? found?.title ?? found?.alias
+            if (n2) article.value.categoryName = String(n2)
+          } catch (e2) {
+            console.warn('分类列表兜底失败:', e2?.message || e2)
+          }
+        }
       } catch (e) {
-        // 分类查询失败不影响正文展示
-        console.warn('分类名称补充失败:', e?.message || e)
+        // 分类详情接口未授权或失败时，直接回退到公开的分类列表
+        try {
+          const listRes = await request.get('/category/list')
+          const lPayload = listRes?.data ?? listRes
+          const list = Array.isArray(lPayload?.data) ? lPayload.data : (Array.isArray(lPayload?.list) ? lPayload.list : (Array.isArray(lPayload) ? lPayload : []))
+          const found = list.find(it => Number(it?.id) === Number(article.value.categoryId))
+          const n2 = found?.categoryName ?? found?.category_name ?? found?.name ?? found?.title ?? found?.alias
+          if (n2) {
+            article.value.categoryName = String(n2)
+          } else {
+            console.warn('分类名称补齐失败：列表中未找到匹配ID', article.value.categoryId)
+          }
+        } catch (e2) {
+          console.warn('分类名称补充失败且列表兜底也失败:', e2?.message || e2)
+        }
       }
     }
 
@@ -456,9 +501,35 @@ const submitComment = async () => {
   }
 }
 
+// 针对某条评论的嵌套回复提交
+const onSubmitReply = async ({ parentId, content }) => {
+  const tokenStore = useTokenStore()
+  if (!tokenStore?.token) {
+    ElMessage.warning('请先登录后再回复')
+    const redirect = encodeURIComponent(location.pathname + location.search)
+    router.push({ name: 'Login', query: { redirect } })
+    return
+  }
+  const text = String(content || '').trim()
+  if (!text) return
+  submittingComment.value = true
+  try {
+    const payload = { content: text, parentId, parent_id: parentId }
+    const resp = await sendCommentApi.addComment(articleId.value, payload)
+    const code = resp?.code ?? resp?.status ?? 0
+    const ok = (code === 0 || code === 200 || resp?.success === true)
+    if (!ok) throw new Error(resp?.message || '回复失败')
+    await loadComments()
+    ElMessage.success('回复成功')
+  } catch (err) {
+    ElMessage.error(err?.message || '回复失败，请稍后重试')
+  } finally {
+    submittingComment.value = false
+  }
+}
+
 // 生成模拟评论数据（兜底）
 const generateMockComments = (id, page = 1, pageSize = 10) => {
-  const total = 50
   const start = (page - 1) * pageSize
   const list = Array.from({ length: pageSize }).map((_, idx) => {
     const cid = start + idx + 1
@@ -476,29 +547,70 @@ const generateMockComments = (id, page = 1, pageSize = 10) => {
       replies: []
     }
   })
+  const total = list.length
   return { list, total }
 }
 
-// 归一化评论数据
-const normalizeComments = (data) => {
-  const list = Array.isArray(data?.list) ? data.list : (Array.isArray(data?.items) ? data.items : [])
-  const total = data?.total ?? list.length
+// 归一化评论数据（递归处理 replies）
+const normalizeCommentItem = (c) => {
   return {
-    list: list.map(c => ({
-      id: c.id ?? 0,
-      content: c.content ?? '',
-      createTime: c.createTime ?? c.create_time ?? '',
-      user: {
-        id: c.user?.id ?? c.user_id ?? c.userId ?? c.uid ?? c.userInfo?.id ?? 0,
-        username: c.user?.username ?? c.user?.nickname ?? c.userInfo?.nickname ?? c.userInfo?.username ?? c.nickname ?? c.userName ?? c.user_name ?? '游客',
-        avatar: normalizeImageUrl(c.user?.avatar ?? c.user?.userPic ?? c.userInfo?.userPic ?? c.userInfo?.avatar ?? c.userPic ?? c.user_pic ?? c.avatarUrl ?? c.avatar) || avatarImgAsset
-      },
-      likeCount: c.likeCount ?? c.comment_like_count ?? 0,
-      isLiked: c.isLiked ?? false,
-      replies: Array.isArray(c.replies) ? c.replies : []
-    })),
-    total
+    id: c.id ?? 0,
+    content: c.content ?? '',
+    createTime: c.createTime ?? c.create_time ?? '',
+    user: {
+      id: c.user?.id ?? c.user_id ?? c.userId ?? c.uid ?? c.userInfo?.id ?? 0,
+      username: c.user?.username ?? c.user?.nickname ?? c.userInfo?.nickname ?? c.userInfo?.username ?? c.nickname ?? c.userName ?? c.user_name ?? '游客',
+      avatar: normalizeImageUrl(c.user?.avatar ?? c.user?.userPic ?? c.userInfo?.userPic ?? c.userInfo?.avatar ?? c.userPic ?? c.user_pic ?? c.avatarUrl ?? c.avatar) || avatarImgAsset
+    },
+    likeCount: c.likeCount ?? c.comment_like_count ?? 0,
+    isLiked: c.isLiked ?? false,
+    parentId: c.parentId ?? c.parent_id ?? 0,
+    replyCount: c.replyCount ?? c.reply_count ?? (Array.isArray(c.replies) ? c.replies.length : 0),
+    replies: Array.isArray(c.replies) ? c.replies.map(normalizeCommentItem) : []
   }
+}
+
+const computeDeepTotal = (arr) => {
+  if (!Array.isArray(arr)) return 0
+  let sum = 0
+  for (const item of arr) {
+    sum += 1 + computeDeepTotal(item?.replies || [])
+  }
+  return sum
+}
+
+const normalizeComments = (data) => {
+  const rawList = Array.isArray(data?.list) ? data.list : (Array.isArray(data?.items) ? data.items : [])
+  const normalizedList = Array.isArray(rawList) ? rawList.map(normalizeCommentItem) : []
+
+  // 如果后端已返回嵌套 replies，则直接取顶层（parentId===0）的节点，并计算总数为所有层级的和
+  const hasNested = normalizedList.some(n => Array.isArray(n.replies) && n.replies.length > 0)
+  if (hasNested) {
+    const total = computeDeepTotal(normalizedList)
+    return { list: normalizedList.filter(n => Number(n.parentId || 0) === 0), total }
+  }
+
+  // 否则根据 parentId 构建树，总数为原始扁平列表长度（已包含子回复）
+  const map = new Map()
+  normalizedList.forEach(n => {
+    n.replies = Array.isArray(n.replies) ? n.replies : []
+    map.set(Number(n.id), n)
+  })
+  const roots = []
+  normalizedList.forEach(n => {
+    const pid = Number(n.parentId || 0)
+    if (pid > 0 && map.has(pid)) {
+      map.get(pid).replies.push(n)
+    } else {
+      roots.push(n)
+    }
+  })
+  // 更新每个节点的回复数量
+  normalizedList.forEach(n => {
+    n.replyCount = n.replyCount ?? (Array.isArray(n.replies) ? n.replies.length : 0)
+  })
+  const total = normalizedList.length
+  return { list: roots, total }
 }
 
 // 加载评论列表
@@ -579,9 +691,6 @@ watch(() => route.params.id, () => {
         <template #header>
           <div class="detail-header">
             <div class="header-top">
-              <button class="back-btn" @click="handleBack">
-                ← 返回
-              </button>
               <h2 class="title">{{ article.title }}</h2>
             </div>
             <div class="meta">
@@ -591,8 +700,16 @@ watch(() => route.params.id, () => {
                 <span class="time">{{ article.createTime }}</span>
               </div>
               <div class="stats">
-                <span>点赞 {{ article.likeCount }}</span>
-                <span>评论 {{ commentsTotal }}</span>
+                <div class="stat-item">
+                  <span class="stat-icon">👍</span>
+                 
+                  <span class="stat-value">{{ localLikeCount }}</span>
+                </div>
+                <div class="stat-item">
+                  <span class="stat-icon">💬</span>
+                 
+                  <span class="stat-value">{{ commentsTotal }}</span>
+                </div>
               </div>
             </div>
           </div>
@@ -628,7 +745,7 @@ watch(() => route.params.id, () => {
         <div class="comments-section">
           <h3 class="comments-title">评论</h3>
 
-          <!-- 新增：发表评论输入框与发布按钮 -->
+          <!-- 新增：发布评论输入框与发布按钮 -->
           <div class="comment-editor">
             <ElInput
               v-model="newComment"
@@ -647,22 +764,14 @@ watch(() => route.params.id, () => {
           <div v-if="commentsLoading" class="comments-loading">正在加载评论...</div>
           <template v-else>
             <template v-if="comments.length">
-              <div v-for="c in comments" :key="c.id" class="comment-item">
-                <ElAvatar :src="c.user.avatar" size="small" @error="onCommentAvatarError(c)" />
-                <div class="c-body">
-                  <div class="c-meta">
-                    <span class="c-user">{{ c.user.username }}</span>
-                    <span class="c-time">{{ c.createTime }}</span>
-                    <span class="c-like">
-                      <ElButton class="c-like-btn" :type="c.isLiked ? 'primary' : 'default'" size="small" @click="onToggleCommentLike(c)" :loading="commentLikeLoading[c.id]">
-                        <span class="icon">👍</span>
-                        <span class="count">{{ c.likeCount }}</span>
-                      </ElButton>
-                    </span>
-                  </div>
-                  <div class="c-content">{{ c.content }}</div>
-                </div>
-              </div>
+              <CommentTree
+                v-for="c in comments"
+                :key="c.id"
+                :node="c"
+                :depth="0"
+                @submit-reply="onSubmitReply"
+                @toggle-like="onToggleCommentLike"
+              />
             </template>
             <ElEmpty v-else description="暂无评论" />
             <ElPagination
@@ -710,23 +819,6 @@ watch(() => route.params.id, () => {
   gap: 12px;
 }
 
-.back-btn {
-  padding: 6px 12px;
-  border: 1px solid #dcdfe6;
-  border-radius: 4px;
-  background-color: #fff;
-  color: #606266;
-  cursor: pointer;
-  font-size: 14px;
-  transition: all 0.2s;
-  white-space: nowrap;
-}
-
-.back-btn:hover {
-  color: #409EFF;
-  border-color: #c6e2ff;
-  background-color: #ecf5ff;
-}
 
 title {
   margin: 0;
@@ -769,10 +861,22 @@ title {
 
 .stats {
   display: flex;
+  align-items: center;
   gap: 12px;
-  color: #909399;
+  color: #606266;
   font-size: 13px;
 }
+.stat-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 10px;
+  background: #f5f7fa;
+  border: 1px solid #ebeef5;
+  border-radius: 16px;
+}
+.stat-icon { font-size: 14px; }
+.stat-value { color: #303133; font-weight: 600; }
 
 .cover {
   width: 100%;

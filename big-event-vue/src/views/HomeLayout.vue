@@ -202,11 +202,35 @@ const goToProfile = () => {
 // 加载导航分类（只取前4个）
 const loadNavCategories = async () => {
   try {
-    const res = await articleCategoryListService()
+    // 读取当前登录用户ID（兼容多字段）
+    const currentUserId = userInfoStore?.info?.id ?? userInfoStore?.info?.userId
+    const params = (isLoggedIn.value && currentUserId)
+      ? { userId: currentUserId }
+      : {}
+
+    const res = await articleCategoryListService(params)
     const payload = res?.data ?? res
-    const list = Array.isArray(payload?.items)
+    let list = Array.isArray(payload?.items)
       ? payload.items
       : (Array.isArray(payload?.list) ? payload.list : (Array.isArray(payload) ? payload : []))
+
+    // 优先使用后端标识位 userCreated 进行过滤
+    if (isLoggedIn.value) {
+      const filteredByFlag = list.filter(c => {
+        const flag = c.userCreated ?? c.isUserCreated ?? c.is_user_created
+        return flag === true || flag === 'true' || flag === 1 || flag === '1'
+      })
+      if (filteredByFlag.length > 0) list = filteredByFlag
+    }
+
+    // 客户端兜底过滤：若后端未按userId过滤且无标识位，前端按创建者ID过滤
+    if (isLoggedIn.value && currentUserId && (!list.length || list.some(c => c.userCreated == null))) {
+      list = list.filter(c => {
+        const ownerId = c.createUser ?? c.create_user ?? c.userId ?? c.createUserId
+        return ownerId == null ? true : String(ownerId) === String(currentUserId)
+      })
+    }
+
     categories.value = list.slice(0, 4).map(c => ({
       id: c.id,
       categoryName: c.categoryName ?? c.category_name ?? '',
