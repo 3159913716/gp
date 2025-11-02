@@ -5,8 +5,23 @@
 
 <template>
   <div class="container"> 
+    <!-- 加载状态 -->
+    <div class="loading-state" v-if="loading">
+      <el-icon class="is-loading"><Loading /></el-icon>
+      <div class="loading-text">加载中...</div>
+    </div>
+    
+    <!-- 错误状态 -->
+    <div class="error-state" v-else-if="error">
+      <el-icon class="error-icon"><WarningFilled /></el-icon>
+      <div class="error-text">{{ errorMessage }}</div>
+      <el-button type="primary" size="small" class="reload-btn" @click="refreshList">
+        <el-icon><Refresh /></el-icon> 重新加载
+      </el-button>
+    </div>
+    
     <!-- 关注用户接口数据展示 -->
-    <div class="follow-table" v-show="success && list.length != 0">
+    <div class="follow-table" v-else-if="success && list.length > 0">
         <div class="table-header">
             <div class="title-cell">用户昵称</div>
             <div class="img-cell">用户头像</div>
@@ -15,7 +30,7 @@
         </div>
         <div class="table-content">
             <div class="table-row" v-for="item in list" :key="item.userId">
-                <div class="title-cell">{{ item.nickname}}</div>
+                <div class="title-cell">{{ item.nickname || item.username }}</div>
                 <div class="img-cell"><img :src="item.userPic" alt="用户头像" class="user-img"></div>
                 <div class="author-cell">{{ item.followTime }}</div>
                 <div class="time-cell">
@@ -25,6 +40,9 @@
         </div>
         <!-- 新增分页组件 -->
         <div class="pagination">
+          <el-button type="primary" size="small" class="refresh-btn" @click="refreshList">
+            <el-icon><Refresh /></el-icon> 刷新
+          </el-button>
           <el-pagination
             @size-change="handleSizeChange"
             @current-change="handleCurrentChange"
@@ -37,56 +55,73 @@
         </div>
     </div>
     <!-- 空数据状态 -->
-    <div class="empty-state" v-show="!success || list.length === 0">
+    <div class="empty-state" v-else>
         <div>暂无关注的用户</div>
+        <div class="empty-tip">您可以在文章详情页关注感兴趣的作者</div>
     </div>
   </div>
 </template>
 
 <script>
 import request from '@/utils/request.js';
-import { WarningFilled } from '@element-plus/icons-vue'; // 引入Element Plus图标
+import { WarningFilled, Refresh, Loading } from '@element-plus/icons-vue'; // 引入Element Plus图标
 
 export default {
- components: { WarningFilled }, // 注册图标组件
+ components: { WarningFilled, Refresh, Loading }, // 注册图标组件
   // 数据定义
   data() {
     return {
         success: false,
+        loading: false,
+        error: false,
+        errorMessage: '',
         message: "获取成功",
-        list: [
-            {
-            userId: 0,
-            username: "",
-            nickname: "",
-            userPic: "",
-            role: 1,
-            followTime: ""
-            }
-        ],
+        list: [],
+        total: 0,
+        page: 1,
+        pageSize: 10
     };
   },
   
   // 组件挂载后调用接口
   mounted() {
-     this.fetchOrders()
+     this.fetchFollowList()
   },
   
   // 方法定义
   methods: {
     
-    // 调用第二个接口：获取关注作者列表
-    async fetchOrders() {    
+    // 获取关注作者列表
+    async fetchFollowList() {    
+        this.loading = true;
+        this.error = false;
+        
         try {
             const response = await request.get('/user/following');
-            this.list = response.data.list;
-            this.total = response.data.total;
+            const data = response.data || response;
+            this.list = Array.isArray(data.list) ? data.list : [];
+            this.total = Number(data.total || 0);
+            this.success = true;
         } catch (error) {
             console.error('获取关注作者列表失败:', error);
+            this.error = true;
+            this.errorMessage = error?.message || '获取关注列表失败';
+            this.$message.error('获取关注列表失败，请稍后重试');
+            // 清空列表数据，确保显示空状态
+            this.list = [];
+            this.total = 0;
+            this.success = false;
+        } finally {
+            this.loading = false;
         }
     },
     
-    // 取消收藏方法（原有逻辑补充）
+    // 刷新关注列表
+    refreshList() {
+      this.fetchFollowList();
+    },
+    
+    // 取消关注方法
     removeFollow(id) {
       this.$confirm('确定要取消关注这个作者吗？', '提示', {
         confirmButtonText: '确定',
@@ -95,14 +130,33 @@ export default {
       }).then(async () => {
         try {
           await request.post(`/user/${id}/follow`);
+          // 更新列表，移除取消关注的用户
           this.list = this.list.filter(item => item.userId !== id);
+          this.total = Math.max(0, this.total - 1);
           this.$message.success('取消关注成功');
+          // 如果列表变空，更新success状态
+          if (this.list.length === 0) {
+            this.success = false;
+          }
         } catch (err) {
+          console.error('取消关注失败:', err);
           this.$message.error('取消关注失败，请稍后重试');
         }
       }).catch(() => {
         this.$message.info('已取消操作');
       });
+    },
+    
+    // 分页处理
+    handleSizeChange(size) {
+      this.pageSize = size;
+      this.page = 1;
+      this.fetchFollowList();
+    },
+    
+    handleCurrentChange(current) {
+      this.page = current;
+      this.fetchFollowList();
     }
   }
 };

@@ -1,7 +1,7 @@
 <script setup>
 import { ref, onMounted, watch, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ElCard, ElAvatar, ElTag, ElPagination, ElEmpty, ElInput, ElButton, ElMessage } from 'element-plus'
+import { ElCard, ElAvatar, ElTag, ElPagination, ElEmpty, ElInput, ElButton, ElMessage, ElMessageBox } from 'element-plus'
 import articleHomeApi from '@/api/articlehome.js'
 import defaultCover from '@/assets/default.png'
 import avatarImgAsset from '@/assets/avatar.jpg'
@@ -64,6 +64,7 @@ const saveInteraction = () => {
     const payload = {
       liked: liked.value,
       favorited: favorited.value,
+      following: following.value,
       likeCount: localLikeCount.value,
       collectCount: localCollectCount.value,
       ts: Date.now()
@@ -147,6 +148,16 @@ const localLikeCount = ref(0)
 const localCollectCount = ref(Number(route.query.collectCount) || 0) // 从URL参数设置初始收藏数
 const likeLoading = ref(false)
 const favoriteLoading = ref(false)
+
+// 关注相关状态
+const following = ref(false) // 关注状态
+const followLoading = ref(false) // 关注加载状态
+
+// 关注UI控制计算属性
+const followingUi = computed(() => {
+  // 只有在已登录且确实已关注的情况下才显示已关注状态
+  return hasAuth.value && following.value
+})
 
 // 新增：点赞UI控制计算属性
 const tokenStoreTop = useTokenStore()
@@ -261,6 +272,7 @@ const generateMockDetail = (id = 1) => {
     coverImg: defaultCover,
     authorName: `作者${(id % 10) + 1}`,
     authorAvatar: avatarImgAsset,
+    authorId: (id % 10) + 1, // 添加authorId，确保关注按钮可用
     categoryId: null,
     categoryName: ['技术资讯', '行业动态', '经验分享', '教程学习'][id % 4],
     createTime: `2024-01-${String(20 - (id % 15)).padStart(2, '0')}`,
@@ -273,6 +285,20 @@ const generateMockDetail = (id = 1) => {
 // 将接口返回的文章字段映射到页面所需结构（兼容驼峰/下划线字段）
 const normalizeDetail = (data) => {
   if (!data || typeof data !== 'object') return generateMockDetail(articleId.value || 1)
+  
+  // 确保authorId始终有值，优先使用已有字段，否则从作者名提取或使用默认值
+  let authorId = data.author?.id ?? data.authorId ?? data.author_id ?? data.userId ?? data.user_id ?? data.create_user;
+  if (!authorId) {
+    const authorName = data.author?.username ?? data.authorName ?? data.author_name ?? data.author ?? data.username ?? data.createUserName ?? (data.create_user ? `用户${data.create_user}` : '匿名作者');
+    const match = String(authorName).match(/\d+/);
+    if (match) {
+      authorId = Number(match[0]);
+    } else {
+      // 默认作者ID为1
+      authorId = 1;
+    }
+  }
+  
   return {
     id: data.id ?? articleId.value,
     title: data.title ?? '',
@@ -281,6 +307,7 @@ const normalizeDetail = (data) => {
     coverImg: normalizeImageUrl(data.coverImg ?? data.cover_img),
     authorName: data.author?.username ?? data.authorName ?? data.author_name ?? data.author ?? data.username ?? data.createUserName ?? (data.create_user ? `用户${data.create_user}` : '匿名作者'),
     authorAvatar: normalizeImageUrl(data.author?.avatar ?? data.authorAvatar ?? data.author_pic ?? data.userPic) || avatarImgAsset,
+    authorId: authorId,
     categoryId: data.categoryId ?? data.category_id ?? null,
     categoryName: data.categoryName ?? data.category_name ?? '',
     createTime: data.createTime ?? data.create_time ?? data.publishTime ?? '',
@@ -297,7 +324,8 @@ const normalizeDetail = (data) => {
 const resolveAuthorFromItem = (item) => {
   const name = item?.author?.username ?? item?.authorName ?? item?.author_name ?? item?.author ?? item?.username ?? item?.createUserName ?? (item?.create_user ? `用户${item.create_user}` : '匿名作者')
   const avatar = normalizeImageUrl(item?.author?.avatar ?? item?.authorAvatar ?? item?.author_pic ?? item?.userPic) || avatarImgAsset
-  return { name, avatar }
+  const authorId = item?.author?.id ?? item?.authorId ?? item?.author_id ?? item?.userId ?? item?.user_id ?? item?.create_user ?? null
+  return { name, avatar, authorId }
 }
 
 // 加载文章详情
@@ -353,6 +381,11 @@ const loadDetail = async () => {
       favorited.value = Boolean(apiIsCollectedRaw)
     } else {
       favorited.value = Boolean(article.value.isCollected)
+    }
+
+    // 关注状态初始化
+    if (persisted.following !== undefined) {
+      following.value = Boolean(persisted.following)
     }
 
     localLikeCount.value = Math.max(0, Number((persisted.likeCount ?? article.value.likeCount) || 0))
@@ -413,9 +446,10 @@ const loadDetail = async () => {
         const list = Array.isArray(payload?.item) ? payload.item : (Array.isArray(payload?.items) ? payload.items : [])
         const found = Array.isArray(list) ? list.find(it => Number(it?.id) === Number(articleId.value)) : null
         if (found) {
-          const { name, avatar } = resolveAuthorFromItem(found)
+          const { name, avatar, authorId } = resolveAuthorFromItem(found)
           if (name) article.value.authorName = name
           if (avatar) article.value.authorAvatar = avatar
+          if (authorId) article.value.authorId = authorId
         }
       } catch (e) {
         console.warn('从列表接口补齐作者失败:', e?.message || e)
@@ -723,6 +757,88 @@ const handleBack = () => {
   }
 }
 
+// 关注/取消关注作者
+const toggleFollow = async () => {
+  // 检查是否已登录
+  const tokenStore = useTokenStore()
+  if (!tokenStore?.token) {
+    const redirect = encodeURIComponent(location.pathname + location.search)
+    router.push({ name: 'Login', query: { redirect } })
+    return
+  }
+  
+  // 修复作者ID解析，确保能从多种格式获取
+  let authorId = article.value?.authorId;
+  // 如果没有authorId，尝试从作者名中提取数字ID
+  if (!authorId && article.value?.authorName) {
+    const match = String(article.value.authorName).match(/\d+/);
+    if (match) {
+      authorId = Number(match[0]);
+    } else {
+      // 如果无法提取数字，使用默认值1
+      authorId = 1;
+    }
+  }
+  
+  if (!authorId) {
+    ElMessage.error('作者信息不完整，无法操作')
+    return
+  }
+  
+  // 检查是否是自己的文章，不能关注自己
+  const userInfoStore = useUserInfoStore();
+  const currentUserId = userInfoStore?.info?.id || 0;
+  if (Number(currentUserId) === Number(authorId)) {
+    ElMessage.warning('不能关注自己')
+    return
+  }
+  
+  // 如果是取消关注，显示确认弹窗
+  if (following.value) {
+    try {
+      await ElMessageBox.confirm('确定要取消关注该用户吗？', '取消关注', {
+        confirmButtonText: '确认',
+        cancelButtonText: '取消',
+        type: 'warning'
+      });
+    } catch {
+      // 用户取消操作
+      ElMessage.info('已取消操作')
+      return
+    }
+  }
+  
+  // 记录操作前的状态
+  const prevFollowing = following.value
+  
+  // 先直接切换关注状态，提供即时反馈
+  following.value = !following.value
+  
+  // 保存状态到本地存储
+  saveInteraction()
+  
+  followLoading.value = true
+  try {
+    // 调用后端接口完成关注/取消关注操作
+    // 添加请求参数，确保接口调用正确
+    const resp = await request.post(`/user/${authorId}/follow`, { 
+      userId: authorId 
+    });
+    
+    // 显示成功消息
+    ElMessage.success(following.value ? '关注成功' : '取消关注成功')
+    
+  } catch (err) {
+    // 接口调用失败，恢复到操作前的状态
+    console.error('关注操作失败：', err?.message || err)
+    following.value = prevFollowing
+    saveInteraction()
+    ElMessage.error('操作失败，请稍后重试')
+  } finally {
+    followLoading.value = false
+  }
+}
+
 // 路由参数变化时，重新加载详情
 watch(() => route.params.id, () => {
   commentsPage.value = 1
@@ -743,6 +859,18 @@ watch(() => route.params.id, () => {
             <div class="meta">
               <div class="author">
                 <span class="author-name">{{ article.authorName }}</span>
+                <ElButton 
+                  v-if="userInfoStore?.info?.id !== Number(article.authorId) && !(article.authorName && userInfoStore?.info?.username && String(article.authorName).includes(userInfoStore.info.username))"
+                  :type="followingUi ? 'success' : 'primary'" 
+                  :loading="followLoading" 
+                  :disabled="followLoading"
+                  size="small" 
+                  class="follow-btn"
+                  @click="toggleFollow"
+                  style="cursor: pointer;"
+                >
+                  {{ followingUi ? '已关注' : '关注' }}
+                </ElButton>
                 <ElTag class="category-tag" size="small" :effect="'light'" @click="goToCategory">{{ article.categoryName }}</ElTag>
                 <span class="time">{{ article.createTime }}</span>
               </div>
@@ -895,6 +1023,21 @@ title {
   display: flex;
   align-items: center;
   gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* 关注按钮样式 */
+.follow-btn {
+  border-radius: 20px;
+  padding: 6px 12px;
+  font-size: 13px;
+  transition: all 0.2s ease;
+  margin: 0 4px;
+}
+
+.follow-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.08);
 }
 
 .category-tag {
