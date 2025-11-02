@@ -66,7 +66,7 @@ export default {
     const raw = tokenStore?.token || localStorage.getItem('token') || '';
     const auth = raw.startsWith('Bearer ') ? raw : (raw ? `Bearer ${raw}` : '');
     const headers = auth ? { Authorization: auth } : {};
-    return request.post(`/comment/${commentId}/like`, null, { headers }).then(response => response);
+    return request.post(`/comment/${commentId}/like`, null, { headers });
   },
 
   /**

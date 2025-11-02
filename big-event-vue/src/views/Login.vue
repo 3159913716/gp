@@ -7,8 +7,8 @@ import { User, Lock, Loading } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 // 引入Vue Router的路由实例
 import router from '@/router'
-// 引入用户注册和登录的API服务
-import { userRegisterService, userLoginService } from '@/api/user.js'
+// 引入用户注册、登录和重置密码的API服务
+import { userRegisterService, userLoginService, resetPasswordService } from '@/api/user.js'
 // 新增：引入邮箱验证码API
 import emailApi from '@/api/email.js'
 // 引入用于管理token的Pinia store
@@ -18,6 +18,7 @@ import { useTokenStore } from '@/stores/token.js'
 const form = ref(null) // 用于引用表单DOM元素
 const isLoading = ref(false) // 加载状态，控制按钮的加载动画
 const isRegister = ref(false) // 标记当前是注册模式还是登录模式
+const isForgotPassword = ref(false) // 标记当前是忘记密码模式
 const tokenStore = useTokenStore() // 使用token存储实例
 
 // 注册数据模型（响应式对象，用于绑定表单数据）
@@ -26,6 +27,14 @@ const registerData = ref({
   password: '', // 密码输入
   rePassword: '', // 重复密码输入
   code: '' // 邮箱验证码
+})
+
+// 忘记密码数据模型
+const forgotPasswordData = ref({
+  email: '', // 邮箱输入
+  code: '', // 验证码
+  newPassword: '', // 新密码
+  confirmPassword: '' // 确认新密码
 })
 
 // 发送验证码相关状态
@@ -83,6 +92,19 @@ const validateRePassword = (rule, value, callback) => {
 }
 
 /*
+ * 自定义验证函数：验证忘记密码时的确认密码
+ */
+const validateConfirmPassword = (rule, value, callback) => {
+  if (!value) {
+    callback(new Error('请再次输入新密码'))
+  } else if (value !== forgotPasswordData.value.newPassword) {
+    callback(new Error('两次输入的新密码不一致'))
+  } else {
+    callback()
+  }
+}
+
+/*
  * 自定义验证函数：验证验证码
  */
 const validateCode = (rule, value, callback) => {
@@ -103,6 +125,14 @@ const rules = {
   code: [{ validator: validateCode, trigger: 'blur' }]
 }
 
+// 忘记密码表单验证规则
+const forgotPasswordRules = {
+  email: [{ validator: validateEmail, trigger: 'blur' }],
+  code: [{ validator: validateCode, trigger: 'blur' }],
+  newPassword: [{ validator: validatePassword, trigger: 'blur' }],
+  confirmPassword: [{ validator: validateConfirmPassword, trigger: 'blur' }]
+}
+
 /*
  * 清空表单数据
  * 功能：重置表单中所有输入字段的值
@@ -117,11 +147,24 @@ const clearRegisterData = () => {
 }
 
 /*
- * 发送邮箱验证码
+ * 清空忘记密码表单数据
  */
-const sendEmailCode = async () => {
+const clearForgotPasswordData = () => {
+  forgotPasswordData.value = {
+    email: '',
+    code: '',
+    newPassword: '',
+    confirmPassword: ''
+  }
+}
+
+/*
+ * 发送邮箱验证码
+ * @param {string} type - 验证码类型：'register' 或 'forgotPassword'
+ */
+const sendEmailCode = async (type = 'register') => {
   if (countdown.value > 0 || isSending.value) return
-  const email = registerData.value.email
+  const email = type === 'register' ? registerData.value.email : forgotPasswordData.value.email
   const pattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
   if (!pattern.test(email)) {
     ElMessage.error('请输入有效的邮箱地址')
@@ -129,11 +172,12 @@ const sendEmailCode = async () => {
   }
   isSending.value = true
   try {
-    const res = await emailApi.sendCode(email, 'register')
+    // 转换类型参数，确保与后端接口匹配
+    const apiType = type === 'forgotPassword' ? 'forget' : type
+    const res = await emailApi.sendCode(email, apiType)
     const ok = (res && res.success === true) || (res && res.code === 0)
     if (ok) {
-      // 后端返回成功时统一展示成功提示，避免因后端message文案不一致而误报失败
-      ElMessage.success('验证码已发送，请查收邮件')
+      // 移除成功提示，直接启动倒计时
       // 立即启动60秒冷却期
       countdown.value = 60
       if (timer) {
@@ -156,6 +200,54 @@ const sendEmailCode = async () => {
   } finally {
     isSending.value = false
   }
+}
+
+/*
+ * 处理忘记密码逻辑
+ */
+const handleForgotPassword = async () => {
+  isLoading.value = true
+  
+  // 调用表单验证方法
+  form.value.validate(async (valid) => {
+    if (!valid) {
+      isLoading.value = false
+      return
+    }
+    
+    try {
+      // 先验证验证码，使用正确的类型参数
+      const verifyRes = await emailApi.verify(
+        forgotPasswordData.value.email,
+        forgotPasswordData.value.code,
+        'forget'
+      )
+      if (!verifyRes.success) {
+        ElMessage.error(verifyRes.message || '验证码错误或已过期')
+        isLoading.value = false
+        return
+      }
+      
+      // 调用重置密码API
+      const result = await resetPasswordService({
+        email: forgotPasswordData.value.email,
+        newPassword: forgotPasswordData.value.newPassword
+      })
+      
+      if (result.code === 0) {
+        ElMessage.success(result.msg || '密码重置成功，请使用新密码登录')
+        isForgotPassword.value = false // 返回登录页
+        clearForgotPasswordData()
+      } else {
+        ElMessage.error(result.msg || '密码重置失败，请重试')
+      }
+    } catch (error) {
+      ElMessage.error('网络错误，请稍后再试')
+      console.error('重置密码接口错误:', error)
+    } finally {
+      isLoading.value = false
+    }
+  })
 }
 
 /*
@@ -285,7 +377,7 @@ onUnmounted(() => {
             />
             <el-button 
               type="primary" 
-              @click="sendEmailCode" 
+              @click="sendEmailCode('register')" 
               :disabled="countdown>0 || isSending"
               :icon="isSending ? Loading : null"
             >
@@ -336,6 +428,89 @@ onUnmounted(() => {
         </el-form-item>
       </el-form>
 
+      <!-- 忘记密码表单部分 -->
+      <el-form 
+        v-else-if="isForgotPassword"
+        ref="form" 
+        size="large" 
+        autocomplete="off" 
+        :model="forgotPasswordData" 
+        :rules="forgotPasswordRules"
+      >
+        <el-form-item>
+          <h1>忘记密码</h1>
+        </el-form-item>
+        
+        <!-- 邮箱输入框 -->
+        <el-form-item prop="email">
+          <el-input 
+            :prefix-icon="User" 
+            placeholder="请输入邮箱" 
+            v-model="forgotPasswordData.email" 
+          />
+        </el-form-item>
+        
+        <!-- 验证码输入框 + 获取按钮 -->
+        <el-form-item prop="code">
+          <div style="display:flex;gap:8px;width:100%">
+            <el-input 
+              placeholder="请输入6位验证码" 
+              v-model="forgotPasswordData.code" 
+              maxlength="6"
+            />
+            <el-button 
+              type="primary" 
+              @click="sendEmailCode('forgotPassword')" 
+              :disabled="countdown>0 || isSending"
+              :icon="isSending ? Loading : null"
+            >
+              {{ countdown>0 ? `重新获取(${countdown}s)` : '获取验证码' }}
+            </el-button>
+          </div>
+        </el-form-item>
+        
+        <!-- 新密码输入框 -->
+        <el-form-item prop="newPassword">
+          <el-input 
+            :prefix-icon="Lock" 
+            type="password" 
+            placeholder="请输入新密码" 
+            v-model="forgotPasswordData.newPassword" 
+          />
+        </el-form-item>
+        
+        <!-- 确认新密码输入框 -->
+        <el-form-item prop="confirmPassword">
+          <el-input 
+            :prefix-icon="Lock" 
+            type="password" 
+            placeholder="请再次输入新密码" 
+            v-model="forgotPasswordData.confirmPassword" 
+          />
+        </el-form-item>
+        
+        <!-- 重置密码按钮 -->
+        <el-form-item>
+          <el-button 
+            class="button" 
+            type="primary" 
+            auto-insert-space 
+            @click="handleForgotPassword" 
+            :loading="isLoading"
+            :icon="isLoading ? Loading : null"
+          >
+            重置密码
+          </el-button>
+        </el-form-item>
+        
+        <!-- 返回登录链接 -->
+        <el-form-item class="flex">
+          <el-link type="info" @click="isForgotPassword = false; clearForgotPasswordData()">
+            ← 返回登录
+          </el-link>
+        </el-form-item>
+      </el-form>
+
       <!-- 登录表单部分（与注册表单类似） -->
       <el-form 
         v-else 
@@ -372,7 +547,7 @@ onUnmounted(() => {
           <div class="flex">
             <el-checkbox>记住我</el-checkbox>
             <div class="right-links">
-              <el-link type="primary">忘记密码？</el-link>
+              <el-link type="primary" @click="isForgotPassword = true">忘记密码？</el-link>
             </div>
           </div>
         </el-form-item>

@@ -23,6 +23,34 @@ const getPersistKey = () => {
   const uid = userInfoStore?.info?.id ?? 0
   return `article:interactions:${articleId.value}:${uid || 'anon'}`
 }
+
+// 新增：评论交互本地持久化
+const getUserCommentKey = (commentId) => {
+  const uid = userInfoStore?.info?.id ?? 0
+  return `comment:interactions:${commentId}:${uid || 'anon'}`
+}
+
+const saveCommentInteraction = (commentId, isLiked, likeCount) => {
+  try {
+    const key = getUserCommentKey(commentId)
+    const payload = {
+      isLiked,
+      likeCount,
+      ts: Date.now()
+    }
+    localStorage.setItem(key, JSON.stringify(payload))
+  } catch {}  
+}
+
+const loadCommentInteraction = (commentId) => {
+  try {
+    const key = getUserCommentKey(commentId)
+    const raw = localStorage.getItem(key)
+    return raw ? JSON.parse(raw) : {}  
+  } catch {
+    return {}
+  }
+}
 const readInteraction = () => {
   try {
     const raw = localStorage.getItem(getPersistKey())
@@ -119,6 +147,14 @@ const localLikeCount = ref(0)
 const localCollectCount = ref(Number(route.query.collectCount) || 0) // 从URL参数设置初始收藏数
 const likeLoading = ref(false)
 const favoriteLoading = ref(false)
+
+// 新增：点赞UI控制计算属性
+const tokenStoreTop = useTokenStore()
+const hasAuth = computed(() => !!tokenStoreTop?.token)
+const likedUi = computed(() => {
+  // 只有在已登录且确实已点赞的情况下才显示已赞状态
+  return hasAuth.value && liked.value
+})
 const toggleLike = async () => {
   if (likeLoading.value) return
   const tokenStore = useTokenStore()
@@ -299,8 +335,8 @@ const loadDetail = async () => {
     const urlCollectCount = Number(route.query.collectCount)
     
     // 认证用户时优先采用接口返回的个性化状态；否则更信任本地持久化
-    const tokenStore = useTokenStore()
-    const hasAuth = !!tokenStore?.token
+    const tokenStoreTop = useTokenStore()
+    const hasAuth = computed(() => !!tokenStoreTop?.token)
     if (persisted.liked !== undefined) {
       liked.value = Boolean(persisted.liked)
     } else if (hasAuth && apiIsLikedRaw !== undefined) {
@@ -432,7 +468,6 @@ const onToggleCommentLike = async (comment) => {
   if (!id || commentLikeLoading.value[id]) return
   const tokenStore = useTokenStore()
   if (!tokenStore?.token) {
-    ElMessage.warning('请先登录后再点赞评论')
     const redirect = encodeURIComponent(location.pathname + location.search)
     router.push({ name: 'Login', query: { redirect } })
     return
@@ -448,10 +483,16 @@ const onToggleCommentLike = async (comment) => {
     else comment.isLiked = !comment.isLiked
     if (count !== undefined) comment.likeCount = Math.max(0, Number(count) || 0)
     else comment.likeCount = Math.max(0, comment.likeCount + (comment.isLiked ? 1 : -1))
+    
+    // 保存到本地存储
+    saveCommentInteraction(id, comment.isLiked, comment.likeCount)
   } catch (err) {
     comment.isLiked = !comment.isLiked
     comment.likeCount = Math.max(0, comment.likeCount + (comment.isLiked ? 1 : -1))
     console.warn('评论点赞接口调用异常：', err?.message || err)
+    
+    // 即使出错也要保存到本地存储，保证本地状态一致性
+    saveCommentInteraction(id, comment.isLiked, comment.likeCount)
   } finally {
     commentLikeLoading.value[id] = false
   }
@@ -553,7 +594,10 @@ const generateMockComments = (id, page = 1, pageSize = 10) => {
 
 // 归一化评论数据（递归处理 replies）
 const normalizeCommentItem = (c) => {
-  return {
+  // 先加载本地存储的交互状态
+  const persisted = loadCommentInteraction(c.id)
+  
+  const comment = {
     id: c.id ?? 0,
     content: c.content ?? '',
     createTime: c.createTime ?? c.create_time ?? '',
@@ -562,12 +606,15 @@ const normalizeCommentItem = (c) => {
       username: c.user?.username ?? c.user?.nickname ?? c.userInfo?.nickname ?? c.userInfo?.username ?? c.nickname ?? c.userName ?? c.user_name ?? '游客',
       avatar: normalizeImageUrl(c.user?.avatar ?? c.user?.userPic ?? c.userInfo?.userPic ?? c.userInfo?.avatar ?? c.userPic ?? c.user_pic ?? c.avatarUrl ?? c.avatar) || avatarImgAsset
     },
-    likeCount: c.likeCount ?? c.comment_like_count ?? 0,
-    isLiked: c.isLiked ?? false,
+    // 优先使用本地存储的点赞状态和数量
+    isLiked: persisted.isLiked ?? c.isLiked ?? false,
+    likeCount: persisted.likeCount ?? c.likeCount ?? c.comment_like_count ?? 0,
     parentId: c.parentId ?? c.parent_id ?? 0,
     replyCount: c.replyCount ?? c.reply_count ?? (Array.isArray(c.replies) ? c.replies.length : 0),
     replies: Array.isArray(c.replies) ? c.replies.map(normalizeCommentItem) : []
   }
+  
+  return comment
 }
 
 const computeDeepTotal = (arr) => {
@@ -727,15 +774,15 @@ watch(() => route.params.id, () => {
 
         <!-- 操作按钮：点赞 / 收藏（前端本地状态） -->
         <div class="actions-bar">
-          <ElButton :type="liked ? 'primary' : 'default'" :loading="likeLoading" :disabled="likeLoading" class="action-btn like" @click="toggleLike">
+          <ElButton :type="likedUi ? 'primary' : 'default'" :loading="likeLoading" :disabled="likeLoading" class="action-btn like" @click="toggleLike">
             <span class="icon">👍</span>
-            <span class="label">{{ liked ? '已赞' : '点赞' }}</span>
-            <span class="count">{{ localLikeCount }}</span>
+            <span class="label">{{ likedUi ? '已赞' : '点赞' }}</span>
+            <span class="count" style="margin-left: 6px; font-weight: bold; font-size: 14px;">{{ localLikeCount }}</span>
           </ElButton>
           <ElButton :type="favorited ? 'warning' : 'default'" :loading="favoriteLoading" :disabled="favoriteLoading" class="action-btn fav" @click="toggleFavorite">
             <span class="icon">⭐</span>
             <span class="label">{{ favorited ? '已收藏' : '收藏' }}</span>
-            <span class="count">{{ localCollectCount }}</span>
+            <span class="count" style="margin-left: 6px; font-weight: bold; font-size: 14px;">{{ localCollectCount }}</span>
           </ElButton>
         </div>
 

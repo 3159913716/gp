@@ -57,6 +57,26 @@ export const userLoginService = (loginData) => {
   return request.post('/user/login', params);
 }
 
+/**
+ * 重置密码服务
+ * @param {Object} resetData 重置密码数据
+ *        - email: 用户邮箱
+ *        - newPassword: 新密码
+ * @returns {Promise} 包含重置结果的Promise
+ * API路径：POST /user/resetPassword
+ * 内容类型：application/x-www-form-urlencoded
+ */
+export const resetPasswordService = (resetData) => {
+  const params = new URLSearchParams();
+  
+  // 遍历重置密码数据，添加到URLSearchParams
+  for (let key in resetData) {
+    params.append(key, resetData[key]);
+  }
+  
+  return request.post('/user/resetPassword', params);
+}
+
 // ==================== 用户信息管理API ====================
 
 /**
