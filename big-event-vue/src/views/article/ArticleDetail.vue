@@ -1,7 +1,7 @@
 <script setup>
 import { ref, onMounted, watch, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ElCard, ElAvatar, ElTag, ElPagination, ElEmpty, ElInput, ElButton, ElMessage, ElMessageBox } from 'element-plus'
+import { ElCard, ElAvatar, ElTag, ElPagination, ElEmpty, ElInput, ElButton, ElMessage } from 'element-plus'
 import articleHomeApi from '@/api/articlehome.js'
 import defaultCover from '@/assets/default.png'
 import avatarImgAsset from '@/assets/avatar.jpg'
@@ -157,6 +157,21 @@ const followLoading = ref(false) // 关注加载状态
 const followingUi = computed(() => {
   // 只有在已登录且确实已关注的情况下才显示已关注状态
   return hasAuth.value && following.value
+})
+
+// 是否显示关注按钮的计算属性
+const showFollowButton = computed(() => {
+  // 未登录状态：始终显示关注按钮
+  if (!hasAuth.value) {
+    return true
+  }
+  
+  // 已登录状态：检查文章作者名与当前登录用户名是否相同
+  const currentUserName = userInfoStore?.info?.username || userInfoStore?.info?.nickname || ''
+  const articleAuthorName = article.value?.authorName || ''
+  
+  // 如果作者名与当前用户名不同，则显示关注按钮
+  return currentUserName !== articleAuthorName
 })
 
 // 新增：点赞UI控制计算属性
@@ -739,7 +754,18 @@ const goToCategory = () => {
     router.push(`/category/${id}`)
   }
 }
+
+// 平滑滚动到顶部
+const scrollToTop = () => {
+  window.scrollTo({
+    top: 0,
+    behavior: 'smooth'
+  })
+}
+
 onMounted(() => {
+  // 进入页面时平滑滚动到顶部
+  scrollToTop()
   loadDetail()
   loadComments()
 })
@@ -785,27 +811,11 @@ const toggleFollow = async () => {
     return
   }
   
-  // 检查是否是自己的文章，不能关注自己
-  const userInfoStore = useUserInfoStore();
-  const currentUserId = userInfoStore?.info?.id || 0;
-  if (Number(currentUserId) === Number(authorId)) {
+  // 检查是否是自己的文章，防止关注自己
+  const currentUserId = userInfoStore?.info?.id;
+  if (currentUserId && Number(currentUserId) === Number(authorId)) {
     ElMessage.warning('不能关注自己')
     return
-  }
-  
-  // 如果是取消关注，显示确认弹窗
-  if (following.value) {
-    try {
-      await ElMessageBox.confirm('确定要取消关注该用户吗？', '取消关注', {
-        confirmButtonText: '确认',
-        cancelButtonText: '取消',
-        type: 'warning'
-      });
-    } catch {
-      // 用户取消操作
-      ElMessage.info('已取消操作')
-      return
-    }
   }
   
   // 记录操作前的状态
@@ -825,6 +835,15 @@ const toggleFollow = async () => {
       userId: authorId 
     });
     
+    // 从响应中获取后端返回的实际关注状态
+    const data = resp?.data || resp;
+    const backendFollowing = data?.following;
+    
+    // 如果后端返回了明确的关注状态，则使用后端状态更新前端
+    if (backendFollowing !== undefined) {
+      following.value = Boolean(backendFollowing);
+    }
+    
     // 显示成功消息
     ElMessage.success(following.value ? '关注成功' : '取消关注成功')
     
@@ -842,6 +861,8 @@ const toggleFollow = async () => {
 // 路由参数变化时，重新加载详情
 watch(() => route.params.id, () => {
   commentsPage.value = 1
+  // 路由参数变化时也平滑滚动到顶部
+  scrollToTop()
   loadDetail()
   loadComments()
 })
@@ -860,7 +881,7 @@ watch(() => route.params.id, () => {
               <div class="author">
                 <span class="author-name">{{ article.authorName }}</span>
                 <ElButton 
-                  v-if="userInfoStore?.info?.id !== Number(article.authorId) && !(article.authorName && userInfoStore?.info?.username && String(article.authorName).includes(userInfoStore.info.username))"
+                  v-if="showFollowButton"
                   :type="followingUi ? 'success' : 'primary'" 
                   :loading="followLoading" 
                   :disabled="followLoading"
