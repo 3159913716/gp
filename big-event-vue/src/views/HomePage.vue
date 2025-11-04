@@ -296,6 +296,7 @@ const shouldShowReadMore = (a) => getRawContent(a).length > 65
 const handleSortChange = () => {
   pageNum.value = 1 // 重置到第一页
   loadArticles()
+  scrollToTop() // 滚动到顶部
 }
 
 // 分页事件分别处理
@@ -303,11 +304,13 @@ const handleSizeChange = (size) => {
   pageSize.value = size
   pageNum.value = 1
   loadArticles()
+  scrollToTop() // 滚动到顶部
 }
 
 const handleCurrentChange = (num) => {
   pageNum.value = num
   loadArticles()
+  scrollToTop() // 滚动到顶部
 }
 
 // 路由实例
@@ -332,6 +335,10 @@ watch(() => route.params.id, () => {
   activeSort.value = 'latest'
   pageNum.value = 1
   loadArticles()
+  // 路由参数变化时也滚动到顶部
+  setTimeout(() => {
+    scrollToTop()
+  }, 100)
 })
 // 同时监听查询参数中的categoryId（兼容从其他位置跳转）
 watch(() => route.query.categoryId, () => {
@@ -341,6 +348,10 @@ watch(() => route.query.categoryId, () => {
   activeSort.value = 'latest'
   pageNum.value = 1
   loadArticles()
+  // 路由参数变化时也滚动到顶部
+  setTimeout(() => {
+    scrollToTop()
+  }, 100)
 })
 // 新增：监听搜索关键词变化，按关键词检索并展示
 watch(() => route.query.keyword, () => {
@@ -348,6 +359,10 @@ watch(() => route.query.keyword, () => {
   activeSort.value = 'latest'
   pageNum.value = 1
   loadArticles()
+  // 搜索时也滚动到顶部
+  setTimeout(() => {
+    scrollToTop()
+  }, 100)
 })
 
 // 跳转到文章详情
@@ -358,7 +373,12 @@ const goToArticleDetail = (articleId) => {
 // 跳转到分类页面（无ID时忽略）
 const goToCategory = (categoryId) => {
   if (!categoryId && categoryId !== 0) return
-  router.push(`/category/${categoryId}`)
+  // 在路由跳转前先滚动到顶部
+  scrollToTop()
+  // 使用setTimeout确保滚动操作先执行
+  setTimeout(() => {
+    router.push(`/category/${categoryId}`)
+  }, 100)
 }
 
 // 加载右侧“最新文章”板块（仅标题与创建日期）
