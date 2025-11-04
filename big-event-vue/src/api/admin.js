@@ -1,5 +1,5 @@
-import request from '@/utils/request.js'
 import useUserInfoStore from '@/stores/userInfo.js'
+import request from '@/utils/request.js'
 
 // ========== 统计 ===========
 export const getStatistics = () => {
@@ -61,7 +61,6 @@ export const rejectAuthorApply = async (id, reason) => {
 }
 
 // ========== 作者申请审核 ===========
-
 
 export default {
   getStatistics,
