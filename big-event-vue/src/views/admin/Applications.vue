@@ -55,6 +55,7 @@
               <template #dropdown>
                 <el-dropdown-menu>
                   <el-dropdown-item @click="approve(row)">通过申请</el-dropdown-item>
+                  <el-dropdown-item @click="openReject(row)">拒绝申请</el-dropdown-item>
                 </el-dropdown-menu>
               </template>
             </el-dropdown>
@@ -79,6 +80,31 @@
       </div>
     </el-card>
   </div>
+
+  <!-- 拒绝对话框 -->
+  <el-dialog
+    v-model="rejectDialogVisible"
+    title="拒绝申请"
+    width="480px"
+    :before-close="handleRejectDialogClose"
+  >
+    <el-form :model="rejectForm" label-width="80px">
+      <el-form-item label="拒绝原因" prop="reason">
+        <el-input
+          v-model="rejectForm.reason"
+          type="textarea"
+          rows="4"
+          placeholder="请输入拒绝原因"
+          maxlength="200"
+          show-word-limit
+        />
+      </el-form-item>
+    </el-form>
+    <template #footer>
+      <el-button @click="handleRejectDialogClose">取消</el-button>
+      <el-button type="primary" @click="confirmReject" :loading="rejectLoading">确认拒绝</el-button>
+    </template>
+  </el-dialog>
 </template>
 
 <script setup>
@@ -94,6 +120,12 @@ const total = ref(0)
 let abortController = null
 
 const filters = ref({ status: null, username: '' })
+
+// 拒绝相关状态
+const rejectDialogVisible = ref(false)
+const rejectForm = ref({ reason: '' })
+const rejectTarget = ref(null)
+const rejectLoading = ref(false)
 
 const debouncedLoadApplies = debounce(loadApplies, 300)
 
@@ -162,6 +194,41 @@ const approve = async (row) => {
       console.error('通过申请失败:', err)
       ElMessage.error('操作失败')
     }
+  }
+}
+
+const openReject = (row) => {
+  rejectTarget.value = row
+  rejectForm.value = { reason: '' }
+  rejectDialogVisible.value = true
+}
+
+const handleRejectDialogClose = () => {
+  rejectDialogVisible.value = false
+  rejectForm.value = { reason: '' }
+  rejectTarget.value = null
+}
+
+const confirmReject = async () => {
+  if (!rejectForm.value.reason.trim()) {
+    ElMessage.warning('请输入拒绝原因')
+    return
+  }
+
+  try {
+    rejectLoading.value = true
+    await auditAuthorApply(rejectTarget.value.id, { 
+      status: 2, 
+      rejectReason: rejectForm.value.reason.trim() 
+    })
+    ElMessage.success('拒绝成功')
+    handleRejectDialogClose()
+    debouncedLoadApplies()
+  } catch (err) {
+    console.error('拒绝申请失败:', err)
+    ElMessage.error('操作失败')
+  } finally {
+    rejectLoading.value = false
   }
 }
 
