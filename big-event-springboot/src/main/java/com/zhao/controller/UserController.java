@@ -11,6 +11,7 @@ import com.zhao.service.AuthorApplyService;
 import com.zhao.service.UserCollectionService;
 import com.zhao.service.UserFollowService;
 import com.zhao.service.UserService;
+import com.zhao.service.impl.EmailVerifyService;
 import com.zhao.utils.JwtUtil;
 import com.zhao.utils.PasswordUtil;
 import com.zhao.utils.ThreadLocalUtil;
@@ -46,7 +47,128 @@ public class UserController {
     private AuthorApplyService authorApplyService;
     @Autowired
     private ArticleService articleService;
+    @Autowired
+    private EmailVerifyService emailVerifyService;
 
+    /**
+     * 忘记密码 - 根据邮箱获取用户信息（用于验证邮箱是否存在）
+     */
+    @PostMapping("/find-by-email")
+    public Result<User> findUserByEmail(@RequestParam String email) {
+        // 验证邮箱格式
+        if (!email.matches("^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$")) {
+            return Result.error("邮箱格式不正确");
+        }
+        
+        // 调用服务层根据邮箱查找用户
+        User user = userService.findByEmail(email);
+        if (user == null) {
+            return Result.error("该邮箱未注册");
+        }
+        
+        // 返回用户信息（不包含敏感信息）
+        User responseUser = new User();
+        responseUser.setId(user.getId());
+        responseUser.setUsername(user.getUsername());
+        responseUser.setEmail(user.getEmail());
+        responseUser.setNickname(user.getNickname());
+        
+        return Result.success(responseUser);
+    }
+    
+    /**
+     * 忘记密码 - 发送验证码
+     */
+    @PostMapping("/send-forget-code")
+    public Result sendForgetCode(@RequestParam Integer userId, @RequestParam String email) {
+        // 验证邮箱格式
+        if (!email.matches("^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$")) {
+            return Result.error("邮箱格式不正确");
+        }
+        
+        // 验证用户ID和邮箱是否匹配
+        User user = userService.findById(userId);
+        if (user == null || !email.equals(user.getEmail())) {
+            return Result.error("用户ID与邮箱不匹配");
+        }
+        
+        // 发送验证码
+        boolean success = emailVerifyService.sendVerifyCode(email, "forget");
+        if (success) {
+            return Result.success("验证码已发送到您的邮箱，有效期5分钟");
+        } else {
+            return Result.error("验证码发送失败，请稍后重试");
+        }
+    }
+    
+    /**
+     * 忘记密码 - 重置密码
+     */
+    @PostMapping("/reset-pwd")
+    public Result resetPassword(@RequestBody Map<String, String> params) {
+        try {
+            // 获取参数
+            String userIdStr = params.get("userId");
+            String email = params.get("email");
+            String code = params.get("code");
+            String newPwd = params.get("newPwd");
+            String rePwd = params.get("rePwd");
+            
+            // 参数校验
+            if (!StringUtils.hasLength(userIdStr) || !StringUtils.hasLength(email) || 
+                !StringUtils.hasLength(code) || !StringUtils.hasLength(newPwd) || !StringUtils.hasLength(rePwd)) {
+                return Result.error("缺少必要的参数");
+            }
+            
+            Integer userId;
+            try {
+                userId = Integer.parseInt(userIdStr);
+            } catch (NumberFormatException e) {
+                return Result.error("用户ID格式错误");
+            }
+            
+            // 验证邮箱格式
+            if (!email.matches("^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$")) {
+                return Result.error("邮箱格式不正确");
+            }
+            
+            // 验证验证码格式
+            if (!code.matches("\\d{6}")) {
+                return Result.error("验证码必须是6位数字");
+            }
+            
+            // 验证密码格式
+            if (!newPwd.matches("^\\S{5,17}$")) {
+                return Result.error("新密码必须是5-17位非空字符");
+            }
+            
+            // 验证两次密码是否一致
+            if (!newPwd.equals(rePwd)) {
+                return Result.error("两次输入的密码不一致");
+            }
+            
+            // 验证用户ID和邮箱是否匹配
+            User user = userService.findById(userId);
+            if (user == null || !email.equals(user.getEmail())) {
+                return Result.error("用户ID与邮箱不匹配");
+            }
+            
+            // 验证验证码
+            boolean isValid = emailVerifyService.verifyCode(email, code, "forget");
+            if (!isValid) {
+                return Result.error("验证码错误或已过期");
+            }
+            
+            // 更新密码
+            userService.updatePasswordById(userId, newPwd);
+            
+            return Result.success("密码重置成功");
+        } catch (Exception e) {
+            e.printStackTrace();
+            return Result.error("密码重置失败，请稍后重试");
+        }
+    }
+    
     /**
      * 注册接口
      */

@@ -11,6 +11,12 @@ public interface UserService {
     
     //根据ID查询用户
     User findById(Integer id);
+    
+    //根据邮箱查询用户
+    User findByEmail(String email);
+    
+    //根据ID更新密码
+    void updatePasswordById(Integer userId, String newPassword);
 
     //注册
     void register(String username, String password);

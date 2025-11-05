@@ -1,8 +1,9 @@
 target/
 功能文档.md
-接口文档.md
 原接口文档.md
-接口文档.md
+insert_test_data.sql
+新增接口文档.md
+接口与数据表映射文档.md
 !.mvn/wrapper/maven-wrapper.jar
 !**/src/main/**/target/
 !**/src/test/**/target/

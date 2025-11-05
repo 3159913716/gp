@@ -31,6 +31,19 @@ public class UserServiceImpl implements UserService {
     public User findById(Integer id) {
         return userMapper.findById(id);
     }
+    
+    @Override
+    public User findByEmail(String email) {
+        return userMapper.findByEmail(email);
+    }
+    
+    @Override
+    public void updatePasswordById(Integer userId, String newPassword) {
+        // 密码加密
+        String encryptPassword = PasswordUtil.encryptPassword(newPassword);
+        // 更新密码
+        userMapper.updatePasswordById(encryptPassword, userId);
+    }
 
     @Override
     public void register(String username, String password) {

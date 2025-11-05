@@ -13,6 +13,19 @@
     <select id="findById" parameterType="java.lang.Integer" resultType="com.zhao.pojo.User">
         select * from user where id=#{id}
     </select>
+    
+    <!-- 根据邮箱查询用户 -->
+    <select id="findByEmail" parameterType="java.lang.String" resultType="com.zhao.pojo.User">
+        select * from user where email=#{email}
+    </select>
+    
+    <!-- 根据ID更新密码 -->
+    <update id="updatePasswordById">
+        update user
+        set password=#{encryptPassword},
+            update_time=now()
+        where id=#{userId}
+    </update>
 
     <!-- 添加 -->
     <!-- now()是数据库里面的函数，旨在获取数据库系统当前时间 -->

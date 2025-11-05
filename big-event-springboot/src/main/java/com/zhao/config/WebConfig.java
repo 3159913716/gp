@@ -25,6 +25,9 @@ public class WebConfig implements WebMvcConfigurer {
                 "/article/detail-page",
                 "/search",
                 "/article/*/comments",
-                "/category/list"); // 添加获取文章评论列表接口到不拦截路径
+                "/category/list",
+                "/user/find-by-email",
+                "/user/send-forget-code",
+                "/user/reset-pwd"); // 添加获取文章评论列表接口到不拦截路径
     }
 }
