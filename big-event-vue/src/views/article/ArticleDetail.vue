@@ -7,6 +7,7 @@ import defaultCover from '@/assets/default.png'
 import avatarImgAsset from '@/assets/avatar.jpg'
 import request from '@/utils/request.js'
 import sendCommentApi from '@/api/sendcomment.js'
+import guanzhu from '@/api/guanzhu.js'
 import { useTokenStore } from '@/stores/token.js'
 import useUserInfoStore from '@/stores/userInfo.js'
 import CommentTree from '@/components/front/CommentTree.vue'
@@ -829,14 +830,10 @@ const toggleFollow = async () => {
   
   followLoading.value = true
   try {
-    // 调用后端接口完成关注/取消关注操作
-    // 添加请求参数，确保接口调用正确
-    const resp = await request.post(`/user/${authorId}/follow`, { 
-      userId: authorId 
-    });
+    // 调用guanzhu.js中的toggleFollow方法完成关注/取消关注操作
+    const data = await guanzhu.toggleFollow(authorId);
     
     // 从响应中获取后端返回的实际关注状态
-    const data = resp?.data || resp;
     const backendFollowing = data?.following;
     
     // 如果后端返回了明确的关注状态，则使用后端状态更新前端
@@ -844,8 +841,8 @@ const toggleFollow = async () => {
       following.value = Boolean(backendFollowing);
     }
     
-    // 显示成功消息
-    ElMessage.success(following.value ? '关注成功' : '取消关注成功')
+    // 保存最新状态到本地存储
+    saveInteraction();
     
   } catch (err) {
     // 接口调用失败，恢复到操作前的状态

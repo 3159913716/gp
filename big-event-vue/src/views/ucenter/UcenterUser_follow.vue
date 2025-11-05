@@ -64,6 +64,7 @@
 
 <script>
 import request from '@/utils/request.js';
+import guanzhu from '@/api/guanzhu.js';
 import { WarningFilled, Refresh, Loading } from '@element-plus/icons-vue'; // 引入Element Plus图标
 
 export default {
@@ -97,10 +98,11 @@ export default {
         this.error = false;
         
         try {
-            const response = await request.get('/user/following');
-            const data = response.data || response;
-            this.list = Array.isArray(data.list) ? data.list : [];
-            this.total = Number(data.total || 0);
+            // 使用guanzhu.js中的getFollowingList方法获取关注列表
+            const data = await guanzhu.getFollowingList();
+            // 适配接口直接返回数组的情况
+            this.list = Array.isArray(data) ? data : Array.isArray(data.list) ? data.list : [];
+            this.total = Array.isArray(data) ? data.length : Number(data.total || 0);
             this.success = true;
         } catch (error) {
             console.error('获取关注作者列表失败:', error);
@@ -129,7 +131,8 @@ export default {
         type: 'warning'
       }).then(async () => {
         try {
-          await request.post(`/user/${id}/follow`);
+          // 使用guanzhu.js中的toggleFollow方法取消关注
+          await guanzhu.toggleFollow(id);
           // 更新列表，移除取消关注的用户
           this.list = this.list.filter(item => item.userId !== id);
           this.total = Math.max(0, this.total - 1);
