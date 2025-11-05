@@ -1,5 +1,7 @@
 package com.zhao.interceptors;
 
+import com.zhao.pojo.User;
+import com.zhao.service.UserService;
 import com.zhao.utils.JwtUtil;
 import com.zhao.utils.ThreadLocalUtil;
 import jakarta.servlet.http.HttpServletRequest;
@@ -17,6 +19,9 @@ import java.util.Map;
 public class LoginInterceptors implements HandlerInterceptor {
     @Autowired
     private StringRedisTemplate stringRedisTemplate;
+    
+    @Autowired
+    private UserService userService;
     @Override
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) throws Exception {
         //令牌验证
@@ -54,6 +59,18 @@ public class LoginInterceptors implements HandlerInterceptor {
                 return false;
             }
             Map<String, Object> claims = JwtUtil.parseToken(token);
+            
+            // 获取用户ID并检查用户状态
+            Integer userId = (Integer) claims.get("id");
+            User user = userService.findById(userId);
+            if (user != null && user.getStatus() == 1) {
+                // 用户被封禁
+                response.setStatus(403);
+                response.setContentType("application/json; charset=UTF-8");
+                response.getWriter().write("{\"code\": 0, \"message\": \"账号已被封禁，无法登录\", \"data\": null}");
+                return false;
+            }
+            
             //把业务数据存放发到ThreadLocal
             ThreadLocalUtil.set(claims);
             //验证通过,放行!!

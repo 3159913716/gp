@@ -24,9 +24,12 @@
     <!-- 更新 -->
     <update id="update" parameterType="com.zhao.pojo.User">
         update user
-        set nickname=#{nickname},
-            email=#{email},
+        <set>
+            <if test="nickname != null">nickname=#{nickname},</if>
+            <if test="email != null">email=#{email},</if>
+            <if test="status != null">status=#{status},</if>
             update_time=#{updateTime}
+        </set>
         where id=#{id}
     </update>
 

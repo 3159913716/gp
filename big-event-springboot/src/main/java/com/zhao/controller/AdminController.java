@@ -1,5 +1,6 @@
 package com.zhao.controller;
 
+import com.zhao.pojo.User;
 import com.zhao.pojo.Result;
 import com.zhao.service.AdminOperationLogService;
 import com.zhao.service.AuthorApplyService;
@@ -236,6 +237,111 @@ public class AdminController {
     }
     
     /**
+     * 封禁用户
+     * @param userId 要封禁的用户ID
+     * @param request HTTP请求对象，用于获取IP地址
+     * @return 操作结果
+     */
+    @PutMapping("/users/{id}/ban")
+    public Result banUser(@PathVariable("id") Integer userId, HttpServletRequest request) {
+        try {
+            // 1. 验证管理员权限
+            Map<String, Object> userMap = ThreadLocalUtil.get();
+            Integer role = (Integer) userMap.get("role");
+            if (role != 0) {
+                return Result.error("没有权限执行此操作");
+            }
+            
+            // 2. 检查是否尝试封禁自己
+            Integer currentAdminId = (Integer) userMap.get("id");
+            if (userId.equals(currentAdminId)) {
+                return Result.error("管理员不能封禁自身账号");
+            }
+            
+            // 3. 检查用户是否存在
+            User user = userService.findById(userId);
+            if (user == null) {
+                return Result.error("用户不存在");
+            }
+            
+            // 4. 检查用户是否已经被封禁
+            if (user.getStatus() == 1) {
+                return Result.error("用户已经被封禁");
+            }
+            
+            // 5. 更新用户状态为禁用
+            User updateUser = new User();
+            updateUser.setId(userId);
+            updateUser.setStatus(1);
+            userService.update(updateUser);
+            
+            // 6. 记录管理员操作日志到数据库
+            String ipAddress = getClientIp(request);
+            String operationContent = "管理员封禁用户[" + userId + "]，用户名：" + user.getUsername();
+            
+            // 调用日志服务记录操作
+            adminOperationLogService.recordLog(currentAdminId, operationContent, ipAddress);
+            
+            return Result.success("用户封禁成功，该用户将无法登录");
+        } catch (RuntimeException e) {
+            // 异常处理
+            e.printStackTrace();
+            return Result.error(e.getMessage());
+        }
+    }
+
+    /**
+     * 解除用户封禁
+     * @param userId 要解除封禁的用户ID
+     * @param request HTTP请求对象，用于获取IP地址
+     * @return 操作结果
+     */
+    @PutMapping("/users/{id}/unban")
+    public Result unbanUser(@PathVariable("id") Integer userId, HttpServletRequest request) {
+        try {
+            // 1. 验证管理员权限
+            Map<String, Object> userMap = ThreadLocalUtil.get();
+            Integer role = (Integer) userMap.get("role");
+            if (role != 0) {
+                return Result.error("没有权限执行此操作");
+            }
+            
+            // 获取当前管理员ID
+            Integer currentAdminId = (Integer) userMap.get("id");
+            
+            // 2. 检查用户是否存在
+            User user = userService.findById(userId);
+            if (user == null) {
+                return Result.error("用户不存在");
+            }
+            
+            // 3. 检查用户是否已经被解封
+            if (user.getStatus() == 0) {
+                return Result.error("用户账号状态正常，无需解除封禁");
+            }
+            
+            // 4. 更新用户状态为正常
+            User updateUser = new User();
+            updateUser.setId(userId);
+            updateUser.setStatus(0);
+            userService.update(updateUser);
+            
+            // 5. 记录管理员操作日志到数据库
+            String ipAddress = getClientIp(request);
+            String operationContent = "管理员解除用户[" + userId + "]的封禁，用户名：" + user.getUsername();
+            
+            // 调用日志服务记录操作
+            adminOperationLogService.recordLog(currentAdminId, operationContent, ipAddress);
+            
+            return Result.success("用户封禁已解除");
+        } catch (RuntimeException e) {
+            // 异常处理
+            e.printStackTrace();
+            return Result.error(e.getMessage());
+        }
+    }
+
+    /**
      * 获取客户端IP地址
      * @param request HTTP请求对象
      * @return IP地址字符串
@@ -257,7 +363,5 @@ public class AdminController {
         }
         return ip;
     }
-
-
 
 }
