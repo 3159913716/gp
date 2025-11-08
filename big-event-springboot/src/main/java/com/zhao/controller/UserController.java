@@ -410,8 +410,9 @@ public class UserController {
      */
     @ExceptionHandler(org.springframework.web.bind.MethodArgumentNotValidException.class)
     public Result handleValidationExceptions(org.springframework.web.bind.MethodArgumentNotValidException ex) {
-        // 针对身份证号格式错误返回友好提示
-        return Result.error("身份证号格式不正确，请输入有效的18位身份证号");
+        // 获取实际的验证错误信息
+        String errorMessage = ex.getBindingResult().getFieldError().getDefaultMessage();
+        return Result.error(errorMessage);
     }
     
     @PostMapping("/author-apply")
