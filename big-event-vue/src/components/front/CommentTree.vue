@@ -48,9 +48,11 @@ const toggleExpand = () => {
         </span>
       </div>
       <div class="ops">
-        <ElButton class="like" :type="node.isLiked ? 'primary' : 'default'" size="small" @click="emit('toggle-like', node)">
-          👍 {{ node.likeCount || 0 }}
-        </ElButton>
+        <div :type="node.isLiked ? 'primary' : 'default'" size="small" @click="emit('toggle-like', node)">
+           <i  class="fa-solid fa-heart"
+              :style="{ color: node.isLiked ?'#ef4444' :  '#c0c4cc' }"></i>
+              <span class="count">{{ node.likeCount || 0 }}</span>
+        </div>
         <ElButton class="reply" size="small" v-if="depth === 0" @click="toggleReply">回复</ElButton>
       </div>
     </div>
@@ -116,4 +118,7 @@ const toggleExpand = () => {
 .reply-editor .actions { margin-top: 6px; display: flex; gap: 8px; }
 .children { margin-top: 6px; }
 .expand-line { margin-top: 4px; color: #409eff; }
+.count{
+  color: #909399;
+}
 </style>

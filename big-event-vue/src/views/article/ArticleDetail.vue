@@ -11,7 +11,7 @@ import guanzhu from '@/api/guanzhu.js'
 import { useTokenStore } from '@/stores/token.js'
 import useUserInfoStore from '@/stores/userInfo.js'
 import CommentTree from '@/components/front/CommentTree.vue'
-
+import '@fortawesome/fontawesome-free/css/all.css';
 const route = useRoute()
 const router = useRouter()
 
@@ -40,14 +40,14 @@ const saveCommentInteraction = (commentId, isLiked, likeCount) => {
       ts: Date.now()
     }
     localStorage.setItem(key, JSON.stringify(payload))
-  } catch {}  
+  } catch { }
 }
 
 const loadCommentInteraction = (commentId) => {
   try {
     const key = getUserCommentKey(commentId)
     const raw = localStorage.getItem(key)
-    return raw ? JSON.parse(raw) : {}  
+    return raw ? JSON.parse(raw) : {}
   } catch {
     return {}
   }
@@ -71,7 +71,7 @@ const saveInteraction = () => {
       ts: Date.now()
     }
     localStorage.setItem(getPersistKey(), JSON.stringify(payload))
-  } catch {}
+  } catch { }
 }
 
 // 加载状态与错误信息
@@ -166,11 +166,11 @@ const showFollowButton = computed(() => {
   if (!hasAuth.value) {
     return true
   }
-  
+
   // 已登录状态：检查文章作者名与当前登录用户名是否相同
   const currentUserName = userInfoStore?.info?.username || userInfoStore?.info?.nickname || ''
   const articleAuthorName = article.value?.authorName || ''
-  
+
   // 如果作者名与当前用户名不同，则显示关注按钮
   return currentUserName !== articleAuthorName
 })
@@ -225,15 +225,15 @@ const toggleFavorite = async () => {
     router.push({ name: 'Login', query: { redirect } })
     return
   }
-  
+
   // 记录操作前的状态
   const prevFavorited = favorited.value
   const prevCount = localCollectCount.value
   const isFromCollectList = route.query.fromCollect === 'true'
-  
+
   // 先直接切换收藏状态，提供即时反馈
   favorited.value = !favorited.value
-  
+
   // 根据收藏状态变化更新收藏数
   if (favorited.value) {
     // 收藏操作：收藏数+1
@@ -242,29 +242,29 @@ const toggleFavorite = async () => {
     // 取消收藏：收藏数-1（但不小于0）
     localCollectCount.value = Math.max(0, prevCount - 1)
   }
-  
+
   // 确保article对象中的收藏数也同步更新
   article.value.collectCount = localCollectCount.value
-  
+
   // 保存状态到本地存储
   saveInteraction()
-  
+
   favoriteLoading.value = true
   try {
     // 调用后端接口完成收藏/取消收藏操作
     const resp = await sendCommentApi.toggleArticleCollect(articleId.value)
-    
+
     // 清除URL参数中的收藏状态，避免状态混乱
     const newQuery = { ...route.query }
     delete newQuery.isCollected
     delete newQuery.collectCount
     router.replace({ query: newQuery })
-    
+
     // 如果从收藏列表进入，设置刷新标志以便返回收藏列表时刷新
     if (isFromCollectList) {
       localStorage.setItem('needRefreshCollectList', 'true')
     }
-    
+
   } catch (err) {
     // 接口调用失败，恢复到操作前的状态
     console.error('文章收藏接口调用失败：', err?.message || err)
@@ -301,7 +301,7 @@ const generateMockDetail = (id = 1) => {
 // 将接口返回的文章字段映射到页面所需结构（兼容驼峰/下划线字段）
 const normalizeDetail = (data) => {
   if (!data || typeof data !== 'object') return generateMockDetail(articleId.value || 1)
-  
+
   // 确保authorId始终有值，优先使用已有字段，否则从作者名提取或使用默认值
   let authorId = data.author?.id ?? data.authorId ?? data.author_id ?? data.userId ?? data.user_id ?? data.create_user;
   if (!authorId) {
@@ -314,7 +314,7 @@ const normalizeDetail = (data) => {
       authorId = 1;
     }
   }
-  
+
   return {
     id: data.id ?? articleId.value,
     title: data.title ?? '',
@@ -377,7 +377,7 @@ const loadDetail = async () => {
     // 优先使用URL参数中的收藏状态（如果有）
     const urlIsCollected = route.query.isCollected === 'true'
     const urlCollectCount = Number(route.query.collectCount)
-    
+
     // 认证用户时优先采用接口返回的个性化状态；否则更信任本地持久化
     const tokenStoreTop = useTokenStore()
     const hasAuth = computed(() => !!tokenStoreTop?.token)
@@ -406,8 +406,8 @@ const loadDetail = async () => {
 
     localLikeCount.value = Math.max(0, Number((persisted.likeCount ?? article.value.likeCount) || 0))
     // 如果URL参数中有收藏数，则优先使用
-    localCollectCount.value = !isNaN(urlCollectCount) && urlCollectCount > 0 ? urlCollectCount : 
-                            Math.max(0, Number((persisted.collectCount ?? article.value.collectCount) || 0))
+    localCollectCount.value = !isNaN(urlCollectCount) && urlCollectCount > 0 ? urlCollectCount :
+      Math.max(0, Number((persisted.collectCount ?? article.value.collectCount) || 0))
 
     // 同步顶部统计为当前展示值
     article.value.likeCount = localLikeCount.value
@@ -533,14 +533,14 @@ const onToggleCommentLike = async (comment) => {
     else comment.isLiked = !comment.isLiked
     if (count !== undefined) comment.likeCount = Math.max(0, Number(count) || 0)
     else comment.likeCount = Math.max(0, comment.likeCount + (comment.isLiked ? 1 : -1))
-    
+
     // 保存到本地存储
     saveCommentInteraction(id, comment.isLiked, comment.likeCount)
   } catch (err) {
     comment.isLiked = !comment.isLiked
     comment.likeCount = Math.max(0, comment.likeCount + (comment.isLiked ? 1 : -1))
     console.warn('评论点赞接口调用异常：', err?.message || err)
-    
+
     // 即使出错也要保存到本地存储，保证本地状态一致性
     saveCommentInteraction(id, comment.isLiked, comment.likeCount)
   } finally {
@@ -646,7 +646,7 @@ const generateMockComments = (id, page = 1, pageSize = 10) => {
 const normalizeCommentItem = (c) => {
   // 先加载本地存储的交互状态
   const persisted = loadCommentInteraction(c.id)
-  
+
   const comment = {
     id: c.id ?? 0,
     content: c.content ?? '',
@@ -663,7 +663,7 @@ const normalizeCommentItem = (c) => {
     replyCount: c.replyCount ?? c.reply_count ?? (Array.isArray(c.replies) ? c.replies.length : 0),
     replies: Array.isArray(c.replies) ? c.replies.map(normalizeCommentItem) : []
   }
-  
+
   return comment
 }
 
@@ -793,7 +793,7 @@ const toggleFollow = async () => {
     router.push({ name: 'Login', query: { redirect } })
     return
   }
-  
+
   // 修复作者ID解析，确保能从多种格式获取
   let authorId = article.value?.authorId;
   // 如果没有authorId，尝试从作者名中提取数字ID
@@ -806,44 +806,44 @@ const toggleFollow = async () => {
       authorId = 1;
     }
   }
-  
+
   if (!authorId) {
     ElMessage.error('作者信息不完整，无法操作')
     return
   }
-  
+
   // 检查是否是自己的文章，防止关注自己
   const currentUserId = userInfoStore?.info?.id;
   if (currentUserId && Number(currentUserId) === Number(authorId)) {
     ElMessage.warning('不能关注自己')
     return
   }
-  
+
   // 记录操作前的状态
   const prevFollowing = following.value
-  
+
   // 先直接切换关注状态，提供即时反馈
   following.value = !following.value
-  
+
   // 保存状态到本地存储
   saveInteraction()
-  
+
   followLoading.value = true
   try {
     // 调用guanzhu.js中的toggleFollow方法完成关注/取消关注操作
     const data = await guanzhu.toggleFollow(authorId);
-    
+
     // 从响应中获取后端返回的实际关注状态
     const backendFollowing = data?.following;
-    
+
     // 如果后端返回了明确的关注状态，则使用后端状态更新前端
     if (backendFollowing !== undefined) {
       following.value = Boolean(backendFollowing);
     }
-    
+
     // 保存最新状态到本地存储
     saveInteraction();
-    
+
   } catch (err) {
     // 接口调用失败，恢复到操作前的状态
     console.error('关注操作失败：', err?.message || err)
@@ -877,30 +877,27 @@ watch(() => route.params.id, () => {
             <div class="meta">
               <div class="author">
                 <span class="author-name">{{ article.authorName }}</span>
-                <ElButton 
-                  v-if="showFollowButton"
-                  :type="followingUi ? 'success' : 'primary'" 
-                  :loading="followLoading" 
-                  :disabled="followLoading"
-                  size="small" 
-                  class="follow-btn"
-                  @click="toggleFollow"
-                  style="cursor: pointer;"
-                >
+                <ElButton v-if="showFollowButton" :type="followingUi ? 'success' : 'primary'" :loading="followLoading"
+                  :disabled="followLoading" size="small" class="follow-btn" @click="toggleFollow"
+                  style="cursor: pointer;">
                   {{ followingUi ? '已关注' : '关注' }}
                 </ElButton>
-                <ElTag class="category-tag" size="small" :effect="'light'" @click="goToCategory">{{ article.categoryName }}</ElTag>
+                <ElTag class="category-tag" size="small" :effect="'light'" @click="goToCategory">{{ article.categoryName
+                }}</ElTag>
                 <span class="time">{{ article.createTime }}</span>
               </div>
               <div class="stats">
                 <div class="stat-item">
-                  <span class="stat-icon">👍</span>
-                 
+                  <!-- <span class="stat-icon fal fa-heart">👍</span> -->
+                  <i class="fa-solid fa-heart" style="color:#c0c4cc;"></i>
+                  <!-- <i class="fa-regular fa-heart text-red-500" style="color: #ef4444;"></i> -->
+
                   <span class="stat-value">{{ localLikeCount }}</span>
                 </div>
                 <div class="stat-item">
-                  <span class="stat-icon">💬</span>
-                 
+                  <!-- <span class="stat-icon">💬</span> -->
+                  <i class="fa-solid fa-comment" style="color:#c0c4cc;"></i>
+
                   <span class="stat-value">{{ commentsTotal }}</span>
                 </div>
               </div>
@@ -920,64 +917,53 @@ watch(() => route.params.id, () => {
 
         <!-- 操作按钮：点赞 / 收藏（前端本地状态） -->
         <div class="actions-bar">
-          <ElButton :type="likedUi ? 'primary' : 'default'" :loading="likeLoading" :disabled="likeLoading" class="action-btn like" @click="toggleLike">
-            <span class="icon">👍</span>
-            <span class="label">{{ likedUi ? '已赞' : '点赞' }}</span>
-            <span class="count" style="margin-left: 6px; font-weight: bold; font-size: 14px;">{{ localLikeCount }}</span>
-          </ElButton>
-          <ElButton :type="favorited ? 'warning' : 'default'" :loading="favoriteLoading" :disabled="favoriteLoading" class="action-btn fav" @click="toggleFavorite">
-            <span class="icon">⭐</span>
-            <span class="label">{{ favorited ? '已收藏' : '收藏' }}</span>
-            <span class="count" style="margin-left: 6px; font-weight: bold; font-size: 14px;">{{ localCollectCount }}</span>
-          </ElButton>
+          <div :loading="likeLoading" :disabled="likeLoading"
+            class="action-btn" @click="toggleLike">
+            <!-- <span class="icon">👍</span> -->
+            <i  class="fa-solid fa-heart"
+              :style="{ color: likedUi ?'#ef4444' :  '#c0c4cc' }"></i>
+            <!-- <span class="label">{{ likedUi ? '已赞' : '点赞' }}</span> -->
+            <span class="count" style="margin-left: 6px; font-weight: bold; font-size: 14px;">{{ localLikeCount
+            }}</span>
+          </div>
+          <div :loading="favoriteLoading" :disabled="favoriteLoading"
+            class="action-btn fav" @click="toggleFavorite">
+            <!-- <span class="icon">⭐</span> -->
+              <i  class="fa-solid fa-star"
+              :style="{ color: favorited ?'#ffb800' :  '#c0c4cc' }"></i>
+            <!-- <span class="label">{{ favorited ? '已收藏' : '收藏' }}</span> -->
+            <span class="count" style="margin-left: 6px; font-weight: bold; font-size: 14px;">{{ localCollectCount
+            }}</span>
+          </div>
         </div>
 
         <div v-if="errorMsg" class="error">{{ errorMsg }}</div>
-        
+
         <!-- 评论列表区域 -->
         <div class="comments-section">
           <h3 class="comments-title">评论</h3>
 
           <!-- 新增：发布评论输入框与发布按钮 -->
           <div class="comment-editor">
-            <ElInput
-              v-model="newComment"
-              type="textarea"
-              :autosize="{ minRows: 3, maxRows: 10 }"
-              :maxlength="MAX_COMMENT_LEN"
-              show-word-limit
-              placeholder="请输入评论内容（最多200字）"
-              class="comment-textarea"
-            />
+            <ElInput v-model="newComment" type="textarea" :autosize="{ minRows: 3, maxRows: 10 }"
+              :maxlength="MAX_COMMENT_LEN" show-word-limit placeholder="请输入评论内容（最多200字）" class="comment-textarea" />
             <div class="editor-actions">
-              <ElButton type="primary" :disabled="!canSubmitComment || submittingComment" @click="submitComment">发布评论</ElButton>
+              <ElButton type="primary" :disabled="!canSubmitComment || submittingComment" @click="submitComment">发布评论
+              </ElButton>
             </div>
           </div>
 
           <div v-if="commentsLoading" class="comments-loading">正在加载评论...</div>
           <template v-else>
             <template v-if="comments.length">
-              <CommentTree
-                v-for="c in comments"
-                :key="c.id"
-                :node="c"
-                :depth="0"
-                @submit-reply="onSubmitReply"
-                @toggle-like="onToggleCommentLike"
-              />
+              <CommentTree v-for="c in comments" :key="c.id" :node="c" :depth="0" @submit-reply="onSubmitReply"
+                @toggle-like="onToggleCommentLike" />
             </template>
             <ElEmpty v-else description="暂无评论" />
-            <ElPagination
-              v-model:current-page="commentsPage"
-              v-model:page-size="commentsPageSize"
-              :page-sizes="[5, 10, 20]"
-              layout="jumper, total, sizes, prev, pager, next"
-              background
-              :total="commentsTotal"
-              @size-change="onCommentsSizeChange"
-              @current-change="onCommentsCurrentChange"
-              class="comments-pagination"
-            />
+            <ElPagination v-model:current-page="commentsPage" v-model:page-size="commentsPageSize"
+              :page-sizes="[5, 10, 20]" layout="jumper, total, sizes, prev, pager, next" background
+              :total="commentsTotal" @size-change="onCommentsSizeChange" @current-change="onCommentsCurrentChange"
+              class="comments-pagination" />
           </template>
           <div v-if="commentsError" class="comments-error">{{ commentsError }}</div>
         </div>
@@ -1070,21 +1056,29 @@ title {
 .stats {
   display: flex;
   align-items: center;
-  gap: 12px;
+  /* gap: 12px; */
   color: #606266;
   font-size: 13px;
 }
+
 .stat-item {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 5px;
   padding: 2px 10px;
-  background: #f5f7fa;
-  border: 1px solid #ebeef5;
-  border-radius: 16px;
+  /* background: #f5f7fa; */
+  /* border: 1px solid #ebeef5;
+  border-radius: 16px; */
 }
-.stat-icon { font-size: 14px; }
-.stat-value { color: #303133; font-weight: 600; }
+
+.stat-icon {
+  font-size: 14px;
+}
+
+.stat-value {
+  color: #909399;
+  font-weight: 600;
+}
 
 .cover {
   width: 100%;
@@ -1116,16 +1110,19 @@ title {
   margin-top: 10px;
   color: #f56c6c;
 }
+
 .comments-section {
   border-top: 1px solid #ebeef5;
   margin-top: 16px;
   padding-top: 14px;
 }
+
 .comments-title {
   margin: 0 0 6px;
   font-size: 16px;
   color: #303133;
 }
+
 /* 统一评论项样式 */
 .comment-item {
   display: flex;
@@ -1133,42 +1130,51 @@ title {
   padding: 12px 10px;
   border-bottom: 1px solid #ebeef5;
 }
+
 .comment-item:last-child {
   border-bottom: none;
 }
+
 /* 头像统一尺寸与形状 */
 .comment-item :deep(.el-avatar) {
   width: 36px;
   height: 36px;
   border-radius: 50%;
   border: 2px solid #fff;
-  box-shadow: 0 2px 6px rgba(0,0,0,0.06);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
 }
+
 /* 主体与元信息 */
 .c-body {
   flex: 1;
 }
+
 .c-meta {
   display: flex;
   align-items: center;
   gap: 8px;
 }
+
 .c-user {
   font-size: 14px;
   font-weight: 600;
   color: #303133;
 }
+
 .c-user:hover {
   color: #409eff;
 }
+
 .c-time {
   font-size: 12px;
   color: #909399;
 }
+
 /* 操作区右对齐 */
 .c-like {
   margin-left: auto;
 }
+
 .c-like-btn {
   border-radius: 16px;
   padding: 2px 10px;
@@ -1176,13 +1182,16 @@ title {
   align-items: center;
   gap: 6px;
 }
+
 .c-like-btn .icon {
   font-size: 14px;
 }
+
 .c-like-btn .count {
   font-size: 12px;
   color: #909399;
 }
+
 /* 内容排版统一 */
 .c-content {
   margin-top: 6px;
@@ -1192,45 +1201,55 @@ title {
   white-space: pre-wrap;
   word-break: break-word;
 }
+
 /* 响应式：在窄屏下减小间距与头像尺寸，并让元信息换行 */
 @media (max-width: 768px) {
   .comment-item {
     gap: 10px;
     padding: 10px 8px;
   }
+
   .comment-item :deep(.el-avatar) {
     width: 32px;
     height: 32px;
   }
+
   .c-meta {
     flex-wrap: wrap;
     gap: 6px;
   }
+
   .c-user {
     font-size: 13px;
   }
+
   .c-time {
     font-size: 12px;
   }
 }
+
 /* 评论编辑区：禁用拖拽放大并提供足够默认输入空间 */
 .comment-editor :deep(.el-textarea__inner) {
   resize: none;
   line-height: 1.6;
   border-radius: 6px;
 }
+
 .comment-editor .editor-actions {
   margin-top: 8px;
 }
+
 /* 修复误插入的模板内容，保留样式作用域 */
 .editor-actions {
   margin-top: 8px;
 }
+
 .comments-loading {
   padding: 16px 0;
   text-align: center;
   color: #909399;
 }
+
 .comments-error {
   margin-top: 8px;
   color: #f56c6c;
@@ -1238,27 +1257,29 @@ title {
 
 /* 操作按钮样式 */
 .actions-bar {
-  margin: 12px 0 8px;
+  margin: 12px 15px 8px;
   display: flex;
-  gap: 12px;
+  gap: 15px;
   justify-content: flex-end;
 }
+
 .action-btn {
-  border-radius: 20px;
-  padding: 8px 14px;
-  transition: all 0.2s ease;
+    cursor: pointer; 
 }
+
 .action-btn .icon {
   font-size: 16px;
   margin-right: 6px;
 }
+
 .action-btn .count {
   margin-left: 6px;
   color: #909399;
   font-size: 12px;
 }
-.action-btn:hover {
+
+/* .action-btn:hover {
   transform: translateY(-1px);
   box-shadow: 0 6px 12px rgba(0, 0, 0, 0.08);
-}
+} */
 </style>
