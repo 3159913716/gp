@@ -316,6 +316,7 @@ const login = async () => {
     if (result.code === 0) {
       ElMessage.success(result.msg || '登录成功')
       tokenStore.setToken(result.data)
+      console.log(result.data)
       router.push('/')
     } else {
       ElMessage.error(result.msg || '邮箱或密码错误，请重试')

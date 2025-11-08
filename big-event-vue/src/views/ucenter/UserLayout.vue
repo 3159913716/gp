@@ -157,10 +157,8 @@ const handleCommand = (command) => {
       <!-- 顶部头部区域 - 包含用户名、导航栏和头像 -->
       <el-header>
         <!-- 用户信息区域 - 只显示用户名 -->
-        <div class="username-display">用户：<strong>{{ 
-          userInfoStore?.info?.username || 
-          '未登录用户' 
-        }}</strong></div>
+        <div>用户：<strong>{{userInfoStore?.info?.nickname || userInfoStore?.info?.username || 
+          '未登录用户'  }}</strong></div>
         
         <!-- 导航栏区域 -->
         <div class="nav-wrapper">
