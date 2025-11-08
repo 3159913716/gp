@@ -16,6 +16,7 @@ import com.zhao.utils.JwtUtil;
 import com.zhao.utils.PasswordUtil;
 import com.zhao.utils.ThreadLocalUtil;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.Pattern;
 import org.hibernate.validator.constraints.URL;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -174,21 +175,25 @@ public class UserController {
      */
     @PostMapping("/register")
     //校验参数是否符合要求
-    public Result register(@Pattern(regexp = "^\\S{5,17}$") String username, @Pattern(regexp = "^\\S{5,17}$") String password) {
+    public Result register(@Pattern(regexp = "^\\S{5,17}$") String username, 
+                          @Pattern(regexp = "^\\S{5,17}$") String password,
+                          @Email String email) {
 
-
-        //查询用户
+        //查询用户名是否被占用
         User u = userService.findByUserName(username);
-        if (u == null) {
-            //用户名没有占用
-            //注册
-            userService.register(username, password);
-            return Result.success();
-        } else {
-            //用户名被占用
+        if (u != null) {
             return Result.error("用户名已被占用！");
         }
-
+        
+        //查询邮箱是否被占用
+        User emailUser = userService.findByEmail(email);
+        if (emailUser != null) {
+            return Result.error("邮箱已被注册！");
+        }
+        
+        //注册
+        userService.register(username, password, email);
+        return Result.success();
     }
 
     /**

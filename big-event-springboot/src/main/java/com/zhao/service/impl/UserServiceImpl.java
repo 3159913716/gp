@@ -46,11 +46,11 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
-    public void register(String username, String password) {
+    public void register(String username, String password, String email) {
         //密码加密
         String encryptPassword = PasswordUtil.encryptPassword(password);
         //添加
-        userMapper.add(username, encryptPassword);
+        userMapper.add(username, encryptPassword, email);
     }
 
     @Override

@@ -19,7 +19,7 @@ public interface UserService {
     void updatePasswordById(Integer userId, String newPassword);
 
     //注册
-    void register(String username, String password);
+    void register(String username, String password, String email);
 
     //更新
     void update(User user);

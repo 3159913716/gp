@@ -23,7 +23,7 @@ public interface UserMapper {
     void updatePasswordById(@Param("encryptPassword") String encryptPassword, @Param("userId") Integer userId);
 
     //添加
-    void add(String username, String encryptPassword);
+    void add(String username, String encryptPassword, String email);
 
     //更新
     void update(User user);

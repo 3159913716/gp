@@ -29,9 +29,9 @@
 
     <!-- 添加 -->
     <!-- now()是数据库里面的函数，旨在获取数据库系统当前时间 -->
-    <insert id="add"  parameterType="com.zhao.pojo.User">
-        insert into user(username,password,create_time,update_time)
-        values(#{username},#{encryptPassword},now(),now())
+    <insert id="add" >
+        insert into user(username,password,email,create_time,update_time)
+        values(#{username},#{encryptPassword},#{email},now(),now())
     </insert>
 
     <!-- 更新 -->
