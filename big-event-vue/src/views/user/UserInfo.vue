@@ -49,7 +49,13 @@ const initialUserInfo = reactive(JSON.parse(JSON.stringify(userInfoStore.info)))
 */
 const userInfo = ref(JSON.parse(JSON.stringify(userInfoStore.info)))
 
-// 如果nickname为空或未定义，设置默认值
+// 跟踪原始nickname是否为空
+const isOriginalNicknameEmpty = ref(
+  !userInfoStore.info.nickname || userInfoStore.info.nickname.trim() === ''
+)
+
+// 保留store中的nickname，如果存在的话
+// 只有在nickname为空时才设置默认值
 if (!userInfo.value.nickname || userInfo.value.nickname.trim() === '') {
   userInfo.value.nickname = userInfo.value.username || '用户' + Date.now().toString().slice(-4)
 }
@@ -84,17 +90,24 @@ watch(
 const rules = {
   // 昵称验证规则
   nickname: [
-    // 必填验证
-    { 
-      required: true, 
-      message: '请输入用户昵称', // 错误提示信息
-      trigger: 'blur'           // 触发时机：失去焦点
-    },
-    // 格式验证
+    // 自定义验证器，会在验证前自动设置默认值
     {
-      pattern: /^\S{2,10}$/,    // 2-10位非空字符正则
-      message: '昵称必须是2-10位的非空字符串',
-      trigger: 'blur'           // 触发时机：失去焦点
+      validator: (rule, value, callback) => {
+        // 如果昵称为空，自动设置默认值
+        if (!value || value.trim() === '') {
+          const defaultNickname = userInfoStore.info?.username || '用户' + Date.now().toString().slice(-4);
+          userInfo.value.nickname = defaultNickname;
+          // 验证通过
+          callback();
+        } else if (!/^\S{2,10}$/.test(value.trim())) {
+          // 格式不正确
+          callback(new Error('昵称必须是2-10位的非空字符串'));
+        } else {
+          // 验证通过
+          callback();
+        }
+      },
+      trigger: 'blur' // 触发时机：失去焦点
     }
   ],
   // 邮箱不再需要验证规则，因为是只读字段
@@ -117,8 +130,16 @@ const resetForm = async () => {
   const email = userInfoStore.info?.email || ''
   // 设置默认昵称逻辑
   const defaultNickname = username || '用户' + Date.now().toString().slice(-4);
-  Object.assign(userInfo.value, { username: username, nickname: defaultNickname, email: email })
-  Object.assign(initialUserInfo, { username: username, nickname: defaultNickname, email: email })
+  
+  // 重新计算原始nickname是否为空
+  isOriginalNicknameEmpty.value = 
+    !userInfoStore.info.nickname || userInfoStore.info.nickname.trim() === ''
+  
+  // 使用store中的实际nickname（如果存在），否则使用默认值
+  const actualNickname = isOriginalNicknameEmpty.value ? defaultNickname : userInfoStore.info.nickname
+  
+  Object.assign(userInfo.value, { username: username, nickname: actualNickname, email: email })
+  Object.assign(initialUserInfo, { username: username, nickname: actualNickname, email: email })
   
   // 重置修改状态
   isFormModified.value = false
@@ -137,12 +158,30 @@ const resetForm = async () => {
   成功处理后更新Pinia store中的数据
 */
 const updateUserInfo = async () => {
-  // 调用Element表单验证方法
-  formRef.value?.validate(async (valid) => {
+  // 如果原始昵称不为空，才进行验证和更新
+  if (!isOriginalNicknameEmpty.value) {
+    // 在验证前确保昵称不为空
+    if (!userInfo.value.nickname || userInfo.value.nickname.trim() === '') {
+      userInfo.value.nickname = userInfoStore.info?.username || '用户' + Date.now().toString().slice(-4);
+    }
+    
+    // 调用Element表单验证方法
+    formRef.value?.validate(async (valid) => {
     if (valid) {  // 验证通过
       try {
+        // 确保提交数据包含所有必要字段：nickname、email、id、username
+        // 当nickname为空时，使用username作为替代值
+        const nicknameValue = userInfo.value.nickname.trim()
+        const finalNickname = nicknameValue !== '' ? nicknameValue.slice(0, 10) : userInfo.value.username
+        const updateData = {
+          nickname: finalNickname,
+          email: userInfo.value.email || '',
+          id: userInfo.value.id || 0,
+          username: userInfo.value.username || ''
+        }
+        
         // 调用API更新用户信息
-        await userInfoUpdateService(userInfo.value)
+        await userInfoUpdateService(updateData)
         ElMessage.success('个人信息更新成功！')  // 显示成功提示
         
         /* 
@@ -150,11 +189,23 @@ const updateUserInfo = async () => {
           使用深拷贝更新，避免引用问题
           保持store中的数据纯净
         */
-        userInfoStore.setInfo(JSON.parse(JSON.stringify(userInfo.value)))
+        // 合并更新后的数据，保留原有信息
+        const updatedUserInfo = {
+          ...userInfoStore.info,
+          ...updateData
+        }
+        
+        userInfoStore.setInfo(JSON.parse(JSON.stringify(updatedUserInfo)))
+        
+        // 更新isOriginalNicknameEmpty状态，确保后续操作正确
+        isOriginalNicknameEmpty.value = false
+        
+        // 更新本地userInfo对象，确保UI显示一致
+        Object.assign(userInfo.value, updateData)
         
         // 更新initialUserInfo以匹配更新后的状态
         // 这样后续修改时isFormModified才能正确反映变化
-        Object.assign(initialUserInfo, JSON.parse(JSON.stringify(userInfo.value)))
+        Object.assign(initialUserInfo, JSON.parse(JSON.stringify(updatedUserInfo)))
         
         // 重置表单修改状态
         isFormModified.value = false
@@ -164,14 +215,36 @@ const updateUserInfo = async () => {
         ElMessage.error('更新失败，请稍后重试')  // 显示错误提示
       }
     } else {  // 表单验证失败
-      ElMessage.warning('请检查表单输入是否正确')
-      return false  // 阻止后续流程
-    }
-  })
+          ElMessage.warning('请检查表单输入是否正确')
+          return false  // 阻止后续流程
+        }
+      })
+  } else {
+    // 原始昵称为空时，不允许修改
+    ElMessage.info('您的昵称使用的是登录名，无法修改')
+  }
 }
 
-// 组件挂载时重置表单并监听路由变化
+// 组件挂载时重新初始化数据并监听路由变化
 onMounted(() => {
+  // 强制重新初始化所有数据，确保使用最新的store信息
+  // 重新创建userInfo对象，确保使用store中的最新数据
+  userInfo.value = JSON.parse(JSON.stringify(userInfoStore.info))
+  
+  // 使用Object.assign更新initialUserInfo对象而不是重新赋值
+  Object.assign(initialUserInfo, JSON.parse(JSON.stringify(userInfoStore.info)))
+  
+  // 重新计算原始nickname状态
+  isOriginalNicknameEmpty.value = 
+    !userInfoStore.info.nickname || userInfoStore.info.nickname.trim() === ''
+  
+  // 只在nickname确实为空时设置默认值
+  if (isOriginalNicknameEmpty.value && (!userInfo.value.nickname || userInfo.value.nickname.trim() === '')) {
+    userInfo.value.nickname = userInfo.value.username || '用户' + Date.now().toString().slice(-4)
+    // 更新initialUserInfo的nickname属性
+    initialUserInfo.nickname = userInfo.value.nickname
+  }
+  
   resetForm()
   
   // 监听路由变化
@@ -242,13 +315,24 @@ onBeforeUnmount(() => {
           </el-form-item>
           
           <!-- 用户昵称字段（带验证） -->
-          <el-form-item label="用户昵称" prop="nickname">
+          <el-form-item label="用户昵称" :prop="isOriginalNicknameEmpty ? undefined : 'nickname'">
             <!-- 
-              双向绑定昵称字段：
-              可编辑状态
-              禁用自动填充
+              根据原始nickname是否为空显示不同内容：
+              1. 原始nickname为空时，只读显示username
+              2. 原始nickname不为空时，正常显示可编辑的nickname
             -->
-            <el-input v-model="userInfo.nickname" autocomplete="new-nickname"></el-input>
+            <template v-if="isOriginalNicknameEmpty">
+              <el-input v-model="userInfo.username" disabled placeholder="使用登录名作为昵称"></el-input>
+            </template>
+            <template v-else>
+              <el-input 
+                v-model="userInfo.nickname" 
+                autocomplete="new-nickname"
+                maxlength="10" 
+                show-word-limit
+                placeholder="请输入2-10个字符的昵称"
+              ></el-input>
+            </template>
           </el-form-item>
 
           <!-- 表单提交按钮 -->

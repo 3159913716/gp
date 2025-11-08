@@ -34,15 +34,12 @@
                 <div class="img-cell"><img :src="item.userPic" alt="用户头像" class="user-img"></div>
                 <div class="author-cell">{{ item.followTime }}</div>
                 <div class="time-cell">
-                    <el-button type="danger" size="mini" @click="removeFollow(item.userId)" class="delete-btn">取消关注</el-button>
+                    <el-button type="danger" size="small" @click="removeFollow(item.userId)" class="delete-btn">取消关注</el-button>
                 </div>
             </div>
         </div>
         <!-- 新增分页组件 -->
         <div class="pagination">
-          <el-button type="primary" size="small" class="refresh-btn" @click="refreshList">
-            <el-icon><Refresh /></el-icon> 刷新
-          </el-button>
           <el-pagination
             @size-change="handleSizeChange"
             @current-change="handleCurrentChange"
@@ -99,11 +96,11 @@ export default {
         
         try {
             // 使用guanzhu.js中的getFollowingList方法获取关注列表
-            const data = await guanzhu.getFollowingList();
-            // 适配接口直接返回数组的情况
-            this.list = Array.isArray(data) ? data : Array.isArray(data.list) ? data.list : [];
-            this.total = Array.isArray(data) ? data.length : Number(data.total || 0);
-            this.success = true;
+            const response = await guanzhu.getFollowingList();
+            // 根据接口文档，数据在response.data中
+            this.list = Array.isArray(response.data) ? response.data : [];
+            this.total = this.list.length;
+            this.success = response.success !== false; // 默认为成功
         } catch (error) {
             console.error('获取关注作者列表失败:', error);
             this.error = true;
@@ -168,7 +165,6 @@ export default {
 <style scoped>
 .container {
   width: 100%;
-  max-width: 1200px;
   padding: 15px;
   box-sizing: border-box;
   min-height: calc(100vh - 120px);

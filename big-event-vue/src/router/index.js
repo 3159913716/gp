@@ -50,10 +50,10 @@ import UcenterFansVue from '@/views/ucenter/UcenterFans.vue';
 import UcenterAuthorVue from '@/views/author/UcenterAuthor.vue';
 
 //用户布局视图
-import UserLayoutVue from '@/views/UserLayout.vue';
+import UserLayoutVue from '@/views/ucenter/UserLayout.vue';
 
 // 作者主布局视图组件
-import LayoutVue from '@/views/Layout.vue';
+import LayoutVue from '@/views/article/Layout.vue';
 // 管理员布局
 import AdminLayoutVue from '@/views/admin/AdminLayout.vue';
 /**

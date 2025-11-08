@@ -57,15 +57,53 @@ const imgUrl = ref(userInfoStore.info.userPic)
 
 /* 
   文件上传成功回调函数：
-  @param {Object} result - 上传接口返回的结果
+  @param {Object} response - 上传接口返回的原始响应
+  @param {Object} file - 上传的文件对象
+  @param {Array} fileList - 文件列表
 */
-const uploadSuccess = (result) => {
-  if (result.data) {
-    imgUrl.value = result.data      // 更新预览头像URL
+const uploadSuccess = (response, file, fileList) => {
+  console.log('上传响应:', response)
+  if (response && (response.data || response.url)) {
+    imgUrl.value = response.data || response.url      // 更新预览头像URL
     fileSelected.value = true        // 标记已选择文件
+    ElMessage.success('图片上传成功') // 显示成功提示
   } else {
-    ElMessage.error('上传失败')     // 显示错误提示
+    ElMessage.error('上传失败，请重试')     // 显示错误提示
+    fileSelected.value = false
   }
+};
+
+/* 
+  文件上传失败回调函数：
+  @param {Error} error - 错误对象
+  @param {Object} file - 上传的文件对象
+  @param {Array} fileList - 文件列表
+*/
+const uploadError = (error, file, fileList) => {
+  console.error('上传错误:', error)
+  ElMessage.error('上传失败，请检查网络或文件大小')
+  fileSelected.value = false
+};
+
+/* 
+  文件上传前的检查：
+  @param {Object} file - 上传的文件对象
+  @param {Array} fileList - 文件列表
+  @returns {boolean} 是否允许上传
+*/
+const beforeUpload = (file) => {
+  const isJPG = file.type === 'image/jpeg' || file.type === 'image/png' || file.type === 'image/gif';
+  const isLt2M = file.size / 1024 / 1024 < 2; // 限制文件大小为2MB
+
+  if (!isJPG) {
+    ElMessage.error('只能上传 JPG/PNG/GIF 格式的图片!');
+    return false;
+  }
+  if (!isLt2M) {
+    ElMessage.error('图片大小不能超过 2MB!');
+    return false;
+  }
+  return true;
 }
 
 /* 
@@ -73,11 +111,21 @@ const uploadSuccess = (result) => {
   调用API更新用户头像，成功后更新本地存储
 */
 const updateAvatar = async () => {
-  await userAvatarUpdateService(imgUrl.value)  // 调用API
-  ElMessage.success('头像更新成功')            // 显示成功提示
-  // 更新Pinia中的用户信息
-  userInfoStore.setInfo({ ...userInfoStore.info, userPic: imgUrl.value })
-  fileSelected.value = false // 标记未选择文件
+  if (!imgUrl.value) {
+    ElMessage.warning('请先选择头像图片')
+    return
+  }
+  
+  try {
+    await userAvatarUpdateService(imgUrl.value)  // 调用API
+    ElMessage.success('头像更新成功')            // 显示成功提示
+    // 更新Pinia中的用户信息
+    userInfoStore.setInfo({ ...userInfoStore.info, userPic: imgUrl.value })
+    fileSelected.value = false // 标记未选择文件
+  } catch (error) {
+    console.error('更新头像失败:', error)
+    ElMessage.error('头像更新失败，请重试')
+  }
 }
 </script>
 
@@ -110,7 +158,9 @@ const updateAvatar = async () => {
           :on-success - 上传成功回调
         -->
         <el-upload ref="uploadRef" class="avatar-uploader" :show-file-list="false" :auto-upload="true"
-          action="/api/upload" name="file" :headers="{ 'Authorization': tokenStore.token }" :on-success="uploadSuccess">
+          action="/api/upload" name="file" :headers="{ 'Authorization': tokenStore.token }" 
+          :on-success="uploadSuccess" :on-error="uploadError" :before-upload="beforeUpload"
+          :with-credentials="true">
           <!-- 头像预览：如果有头像URL则显示，否则显示默认头像 -->
           <img v-if="imgUrl" :src="imgUrl" class="avatar" />
           <img v-else :src="avatar" width="278" />
