@@ -19,11 +19,17 @@ public interface UserMapper {
     //根据邮箱查询用户
     User findByEmail(String email);
     
+    //根据手机号查询用户
+    User findByPhone(String phone);
+    
     //根据ID更新密码
     void updatePasswordById(@Param("encryptPassword") String encryptPassword, @Param("userId") Integer userId);
 
-    //添加
+    //添加（邮箱方式）
     void add(String username, String encryptPassword, String email);
+    
+    //添加（手机号方式）
+    void addByPhone(String username, String encryptPassword, String phone);
 
     //更新
     void update(User user);

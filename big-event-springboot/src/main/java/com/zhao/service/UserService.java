@@ -15,11 +15,17 @@ public interface UserService {
     //根据邮箱查询用户
     User findByEmail(String email);
     
+    //根据手机号查询用户
+    User findByPhone(String phone);
+    
     //根据ID更新密码
     void updatePasswordById(Integer userId, String newPassword);
 
-    //注册
+    //注册（邮箱方式）
     void register(String username, String password, String email);
+    
+    //注册（手机号方式）
+    void registerByPhone(String username, String password, String phone);
 
     //更新
     void update(User user);
