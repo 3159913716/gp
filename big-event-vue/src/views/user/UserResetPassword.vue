@@ -12,10 +12,13 @@
   FormInstance - Element Plus表单实例类型
   useRouter - Vue路由实例
 */
-import { ref, onMounted, onBeforeUnmount, watch } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
-import { ElMessage } from 'element-plus'
+import { ref, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
+import { useRoute } from 'vue-router'
+import { ElMessage, type FormInstance } from 'element-plus'
 import useUserInfoStore from '@/stores/userInfo.js'
+import { useRouter } from 'vue-router'
+import { redirectToLogin } from '@/router/index.js'
+import request from '@/utils/request.js'
 import { userUpdatePasswordService } from '@/api/user.js'
 
 /* 
@@ -27,7 +30,7 @@ import { userUpdatePasswordService } from '@/api/user.js'
 const router = useRouter()
 const route = useRoute()
 const userInfoStore = useUserInfoStore()
-const formRef = ref()  // 表单引用
+const formRef = ref<FormInstance>()  // 带类型声明的表单引用
 const formKey = ref(0)  // 用于强制重新渲染表单
 
 /* 
@@ -70,7 +73,7 @@ const pwdModel = ref({
   @param {string} value - 用户输入值
   @param {Function} callback - 验证回调函数
 */
-const validateRePwd = (rule, value, callback) => {
+const validateRePwd = (rule: any, value: string, callback: any) => {
   if (value === '') {
     callback(new Error('请再次输入新密码'))  // 空值错误
   } else if (value !== pwdModel.value.newPwd) {
@@ -86,7 +89,7 @@ const validateRePwd = (rule, value, callback) => {
   @param {string} value - 用户输入值
   @param {Function} callback - 验证回调函数
 */
-const validateEmail = (rule, value, callback) => {
+const validateEmail = (rule: any, value: string, callback: any) => {
   if (value === '') {
     callback(new Error('请输入邮箱地址'))
   } else {
@@ -106,7 +109,7 @@ const validateEmail = (rule, value, callback) => {
   @param {string} value - 用户输入值
   @param {Function} callback - 验证回调函数
 */
-const validateCode = (rule, value, callback) => {
+const validateCode = (rule: any, value: string, callback: any) => {
   if (value === '') {
     callback(new Error('请输入验证码'))
   } else {
@@ -140,22 +143,20 @@ const sendCode = async () => {
     return
   }
   
+  // 记录参数值用于调试
+  console.log('Sending verification code with:', { email: pwdModel.value.email, type: 'forget' })
+  
   try {
-              // 验证码发送逻辑应该通过API服务调用
-              ElMessage.warning('验证码发送功能暂未实现')
-              return;
-              
-              // 以下是原有的实现逻辑，暂时注释掉
-              /*
-              const result = await request.post('/api/email/send-code', null, {
-                params: {
-                  email: pwdModel.value.email,
-                  type: 'forget'
-                }
-              })
-              
-              if (result && result.success) {
-              */
+        // 使用完整的API路径格式
+        const result = await request.post('/api/email/send-code', null, {
+          params: {
+            email: pwdModel.value.email,
+            type: 'forget'
+          }
+        })
+    
+    // 由于request拦截器已经提取了data，直接判断success
+    if (result && result.success) {
       ElMessage.success('验证码已发送，请查收邮件')
       // 开始倒计时
       startCountdown()
@@ -243,7 +244,7 @@ const rules = {
     },
     // 自定义验证：新密码不能与原密码相同
     {
-      validator: (rule, value, callback) => {
+      validator: (rule: any, value: string, callback: any) => {
         if (value === pwdModel.value.oldPwd) {
           callback(new Error('新密码不能与原密码相同'))
         } else {
@@ -329,12 +330,10 @@ const submitForm = async () => {
   if (!valid) return  // 验证失败则中止
 
   try {
-         // 验证码验证逻辑应该通过API服务调用
-         // 暂时简化处理
-         const verifyResult = { success: true };
+         // 记录参数值用于调试
+         console.log('Verifying code with:', { email: pwdModel.value.email, code: pwdModel.value.code, type: 'forget' })
          
-         // 以下是原有的实现逻辑，暂时注释掉
-         /*
+         // 使用完整的API路径格式
          const verifyResult = await request.post('/api/email/verify', null, {
            params: {
              email: pwdModel.value.email,
@@ -342,7 +341,6 @@ const submitForm = async () => {
              type: 'forget'
            }
          })
-         */
     
     // 验证验证码是否成功
     if (verifyResult && verifyResult.success) {
@@ -359,16 +357,16 @@ const submitForm = async () => {
         resetForm()  // 重置表单
         // 2秒后跳转登录页
         setTimeout(() => {
-          router.push('/login')  // 直接跳转到登录页
+          redirectToLogin()  // 执行登录页重定向
         }, 2000)
       } else {
         // 处理密码更新业务逻辑错误
         ElMessage.error(updateResult && updateResult.message || '修改密码失败');
       }
     } else {
-          // 验证码验证失败
-          ElMessage.error(verifyResult && verifyResult.message || '验证码错误或已过期')
-        }
+      // 验证码验证失败
+      ElMessage.error(verifyResult && verifyResult.message || '验证码错误或已过期')
+    }
   } catch (error) {
     console.error('提交表单失败:', error)
     ElMessage.error('操作失败，请稍后重试')  // 通用错误提示
