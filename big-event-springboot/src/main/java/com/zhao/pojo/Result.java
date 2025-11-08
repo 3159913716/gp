@@ -22,6 +22,11 @@ public class Result<T> {
     public static <E> Result<E> success() {
         return new Result<>(0, "操作成功", null);
     }
+    
+    //快速返回带自定义消息的操作成功响应结果
+    public static <E> Result<E> success(String message) {
+        return new Result<>(0, message, null);
+    }
 
     public static <E> Result<E> error(String message) {
         return new Result<>(1, message, null);

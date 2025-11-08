@@ -39,6 +39,12 @@ public class User {
     @NotEmpty
     @Email
     private String email;
+    
+    /**
+     * 手机号字段，支持手机号注册和登录
+     */
+    private String phone;
+    
     private String userPic;//用户头像地址
     private LocalDateTime createTime;//创建时间
     private LocalDateTime updateTime;//更新时间

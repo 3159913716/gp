@@ -28,6 +28,17 @@ spring:
             enable: true
           ssl:
             enable: true
+  spug:
+    sms:
+      # Spug短信服务API地址
+      api-url: ${SPUG_SMS_API_URL:http://your-spug-server/api/v1/sms/send}
+      # Spug短信服务密钥
+      api-key: ${SPUG_SMS_API_KEY:your-api-key}
+      # 短信模板ID
+      template-id: ${SPUG_SMS_TEMPLATE_ID:your-template-id}
+      # 验证码有效期（分钟）
+      code-expiry: 5
+
 
   #上传文件限制大小10mb
   servlet:
@@ -41,6 +52,17 @@ mybatis:
   configuration:
     map-underscore-to-camel-case: true
 
+# Spug短信服务配置
+spug:
+  sms:
+    # Spug短信服务API地址
+    api-url: ${SPUG_SMS_API_URL:https://push.spug.cc/send/My5R7m0APMjV2DgG}
+    # Spug短信服务密钥
+    api-key: ${SPUG_SMS_API_KEY:your-api-key}
+    # 短信模板ID
+    template-id: ${SPUG_SMS_TEMPLATE_ID:your-template-id}
+    # 验证码有效期（分钟）
+    code-expiry: 5
 
 
 

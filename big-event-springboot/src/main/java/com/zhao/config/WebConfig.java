@@ -19,15 +19,20 @@ public class WebConfig implements WebMvcConfigurer {
         registry.addInterceptor(loginInterceptors).excludePathPatterns(
                 "/user/login",
                 "/user/register",
+                "/user/find-by-email",
+                "/user/send-forget-code",
+                "/user/reset-pwd",
+                "/user/register-by-phone",
+                "/user/login-by-phone",
                 "/api/email/send-code",
                 "/api/email/verify",
+                "/api/sms/send-code",
+                "/api/sms/verify",
                 "/article/home",
                 "/article/detail-page",
                 "/search",
                 "/article/*/comments",
-                "/category/list",
-                "/user/find-by-email",
-                "/user/send-forget-code",
-                "/user/reset-pwd"); // 添加获取文章评论列表接口到不拦截路径
+                "/category/list"
+                ); // 添加获取文章评论列表接口到不拦截路径
     }
 }

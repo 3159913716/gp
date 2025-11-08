@@ -8,10 +8,11 @@ import com.zhao.pojo.Result;
 import com.zhao.pojo.User;
 import com.zhao.service.ArticleService;
 import com.zhao.service.AuthorApplyService;
+import com.zhao.service.impl.EmailVerifyService;
+import com.zhao.service.SmsService;
 import com.zhao.service.UserCollectionService;
 import com.zhao.service.UserFollowService;
 import com.zhao.service.UserService;
-import com.zhao.service.impl.EmailVerifyService;
 import com.zhao.utils.JwtUtil;
 import com.zhao.utils.PasswordUtil;
 import com.zhao.utils.ThreadLocalUtil;
@@ -50,6 +51,9 @@ public class UserController {
     private ArticleService articleService;
     @Autowired
     private EmailVerifyService emailVerifyService;
+    
+    @Autowired
+    private SmsService smsService;
 
     /**
      * 忘记密码 - 根据邮箱获取用户信息（用于验证邮箱是否存在）
@@ -171,7 +175,7 @@ public class UserController {
     }
     
     /**
-     * 注册接口
+     * 注册接口（邮箱方式）
      */
     @PostMapping("/register")
     //校验参数是否符合要求
@@ -195,9 +199,41 @@ public class UserController {
         userService.register(username, password, email);
         return Result.success();
     }
+    
+    /**
+     * 注册接口（手机号方式）
+     */
+    @PostMapping("/register-by-phone")
+    public Result registerByPhone(@Pattern(regexp = "^\\S{5,17}$") String username, 
+                                 @Pattern(regexp = "^\\S{5,17}$") String password,
+                                 @Pattern(regexp = "^1[3-9]\\d{9}$") String phone,
+                                 @Pattern(regexp = "^\\d{6}$") String code) {
+        
+        // 查询用户名是否被占用
+        User u = userService.findByUserName(username);
+        if (u != null) {
+            return Result.error("用户名已被占用！");
+        }
+        
+        // 查询手机号是否被占用
+        User phoneUser = userService.findByPhone(phone);
+        if (phoneUser != null) {
+            return Result.error("手机号已被注册！");
+        }
+        
+        // 验证短信验证码
+        boolean isValid = smsService.verifyCode(phone, code, "register");
+        if (!isValid) {
+            return Result.error("验证码错误或已过期");
+        }
+        
+        // 注册
+        userService.registerByPhone(username, password, phone);
+        return Result.success("注册成功");
+    }
 
     /**
-     * 登录接口
+     * 登录接口（用户名密码方式）
      */
     @PostMapping("/login")
     public Result<String> login(@Pattern(regexp = "^\\S{5,17}$") String username, @Pattern(regexp = "^\\S{5,17}$") String password) {
@@ -233,6 +269,46 @@ public class UserController {
         }
         //判断密码是否正确
         return Result.error("用户名或密码错误！");
+    }
+    
+    /**
+     * 登录接口（手机号验证码方式）
+     */
+    @PostMapping("/login-by-phone")
+    public Result<String> loginByPhone(@Pattern(regexp = "^1[3-9]\\d{9}$") String phone, 
+                                      @Pattern(regexp = "^\\d{6}$") String code) {
+        
+        // 查询用户是否存在
+        User loginUser = userService.findByPhone(phone);
+        if (loginUser == null) {
+            return Result.error("该手机号未注册");
+        }
+        
+        // 检查用户状态，如果被禁用则不允许登录
+        if (loginUser.getStatus() != null && loginUser.getStatus() == 1) {
+            return Result.error("账号已被禁用，请联系管理员！");
+        }
+        
+        // 验证短信验证码
+        boolean isValid = smsService.verifyCode(phone, code, "login");
+        if (!isValid) {
+            return Result.error("验证码错误或已过期");
+        }
+        
+        // 登录成功后更新用户的最后登录时间
+        userService.updateLastLoginTime(loginUser.getId());
+        
+        // 登录成功，响应jwt令牌
+        Map<String, Object> claims = new HashMap<>();
+        claims.put("id", loginUser.getId());
+        claims.put("username", loginUser.getUsername());
+        claims.put("role", loginUser.getRole());
+        String token = JwtUtil.genToken(claims);
+        // 把token存储到redis中
+        ValueOperations<String,String> operations = stringRedisTemplate.opsForValue();
+        operations.set(token, token, 12, TimeUnit.HOURS);
+        
+        return Result.success(token);
     }
 
     /**

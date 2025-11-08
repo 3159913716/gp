@@ -38,6 +38,11 @@ public class UserServiceImpl implements UserService {
     }
     
     @Override
+    public User findByPhone(String phone) {
+        return userMapper.findByPhone(phone);
+    }
+    
+    @Override
     public void updatePasswordById(Integer userId, String newPassword) {
         // 密码加密
         String encryptPassword = PasswordUtil.encryptPassword(newPassword);
@@ -51,6 +56,14 @@ public class UserServiceImpl implements UserService {
         String encryptPassword = PasswordUtil.encryptPassword(password);
         //添加
         userMapper.add(username, encryptPassword, email);
+    }
+    
+    @Override
+    public void registerByPhone(String username, String password, String phone) {
+        //密码加密
+        String encryptPassword = PasswordUtil.encryptPassword(password);
+        //添加
+        userMapper.addByPhone(username, encryptPassword, phone);
     }
 
     @Override

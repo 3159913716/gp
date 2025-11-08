@@ -19,6 +19,11 @@
         select * from user where email=#{email}
     </select>
     
+    <!-- 根据手机号查询用户 -->
+    <select id="findByPhone" parameterType="java.lang.String" resultType="com.zhao.pojo.User">
+        select * from user where phone=#{phone}
+    </select>
+    
     <!-- 根据ID更新密码 -->
     <update id="updatePasswordById">
         update user
@@ -27,11 +32,17 @@
         where id=#{userId}
     </update>
 
-    <!-- 添加 -->
+    <!-- 添加（邮箱方式） -->
     <!-- now()是数据库里面的函数，旨在获取数据库系统当前时间 -->
     <insert id="add" >
         insert into user(username,password,email,create_time,update_time)
         values(#{username},#{encryptPassword},#{email},now(),now())
+    </insert>
+    
+    <!-- 添加（手机号方式） -->
+    <insert id="addByPhone" >
+        insert into user(username,password,phone,create_time,update_time)
+        values(#{username},#{encryptPassword},#{phone},now(),now())
     </insert>
 
     <!-- 更新 -->
