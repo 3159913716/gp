@@ -62,7 +62,13 @@ instance.interceptors.request.use(
       /^\/article\/published/.test(url) ||
       /^\/article\/public/.test(url) ||
       /^\/public-detail\//.test(url) ||
-      /^\/article\/detail-page/.test(url)
+      /^\/article\/detail-page/.test(url) ||
+      // 手机验证码相关接口
+      /^\/api\/sms\//.test(url) ||
+      // 用户注册登录相关接口
+      /^\/user\/register-by-phone/.test(url) ||
+      /^\/user\/login-by-phone/.test(url) ||
+      /^\/user\/check-phone/.test(url)
 
     if (hasToken && !isPublicEndpoint) {
       const raw = tokenStore.token
@@ -119,7 +125,13 @@ instance.interceptors.response.use(
         /^\/article\/published/.test(url) ||
         /^\/article\/public/.test(url) ||
         /^\/public-detail\//.test(url) ||
-        /^\/article\/detail-page/.test(url)
+        /^\/article\/detail-page/.test(url) ||
+        // 手机验证码相关接口
+        /^\/api\/sms\//.test(url) ||
+        // 用户注册登录相关接口
+        /^\/user\/register-by-phone/.test(url) ||
+        /^\/user\/login-by-phone/.test(url) ||
+        /^\/user\/check-phone/.test(url)
       const tokenStore = useTokenStore();
       const hasToken = !!tokenStore.token
       if (!isPublicEndpoint && hasToken) {

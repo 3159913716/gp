@@ -658,9 +658,9 @@ const normalizeCommentItem = (c) => {
     createTime: c.createTime ?? c.create_time ?? '',
     user: {
       id: c.user?.id ?? c.user_id ?? c.userId ?? c.uid ?? c.userInfo?.id ?? 0,
-      // 先使用评论数据中的nickname，如果为空则使用userinfo接口返回的username
-      nickname: c.user?.nickname ?? c.userInfo?.nickname ?? c.nickname ?? currentUserInfo.username ?? '',
-      username: c.user?.username ?? c.userInfo?.username ?? c.userName ?? c.user_name ?? currentUserInfo.username ?? '游客',
+      // 优先使用评论数据中的nickname，如果为空则使用username，都为空时显示'匿名用户'
+      nickname: c.user?.nickname ?? c.userInfo?.nickname ?? c.nickname ?? c.user?.username ?? c.userInfo?.username ?? c.userName ?? c.user_name ?? '匿名用户',
+      username: c.user?.username ?? c.userInfo?.username ?? c.userName ?? c.user_name ?? '匿名用户',
       // 头像为空时使用默认头像
       avatar: normalizeImageUrl(c.user?.avatar ?? c.user?.userPic ?? c.userInfo?.userPic ?? c.userInfo?.avatar ?? c.userPic ?? c.user_pic ?? c.avatarUrl ?? c.avatar) || defaultAvatar
     },

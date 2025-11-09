@@ -11,6 +11,8 @@ import router from '@/router'
 import { userRegisterService, userLoginService, resetPasswordService } from '@/api/user.js'
 // 新增：引入邮箱验证码API
 import emailApi from '@/api/email.js'
+// 新增：引入手机验证码API
+import { sendSmsCode, registerByPhone, loginByPhone } from '@/api/phoneAuthApi.js'
 // 引入用于管理token的Pinia store
 import { useTokenStore } from '@/stores/token.js'
 
@@ -127,6 +129,12 @@ const validatePassword = (rule, value, callback) => {
  *   - 必须与第一次输入的密码一致
  */
 const validateRePassword = (rule, value, callback) => {
+  // 如果是手机号注册模式，不验证重复密码
+  if (!isEmailRegister.value) {
+    callback()
+    return
+  }
+  
   if (!value) {
     callback(new Error('请再次输入密码'))
   } else if (value !== registerData.value.password) {
@@ -252,7 +260,7 @@ const sendEmailCode = async (type = 'register') => {
       // 找回密码流程：先查找用户，再发送验证码
       
       // 1. 根据邮箱查找用户 - 使用email.js中的findUserByEmail接口
-      const findUserRes = await emailApi.findUserByEmail(email)
+      const findUserRes = await emailApi.findUserByEmail(contactInfo)
       
       // 优化成功状态判断
       const isFindSuccess = findUserRes.success === true || findUserRes.code === 0
@@ -269,7 +277,7 @@ const sendEmailCode = async (type = 'register') => {
       userId.value = findUserRes.data?.id
       
       // 3. 发送找回密码验证码 - 使用email.js中的sendForgetCode接口
-      const sendCodeRes = await emailApi.sendForgetCode(userId.value, email)
+      const sendCodeRes = await emailApi.sendForgetCode(userId.value, contactInfo)
       
       // 立即启动60秒冷却期，无论成功失败
       countdown.value = 60
@@ -284,8 +292,8 @@ const sendEmailCode = async (type = 'register') => {
         // 邮箱注册
         res = await emailApi.sendCode(contactInfo, 'register')
       } else {
-        // 手机号注册 - 假设API支持手机号验证码
-        res = await emailApi.sendPhoneCode(contactInfo, 'register')
+        // 手机号注册 - 使用手机验证码API
+        res = await sendSmsCode(contactInfo, 'register')
       }
       
       // 增加多种成功状态判断
@@ -392,41 +400,58 @@ const handleRegister = async () => {
     }
 
     try {
-      // 先验证验证码
-      const verifyRes = await emailApi.verify(
-        isEmailRegister.value ? registerData.value.email : registerData.value.phone,
-        registerData.value.code,
-        'register'
-      )
-      if (!verifyRes.success) {
-        ElMessage.error(verifyRes.message || '验证码错误或已过期')
-        isLoading.value = false
-        return
-      }
-
-      // 准备注册数据
-      const registerParams = {
-        username: registerData.value.username,
-        password: registerData.value.password
-      }
-      
-      // 根据注册方式添加相应字段
+      // 根据注册方式使用不同的验证码验证和注册接口
       if (isEmailRegister.value) {
-        registerParams.email = registerData.value.email
-      } else {
-        registerParams.phone = registerData.value.phone
-      }
+        // 邮箱注册流程
+        // 先验证验证码
+        const verifyRes = await emailApi.verify(
+          registerData.value.email,
+          registerData.value.code,
+          'register'
+        )
+        if (!verifyRes.success) {
+          ElMessage.error(verifyRes.message || '验证码错误或已过期')
+          isLoading.value = false
+          return
+        }
 
-      // 调用注册API服务
-      const result = await userRegisterService(registerParams)
-      
-      // 检查返回结果状态码
-      if (result.code === 0) {
-        ElMessage.success(result.msg || '注册成功')
-        isRegister.value = false // 切换到登录界面
-        clearRegisterData()
+        // 准备注册数据
+        const registerParams = {
+          username: registerData.value.username,
+          password: registerData.value.password,
+          email: registerData.value.email
+        }
+
+        // 调用注册API服务
+        const result = await userRegisterService(registerParams)
+        
+        // 检查返回结果状态码
+        if (result.code === 0) {
+          ElMessage.success(result.msg || '注册成功')
+          isRegister.value = false // 切换到登录界面
+          clearRegisterData()
+        } else {
+          ElMessage.error(result.msg || '注册失败，请重试')
+        }
       } else {
-        ElMessage.error(result.msg || '注册失败，请重试')
+        // 手机号注册流程
+        // 直接使用手机号注册接口
+        const result = await registerByPhone(
+          registerData.value.username,
+          registerData.value.password,
+          registerData.value.phone,
+          registerData.value.code
+        )
+        
+        // 检查返回结果状态码，适配不同的成功状态格式
+        const isRegisterSuccess = result.success === true || result.code === 0
+        if (isRegisterSuccess) {
+          ElMessage.success(result.msg || result.message || '注册成功')
+          isRegister.value = false // 切换到登录界面
+          clearRegisterData()
+        } else {
+          ElMessage.error(result.msg || result.message || '注册失败，请重试')
+        }
       }
     } catch (error) {
       ElMessage.error('网络错误，请稍后再试')
@@ -443,24 +468,83 @@ const handleRegister = async () => {
 const login = async () => {
   isLoading.value = true // 开始加载，显示加载动画
   try {
-    // 使用邮箱登录
-    const result = await userLoginService({
-      username: registerData.value.email,
-      password: registerData.value.password
-    })
+    // 根据注册方式使用不同的登录接口
+    let result;
     
-    if (result.code === 0) {
-      ElMessage.success(result.msg || '登录成功')
-      tokenStore.setToken(result.data)
-      router.push('/')
+    if (isEmailRegister.value) {
+        // 用户名登录 - 使用密码登录
+        result = await userLoginService({
+          username: registerData.value.username,
+          password: registerData.value.password
+        })
+        
+        if (result.code === 0) {
+          ElMessage.success(result.msg || '登录成功')
+          tokenStore.setToken(result.message)
+          router.push('/')
+        } else {
+          // 不显示失败提示
+          console.log('登录失败:', result.msg || '邮箱或密码错误')
+        }
     } else {
-      ElMessage.error(result.msg || '邮箱或密码错误，请重试')
+        // 手机号登录 - 使用验证码登录
+        result = await loginByPhone(
+          registerData.value.phone,
+          registerData.value.code
+        )
+        
+        // 检查返回结果状态码，适配不同的成功状态格式
+        const isLoginSuccess = result.success === true || result.code === 0
+        if (isLoginSuccess) {
+          // 不显示成功提示，直接设置token并跳转
+          // 设置token，适配不同的返回格式
+          tokenStore.setToken(result.message || result.data?.token)
+          router.push('/')
+        } else {
+          ElMessage.error(result.msg || result.message || '手机号或验证码错误，请重试')
+        }
     }
   } catch (error) {
     ElMessage.error('网络错误，请稍后再试')
     console.error('登录接口错误:', error)
   } finally {
     isLoading.value = false
+  }
+}
+
+// 处理手机号登录时发送验证码
+const handleSendSmsCode = async () => {
+  if (countdown.value > 0 || isSending.value) return
+  
+  // 验证手机号格式
+  const phone = registerData.value.phone
+  const validationPattern = /^1[3-9]\d{9}$/
+  
+  if (!validationPattern.test(phone)) {
+    ElMessage.error('请输入有效的手机号')
+    return
+  }
+  
+  isSending.value = true
+  try {
+    // 调用发送验证码API
+    const res = await sendSmsCode(phone, 'login')
+    
+    // 无论成功失败都启动倒计时
+    countdown.value = 60
+    startCountdown()
+    
+    // 控制台记录结果
+    console.log('登录验证码发送结果:', res)
+  } catch (error) {
+    console.error('发送验证码错误:', error)
+    // 即使发生错误也启动倒计时，避免频繁点击
+    if (countdown.value <= 0) {
+      countdown.value = 60
+      startCountdown()
+    }
+  } finally {
+    isSending.value = false
   }
 }
 
@@ -570,8 +654,8 @@ onUnmounted(() => {
           />
         </el-form-item>
         
-        <!-- 重复密码输入框 -->
-        <el-form-item prop="rePassword">
+        <!-- 手机号注册不显示重复密码输入框 -->
+        <el-form-item v-if="isEmailRegister" prop="rePassword">
           <el-input 
             :prefix-icon="Lock" 
             type="password" 
@@ -697,34 +781,92 @@ onUnmounted(() => {
           <h1>登录</h1>
         </el-form-item>
         
-        <!-- 邮箱输入框 -->
-        <el-form-item prop="email">
-          <el-input 
-            :prefix-icon="User" 
-            placeholder="请输入邮箱" 
-            v-model="registerData.email" 
-          />
-        </el-form-item>
-        
-        <!-- 密码输入框 -->
-        <el-form-item prop="password">
-          <el-input 
-            :prefix-icon="Lock" 
-            type="password" 
-            placeholder="请输入密码" 
-            v-model="registerData.password" 
-          />
-        </el-form-item>
-        
-        <!-- 记住我和忘记密码选项 -->
-        <el-form-item class="flex">
-          <div class="flex">
-            <el-checkbox>记住我</el-checkbox>
-            <div class="right-links">
-              <el-link type="primary" @click="isForgotPassword = true">找回密码？</el-link>
-            </div>
+        <!-- 登录方式切换按钮 -->
+        <el-form-item>
+          <div class="register-tabs">
+            <el-button 
+              :type="isEmailRegister ? 'primary' : ''" 
+              :class="{ active: isEmailRegister }"
+              @click="isEmailRegister = true"
+              class="tab-button"
+              style="border-radius: 8px 0 0 8px;"
+            >
+              用户名登录
+            </el-button>
+            <el-button 
+              :type="!isEmailRegister ? 'primary' : ''" 
+              :class="{ active: !isEmailRegister }"
+              @click="isEmailRegister = false"
+              class="tab-button"
+              style="border-radius: 0 8px 8px 0;"
+            >
+              手机号登录
+            </el-button>
           </div>
         </el-form-item>
+        
+        <!-- 用户名登录相关输入框 -->
+        <template v-if="isEmailRegister">
+          <!-- 用户名输入框 -->
+          <el-form-item prop="username">
+            <el-input 
+              :prefix-icon="User" 
+              placeholder="请输入用户名" 
+              v-model="registerData.username" 
+            />
+          </el-form-item>
+          
+          <!-- 密码输入框 -->
+          <el-form-item prop="password">
+            <el-input 
+              :prefix-icon="Lock" 
+              type="password" 
+              placeholder="请输入密码" 
+              v-model="registerData.password" 
+            />
+          </el-form-item>
+          
+          <!-- 记住我和忘记密码选项 -->
+          <el-form-item class="flex">
+            <div class="flex">
+              <el-checkbox>记住我</el-checkbox>
+              <div class="right-links">
+                <el-link type="primary" @click="isForgotPassword = true">找回密码？</el-link>
+              </div>
+            </div>
+          </el-form-item>
+        </template>
+        
+        <!-- 手机号登录相关输入框 -->
+        <template v-else>
+          <!-- 手机号输入框 -->
+          <el-form-item prop="phone">
+            <el-input 
+              :prefix-icon="User" 
+              placeholder="请输入手机号" 
+              v-model="registerData.phone" 
+            />
+          </el-form-item>
+          
+          <!-- 验证码输入框 + 获取按钮 -->
+          <el-form-item prop="code">
+            <div style="display:flex;gap:8px;width:100%">
+              <el-input 
+                placeholder="请输入6位验证码" 
+                v-model="registerData.code" 
+                maxlength="6"
+              />
+              <el-button 
+                type="primary" 
+                @click="handleSendSmsCode" 
+                :disabled="countdown>0 || isSending"
+                :icon="isSending ? Loading : null"
+              >
+                {{ countdown>0 ? `重新获取(${countdown}s)` : '获取验证码' }}
+              </el-button>
+            </div>
+          </el-form-item>
+        </template>
         
         <!-- 登录按钮 -->
         <el-form-item>
@@ -733,6 +875,8 @@ onUnmounted(() => {
             type="primary" 
             auto-insert-space 
             @click="login"
+            :loading="isLoading"
+            :icon="isLoading ? Loading : null"
           >
             登录
           </el-button>
@@ -757,6 +901,21 @@ onUnmounted(() => {
     </el-col>
   </el-row>
 </template>
+
+<style scoped>
+.register-tabs {
+  display: flex;
+  margin-bottom: 16px;
+}
+
+.tab-button {
+  flex: 1;
+}
+
+.button {
+  width: 100%;
+}
+</style>
 
 <style lang="scss" scoped>
 /* 保持原样式 */
