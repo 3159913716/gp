@@ -64,17 +64,15 @@ export const userLoginService = (loginData) => {
  *        - newPassword: 新密码
  * @returns {Promise} 包含重置结果的Promise
  * API路径：POST /user/resetPassword
- * 内容类型：application/x-www-form-urlencoded
+ * 内容类型：application/json
  */
 export const resetPasswordService = (resetData) => {
-  const params = new URLSearchParams();
-  
-  // 遍历重置密码数据，添加到URLSearchParams
-  for (let key in resetData) {
-    params.append(key, resetData[key]);
-  }
-  
-  return request.post('/user/resetPassword', params);
+  // 直接发送JSON对象
+  return request.post('/user/resetPassword', resetData, {
+    headers: {
+      'Content-Type': 'application/json'
+    }
+  });
 }
 
 // ==================== 用户信息管理API ====================

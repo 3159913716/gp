@@ -4,14 +4,13 @@ import { useRoute, useRouter } from 'vue-router'
 import { ElCard, ElAvatar, ElTag, ElPagination, ElEmpty, ElInput, ElButton, ElMessage } from 'element-plus'
 import articleHomeApi from '@/api/articlehome.js'
 import defaultCover from '@/assets/default.png'
-import avatarImgAsset from '@/assets/avatar.jpg'
+const defaultAvatar = 'https://n.sinaimg.cn/sinacn20122/80/w440h440/20181223/62bf-hqqzpku8165766.jpg';
 import request from '@/utils/request.js'
 import sendCommentApi from '@/api/sendcomment.js'
 import guanzhu from '@/api/guanzhu.js'
 import { useTokenStore } from '@/stores/token.js'
 import useUserInfoStore from '@/stores/userInfo.js'
 import CommentTree from '@/components/front/CommentTree.vue'
-import '@fortawesome/fontawesome-free/css/all.css';
 const route = useRoute()
 const router = useRouter()
 
@@ -129,20 +128,22 @@ const onCoverError = () => {
     article.value.coverImg = ''
   }
 }
-// 作者头像加载失败：回退默认头像
-const onAuthorAvatarError = () => {
-  if (article.value) {
-    article.value.authorAvatar = avatarImgAsset
+  
+  // 作者头像加载失败：回退默认头像
+  const onAuthorAvatarError = () => {
+    if (article.value) {
+      article.value.authorAvatar = defaultAvatar
+    }
   }
-}
-// 评论头像加载失败：回退默认头像
-const onCommentAvatarError = (c) => {
-  if (c?.user) {
-    c.user.avatar = avatarImgAsset
+  
+  // 评论头像加载失败：回退默认头像
+  const onCommentAvatarError = (c) => {
+    if (c?.user) {
+      c.user.avatar = defaultAvatar
+    }
   }
-}
-
-// 点赞与收藏（接入后端接口）
+  
+  // 点赞与收藏（接入后端接口）
 const liked = ref(false)
 const favorited = ref(route.query.isCollected === 'true') // 从URL参数设置初始收藏状态
 const localLikeCount = ref(0)
@@ -322,7 +323,7 @@ const normalizeDetail = (data) => {
     contentText: data.content ?? data.content_text ?? '',
     coverImg: normalizeImageUrl(data.coverImg ?? data.cover_img),
     authorName: data.author?.username ?? data.authorName ?? data.author_name ?? data.author ?? data.username ?? data.createUserName ?? (data.create_user ? `用户${data.create_user}` : '匿名作者'),
-    authorAvatar: normalizeImageUrl(data.author?.avatar ?? data.authorAvatar ?? data.author_pic ?? data.userPic) || avatarImgAsset,
+    authorAvatar: normalizeImageUrl(data.author?.avatar ?? data.authorAvatar ?? data.author_pic ?? data.userPic) || defaultAvatar,
     authorId: authorId,
     categoryId: data.categoryId ?? data.category_id ?? null,
     categoryName: data.categoryName ?? data.category_name ?? '',
@@ -339,7 +340,7 @@ const normalizeDetail = (data) => {
 // 新增：从列表项解析作者信息（与首页保持一致）
 const resolveAuthorFromItem = (item) => {
   const name = item?.author?.username ?? item?.authorName ?? item?.author_name ?? item?.author ?? item?.username ?? item?.createUserName ?? (item?.create_user ? `用户${item.create_user}` : '匿名作者')
-  const avatar = normalizeImageUrl(item?.author?.avatar ?? item?.authorAvatar ?? item?.author_pic ?? item?.userPic) || avatarImgAsset
+  const avatar = normalizeImageUrl(item?.author?.avatar ?? item?.authorAvatar ?? item?.author_pic ?? item?.userPic) || defaultAvatar
   const authorId = item?.author?.id ?? item?.authorId ?? item?.author_id ?? item?.userId ?? item?.user_id ?? item?.create_user ?? null
   return { name, avatar, authorId }
 }
@@ -646,6 +647,10 @@ const generateMockComments = (id, page = 1, pageSize = 10) => {
 const normalizeCommentItem = (c) => {
   // 先加载本地存储的交互状态
   const persisted = loadCommentInteraction(c.id)
+  // 默认头像链接
+  const defaultAvatar = 'https://n.sinaimg.cn/sinacn20122/80/w440h440/20181223/62bf-hqqzpku8165766.jpg'
+  // 获取当前用户信息
+  const currentUserInfo = userInfoStore?.info || {}
 
   const comment = {
     id: c.id ?? 0,
@@ -653,8 +658,11 @@ const normalizeCommentItem = (c) => {
     createTime: c.createTime ?? c.create_time ?? '',
     user: {
       id: c.user?.id ?? c.user_id ?? c.userId ?? c.uid ?? c.userInfo?.id ?? 0,
-      username: c.user?.username ?? c.user?.nickname ?? c.userInfo?.nickname ?? c.userInfo?.username ?? c.nickname ?? c.userName ?? c.user_name ?? '游客',
-      avatar: normalizeImageUrl(c.user?.avatar ?? c.user?.userPic ?? c.userInfo?.userPic ?? c.userInfo?.avatar ?? c.userPic ?? c.user_pic ?? c.avatarUrl ?? c.avatar) || avatarImgAsset
+      // 先使用评论数据中的nickname，如果为空则使用userinfo接口返回的username
+      nickname: c.user?.nickname ?? c.userInfo?.nickname ?? c.nickname ?? currentUserInfo.username ?? '',
+      username: c.user?.username ?? c.userInfo?.username ?? c.userName ?? c.user_name ?? currentUserInfo.username ?? '游客',
+      // 头像为空时使用默认头像
+      avatar: normalizeImageUrl(c.user?.avatar ?? c.user?.userPic ?? c.userInfo?.userPic ?? c.userInfo?.avatar ?? c.userPic ?? c.user_pic ?? c.avatarUrl ?? c.avatar) || defaultAvatar
     },
     // 优先使用本地存储的点赞状态和数量
     isLiked: persisted.isLiked ?? c.isLiked ?? false,

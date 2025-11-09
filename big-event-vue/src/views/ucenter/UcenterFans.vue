@@ -19,9 +19,9 @@
                 <div class="img-cell"><img :src="item.userPic" alt="用户头像" class="user-img"></div>
                 <div class="author-cell">{{ item.followTime }}</div>
                 <div class="time-cell">
-                    <el-button type="primary" size="small" @click="viewUserProfile(item.id)" class="view-btn">查看资料</el-button>
-                    <el-button type="success" size="small" @click="followBack(item.id || item.userId)" class="follow-btn" v-if="!(item.isFollow || item.followed || item.isFollowing)">回关</el-button>
-                    <el-button type="danger" size="small" @click="unfollow(item.id || item.userId)" class="unfollow-btn" v-else>已回关</el-button>
+                    <el-button type="primary" size="mini" @click="viewUserProfile(item.id)" class="view-btn">查看资料</el-button>
+                    <el-button type="success" size="mini" @click="followBack(item.id)" class="follow-btn" v-if="!isFollowing(item.id)">回关</el-button>
+                    <el-button type="info" size="mini" disabled class="followed-btn" v-else>已关注</el-button>
                 </div>
             </div>
         </div>
@@ -40,7 +40,6 @@
 
 <script>
 import request from '@/utils/request.js';
-import guanzhu from '@/api/guanzhu.js';
 import { Loading } from '@element-plus/icons-vue'; // 引入Element Plus图标
 import { useTokenStore } from '@/stores/token.js';
 
@@ -52,71 +51,39 @@ export default {
       loading: false,
       error: false,
       fansList: [], // 粉丝列表数组，直接对应接口返回的data字段
-      followingList: [] // 完整的关注列表，用于精确判断关注状态
+      followingIds: []
     }
   },
   
   // 组件挂载后调用接口
   mounted() {
-    this.fetchData();
+    this.fetchFans();
   },
   
   // 方法定义
   methods: {
-    // 同时获取粉丝列表和关注列表
-    async fetchData() {
+    // 调用接口：获取粉丝列表
+    async fetchFans() {
       this.loading = true;
       this.error = false;
       
       try {
-        // 并行获取粉丝列表和关注列表
-        const [fansResponse, followingResponse] = await Promise.all([
-          request.get('/user/followers'),
-          guanzhu.getFollowingList()
-        ]);
+        // 调用真实接口，使用request实例自动携带token
+        const response = await request.get('/user/followers');
         
-        // 处理粉丝列表响应
-        if (fansResponse.code === 0 || fansResponse.data?.code === 0) {
-          this.fansList = Array.isArray(fansResponse.data) ? fansResponse.data : 
-                         (fansResponse.data?.data || []);
-          console.log('粉丝列表数据:', this.fansList);
+        // 处理接口返回数据
+        if (response.data.success) {
+          this.fansList = response.data.data; // 直接使用一个数组接收data字段
         } else {
-          throw new Error('获取粉丝列表失败');
+          this.error = true;
+          console.error('获取粉丝列表失败:', response.data.message);
         }
-        
-        // 处理关注列表响应
-        this.followingList = Array.isArray(followingResponse.data) ? followingResponse.data : [];
-        console.log('关注列表数据:', this.followingList);
-        
-        // 更新每个粉丝的关注状态
-        this.updateFansFollowStatus();
-        
       } catch (error) {
-        console.error('获取数据失败:', error);
+        console.error('获取粉丝列表失败:', error);
         this.error = true;
-        this.$message.error('获取数据失败，请稍后重试');
       } finally {
         this.loading = false;
       }
-    },
-    
-    // 更新粉丝的关注状态
-    updateFansFollowStatus() {
-      // 创建关注用户ID的Set，支持userId字段（从关注列表中提取）
-      const followingUserIds = new Set(
-        this.followingList.map(user => user.userId).filter(id => id)
-      );
-      
-      console.log('关注用户ID集合:', Array.from(followingUserIds));
-      
-      // 遍历粉丝列表，更新每个粉丝的关注状态
-      this.fansList.forEach(fan => {
-        // 检查粉丝是否在关注列表中，支持多种ID字段
-        const fanId = fan.id || fan.userId;
-        fan.isFollow = followingUserIds.has(fanId);
-        fan.followed = fan.isFollow; // 保持字段一致性
-        console.log(`粉丝 ${fan.nickname || fan.username} 的关注状态:`, fan.isFollow);
-      });
     },
     
     // 查看用户资料
@@ -134,25 +101,13 @@ export default {
         type: 'info'
       }).then(async () => {
         try {
-          // 使用guanzhu.js中的toggleFollow方法关注用户
-          await guanzhu.toggleFollow(Id);
+          // 调用关注接口，使用request实例自动携带token
+          await request.post(`/user/follow/${Id}`);
           
-          // 更新粉丝项的关注状态
-          const fanItem = this.fansList.find(item => item.id === Id || item.userId === Id);
-          if (fanItem) {
-            fanItem.isFollow = true;
-            fanItem.followed = true;
-          }
-          
-          // 同时更新关注列表，以便下次判断准确
-          const user = this.fansList.find(item => item.id === Id || item.userId === Id);
-          if (user) {
-            this.followingList.push({ userId: user.id || user.userId });
-          }
-          
+          // 更新已关注列表
+          this.followingIds.push(Id);
           this.$message.success('关注成功');
         } catch (err) {
-          console.error('关注失败:', err);
           this.$message.error('关注失败，请稍后重试');
         }
       }).catch(() => {
@@ -160,42 +115,9 @@ export default {
       });
     },
     
-    // 取消回关
-    unfollow(Id) {
-      this.$confirm('确定要取消关注这个用户吗？', '提示', {
-        confirmButtonText: '确定',
-        cancelButtonText: '取消',
-        type: 'warning'
-      }).then(async () => {
-        try {
-          // 使用guanzhu.js中的toggleFollow方法取消关注
-          await guanzhu.toggleFollow(Id);
-          
-          // 更新粉丝项的关注状态
-          const fanItem = this.fansList.find(item => item.id === Id || item.userId === Id);
-          if (fanItem) {
-            fanItem.isFollow = false;
-            fanItem.followed = false;
-          }
-          
-          // 同时从关注列表中移除，以便下次判断准确
-          this.followingList = this.followingList.filter(
-            item => item.userId !== (Id || null)
-          );
-          
-          this.$message.success('取消关注成功');
-        } catch (err) {
-          console.error('取消关注失败:', err);
-          this.$message.error('取消关注失败，请稍后重试');
-        }
-      }).catch(() => {
-        this.$message.info('已取消操作');
-      });
-    },
-    
-    // 刷新数据
-    async refreshData() {
-      await this.fetchData();
+    // 判断是否已关注用户
+    isFollowing(Id) {
+      return this.followingIds.includes(Id);
     },
     
     // 由于接口未提供分页参数，这里移除分页相关方法
@@ -207,6 +129,7 @@ export default {
 <style scoped>
 .container {
   width: 100%;
+  max-width: 1200px;
   padding: 15px;
   box-sizing: border-box;
   min-height: calc(100vh - 120px);

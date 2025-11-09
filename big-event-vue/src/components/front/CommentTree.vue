@@ -39,14 +39,14 @@ const toggleExpand = () => {
 <template>
   <div class="comment-node" :style="{ marginLeft: depth * 16 + 'px' }">
     <div class="node-header">
-      <ElAvatar :src="node.user?.avatar" size="small" />
+      <ElAvatar :src="node.user?.avatar || 'https://n.sinaimg.cn/sinacn20122/80/w440h440/20181223/62bf-hqqzpku8165766.jpg'" size="small" />
       <div class="meta">
-        <span class="user">{{ node.user?.username || '游客' }}</span>
-        <span class="time">{{ node.createTime }}</span>
-        <span class="reply-count" v-if="(node.replyCount ?? (node.replies?.length || 0)) > 0">
-          · 回复 {{ node.replyCount ?? (node.replies?.length || 0) }}
-        </span>
-      </div>
+          <span class="user">{{ node.user?.nickname || node.user?.username || '游客' }}</span>
+          <span class="time">{{ node.createTime }}</span>
+          <span class="reply-count" v-if="(node.replyCount ?? (node.replies?.length || 0)) > 0">
+            · 回复 {{ node.replyCount ?? (node.replies?.length || 0) }}
+          </span>
+        </div>
       <div class="ops">
         <div :type="node.isLiked ? 'primary' : 'default'" size="small" @click="emit('toggle-like', node)">
            <i  class="fa-solid fa-heart"

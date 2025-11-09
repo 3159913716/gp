@@ -13,8 +13,8 @@ import { ElMessage } from 'element-plus'
 // 导入Pinia状态管理
 import useUserInfoStore from '@/stores/userInfo.js'
 
-// 导入用户信息相关的API服务
-import { userInfoUpdateService, userInfoService } from '@/api/user.js'
+// 导入更新用户信息的API服务
+import { userInfoUpdateService } from '@/api/user.js'
 
 /* 
   状态管理初始化：
@@ -49,28 +49,10 @@ const initialUserInfo = reactive(JSON.parse(JSON.stringify(userInfoStore.info)))
 */
 const userInfo = ref(JSON.parse(JSON.stringify(userInfoStore.info)))
 
-// 生成用户专属的localStorage键名
-const getLocalStorageKey = () => {
-  // 使用用户名作为唯一标识，确保不同用户的数据隔离
-  const username = userInfoStore.info?.username || 'default';
-  return `userNickname_${username}`;
-};
-
-// 确保nickname有值
-const ensureNicknameExists = () => {
-  if (!userInfo.value.nickname || userInfo.value.nickname.trim() === '') {
-    // 获取用户专属的localStorage键名
-    const localStorageKey = getLocalStorageKey();
-    // 优先级：localStorage中的nickname > store中已有的nickname > username > 随机昵称
-    const storedNickname = localStorage.getItem(localStorageKey) || '';
-    userInfo.value.nickname = storedNickname || userInfoStore.info?.nickname || userInfoStore.info?.username || '用户' + Date.now().toString().slice(-4)
-    // 立即保存到localStorage
-    localStorage.setItem(localStorageKey, userInfo.value.nickname);
-  }
+// 如果nickname为空或未定义，设置默认值
+if (!userInfo.value.nickname || userInfo.value.nickname.trim() === '') {
+  userInfo.value.nickname = userInfo.value.username || '用户' + Date.now().toString().slice(-4)
 }
-
-// 初始调用确保nickname有值
-ensureNicknameExists()
 
 /* 
   表单修改状态：
@@ -95,21 +77,24 @@ watch(
 )
 
 /* 
-  表单验证规则：
-  使用Element UI的表单验证功能
+  表单验证规则对象：
+  使用Element Plus的表单验证机制
+  包含字段验证规则和触发条件
 */
 const rules = {
+  // 昵称验证规则
   nickname: [
+    // 必填验证
     { 
       required: true, 
-      message: '请输入用户昵称', 
-      trigger: 'blur' 
+      message: '请输入用户昵称', // 错误提示信息
+      trigger: 'blur'           // 触发时机：失去焦点
     },
-    { 
-      min: 2, 
-      max: 10, 
-      message: '昵称长度应为2-10个字符', 
-      trigger: 'blur' 
+    // 格式验证
+    {
+      pattern: /^\S{2,10}$/,    // 2-10位非空字符正则
+      message: '昵称必须是2-10位的非空字符串',
+      trigger: 'blur'           // 触发时机：失去焦点
     }
   ],
   // 邮箱不再需要验证规则，因为是只读字段
@@ -121,40 +106,19 @@ const rules = {
   使用nextTick确保DOM更新后执行重置
 */
 const resetForm = async () => {
-  console.log('重置表单...')
-  
   // 强制表单重新渲染
   formKey.value++
   
   // 等待DOM更新
   await nextTick()
   
-  // 获取当前store中的信息
-  const currentStoreInfo = userInfoStore.info || {}
-  // 获取用户专属的localStorage键名
-  const localStorageKey = getLocalStorageKey();
-  // 从localStorage获取保存的nickname
-  const storedNickname = localStorage.getItem(localStorageKey) || '';
-  
-  // 重置用户信息，确保所有字段都存在，优先使用localStorage中的nickname
-  const resetData = {
-    username: currentStoreInfo.username || '',
-    email: currentStoreInfo.email || '',
-    // 优先级：localStorage中的nickname > store中的nickname > username > 随机昵称
-    nickname: storedNickname || currentStoreInfo.nickname || currentStoreInfo.username || '用户' + Date.now().toString().slice(-4)
-  }
-  
-  // 应用重置数据
-  Object.assign(userInfo.value, resetData)
-  Object.assign(initialUserInfo, resetData)
-  
-  // 确保nickname不为空（作为最后的保障）
-  ensureNicknameExists()
-  // 同步更新initialUserInfo的nickname
-  initialUserInfo.nickname = userInfo.value.nickname
-  
-  console.log('重置后的用户信息:', userInfo.value)
-  console.log('重置后的initialUserInfo:', initialUserInfo)
+  // 重置用户信息，保留用户名和邮箱，并设置默认昵称
+  const username = userInfoStore.info?.username || ''
+  const email = userInfoStore.info?.email || ''
+  // 设置默认昵称逻辑
+  const defaultNickname = username || '用户' + Date.now().toString().slice(-4);
+  Object.assign(userInfo.value, { username: username, nickname: defaultNickname, email: email })
+  Object.assign(initialUserInfo, { username: username, nickname: defaultNickname, email: email })
   
   // 重置修改状态
   isFormModified.value = false
@@ -170,140 +134,45 @@ const resetForm = async () => {
 /* 
   更新用户信息函数：
   调用API提交修改后的用户信息
-  成功处理后更新Pinia store中的数据和localStorage
+  成功处理后更新Pinia store中的数据
 */
 const updateUserInfo = async () => {
-    // 在验证前确保昵称不为空
-    if (!userInfo.value.nickname || userInfo.value.nickname.trim() === '') {
-      userInfo.value.nickname = userInfoStore.info?.username || '用户' + Date.now().toString().slice(-4);
-    }
-    
-    // 调用Element表单验证方法
-    formRef.value?.validate(async (valid) => {
+  // 调用Element表单验证方法
+  formRef.value?.validate(async (valid) => {
     if (valid) {  // 验证通过
       try {
-        // 提交所有必要字段进行修改：nickname、email、id、username
-        const nicknameValue = userInfo.value.nickname.trim()
-        // 确保finalNickname不为空，优先级：用户输入 > 用户名 > 随机昵称
-        const finalNickname = nicknameValue !== '' ? nicknameValue.slice(0, 10) : 
-                             (userInfoStore.info?.username || '用户' + Date.now().toString().slice(-4))
-        const updateData = {
-          nickname: finalNickname,
-          email: userInfo.value.email || '',
-          id: userInfoStore.info?.id || '',
-          username: userInfoStore.info?.username || ''
-        }
-        
-        console.log('准备更新的昵称数据:', updateData)
-        console.log('API请求路径:', '/user/update')
-        
         // 调用API更新用户信息
-        const response = await userInfoUpdateService(updateData)
-        console.log('API响应完整对象:', response)
+        await userInfoUpdateService(userInfo.value)
+        ElMessage.success('个人信息更新成功！')  // 显示成功提示
         
-        // 根据后端实际返回格式检查响应是否成功
-        // 后端返回格式为{code: 0, message: '操作成功', data: {}}表示成功
-        if (response && response.code === 0) {
-          console.log('API调用成功，准备更新本地数据')
-          
-          // 将nickname保存到用户专属的localStorage中
-          localStorage.setItem(getLocalStorageKey(), finalNickname);
-          
-          /* 
-            更新Pinia store中的用户信息
-          */
-          // 创建更新后的用户信息对象
-          const currentUserInfo = { ...userInfoStore.info }
-          // 确保username存在
-          const currentUsername = currentUserInfo.username || userInfo.value.username || ''
-          // 设置nickname
-          const updatedUserInfo = {
-            ...currentUserInfo,
-            username: currentUsername,
-            nickname: finalNickname
-          }
-          
-          console.log('更新后的用户信息:', updatedUserInfo)
-          
-          // 更新store
-          userInfoStore.setInfo(JSON.parse(JSON.stringify(updatedUserInfo)))
-          
-          // 更新本地userInfo对象，确保UI显示一致
-          userInfo.value.nickname = finalNickname
-          
-          // 更新initialUserInfo以匹配更新后的状态
-          Object.assign(initialUserInfo, JSON.parse(JSON.stringify(updatedUserInfo)))
-          
-          // 重置表单修改状态
-          isFormModified.value = false
-          
-          ElMessage.success('昵称更新成功！')  // 显示成功提示
-        } else {
-          // API调用返回但不成功
-          console.error('API调用返回失败:', response)
-          ElMessage.error(response?.message || '更新失败，请稍后重试')
-        }
+        /* 
+          更新Pinia store中的用户信息：
+          使用深拷贝更新，避免引用问题
+          保持store中的数据纯净
+        */
+        userInfoStore.setInfo(JSON.parse(JSON.stringify(userInfo.value)))
+        
+        // 更新initialUserInfo以匹配更新后的状态
+        // 这样后续修改时isFormModified才能正确反映变化
+        Object.assign(initialUserInfo, JSON.parse(JSON.stringify(userInfo.value)))
+        
+        // 重置表单修改状态
+        isFormModified.value = false
         
       } catch (error) {  // 错误处理
-        console.error('更新用户昵称时发生异常:', error)
-        console.error('错误详情:', error.response || error.message)
-        
-        // 不要在API失败时更新localStorage，避免与数据库数据不一致
-        ElMessage.error('更新失败，请检查网络连接或稍后重试')
+        console.error('更新用户信息失败:', error)
+        ElMessage.error('更新失败，请稍后重试')  // 显示错误提示
       }
     } else {  // 表单验证失败
-        ElMessage.warning('请检查表单输入是否正确')
-        return false  // 阻止后续流程
-      }
+      ElMessage.warning('请检查表单输入是否正确')
+      return false  // 阻止后续流程
+    }
   })
 }
 
-// 组件挂载时重新初始化数据并监听路由变化
-onMounted(async () => {
-  try {
-    // 获取用户专属的localStorage键名
-    const localStorageKey = getLocalStorageKey();
-    // 从localStorage获取保存的nickname
-    const storedNickname = localStorage.getItem(localStorageKey) || '';
-    console.log('从localStorage读取的nickname:', storedNickname, '键名:', localStorageKey);
-    
-    // 主动获取最新的用户信息
-    console.log('开始获取用户信息...')
-    const userData = await userInfoService()
-    console.log('获取到的用户数据:', userData)
-    
-    // 更新store中的用户信息
-    if (userData && userData.data) {
-      // 确保data对象包含所有必要字段
-      const userInfoWithDefaults = {
-        ...userData.data,
-        // 确保username存在
-        username: userData.data.username || '',
-        // 确保nickname不为空，优先级：localStorage中的nickname > API返回的nickname > username > 随机昵称
-        nickname: storedNickname || userData.data.nickname || userData.data.username || '用户' + Date.now().toString().slice(-4)
-      }
-      userInfoStore.setInfo(userInfoWithDefaults)
-      console.log('更新后的store信息:', userInfoStore.info)
-    }
-    
-    // 重新创建userInfo对象，确保使用store中的最新数据
-    userInfo.value = JSON.parse(JSON.stringify(userInfoStore.info))
-    
-    // 使用Object.assign更新initialUserInfo对象而不是重新赋值
-    Object.assign(initialUserInfo, JSON.parse(JSON.stringify(userInfoStore.info)))
-    
-    // 确保nickname有值
-    ensureNicknameExists()
-    // 更新initialUserInfo的nickname属性
-    initialUserInfo.nickname = userInfo.value.nickname
-    
-    resetForm()
-    
-  } catch (error) {
-    console.error('获取用户信息失败:', error)
-    // 即使获取失败也要确保表单有默认值
-    ensureNicknameExists()
-  }
+// 组件挂载时重置表单并监听路由变化
+onMounted(() => {
+  resetForm()
   
   // 监听路由变化
   routeUnwatch = watch(
@@ -374,13 +243,12 @@ onBeforeUnmount(() => {
           
           <!-- 用户昵称字段（带验证） -->
           <el-form-item label="用户昵称" prop="nickname">
-            <el-input 
-              v-model="userInfo.nickname" 
-              autocomplete="new-nickname"
-              maxlength="10" 
-              show-word-limit
-              placeholder="请输入2-10个字符的昵称"
-            ></el-input>
+            <!-- 
+              双向绑定昵称字段：
+              可编辑状态
+              禁用自动填充
+            -->
+            <el-input v-model="userInfo.nickname" autocomplete="new-nickname"></el-input>
           </el-form-item>
 
           <!-- 表单提交按钮 -->

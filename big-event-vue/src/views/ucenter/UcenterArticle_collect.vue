@@ -21,7 +21,7 @@
           <div class="author-cell">{{ item.author }}</div>
           <div class="time-cell">{{ item.collectTime }}</div>
           <div class="action-cell">
-            <el-button type="danger" size="small" @click="removeCollect(item.id)" class="delete-btn">取消收藏</el-button>
+            <el-button type="danger" size="mini" @click="removeCollect(item.id)" class="delete-btn">取消收藏</el-button>
           </div>
         </div>
       </div>

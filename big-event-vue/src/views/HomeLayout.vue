@@ -6,7 +6,7 @@ import useUserInfoStore from '@/stores/userInfo.js'
 import { ElDropdown, ElDropdownMenu, ElDropdownItem, ElAvatar } from 'element-plus'
 import { articleCategoryListService } from '@/api/article.js'
 import { ElMessageBox } from 'element-plus'
-import avatar from '@/assets/default.png'
+// 使用在线默认头像链接，不再导入本地资源
 import { userInfoService } from '@/api/user.js'
 
 // 路由和状态管理
@@ -324,7 +324,7 @@ watch(() => tokenStore.token, (newToken, oldToken) => {
           <template v-if="isLoggedIn">
             <ElDropdown>
               <span class="user-dropdown">
-              <ElAvatar :src="userInfoStore.info?.userPic ? userInfoStore.info.userPic : avatar" />
+              <ElAvatar :src="userInfoStore.info?.userPic ? userInfoStore.info.userPic : 'https://n.sinaimg.cn/sinacn20122/80/w440h440/20181223/62bf-hqqzpku8165766.jpg'" />
                 <span class="username">{{ userInfoStore.info?.nickname || userInfoStore.info?.username || '用户' }}</span>
               </span>
               <template #dropdown>

@@ -9,14 +9,14 @@ import ElementPlus from 'element-plus'
 import 'element-plus/dist/index.css'
 import locale from 'element-plus/dist/locale/zh-cn.js'
 
-import piniaPluginPersistedstate from 'pinia-plugin-persistedstate'
+import { createPersistedState } from 'pinia-persistedstate-plugin'
 
 // 创建应用实例
 const app = createApp(App)
 const pinia = createPinia()
 
 // 配置Pinia持久化插件
-pinia.use(piniaPluginPersistedstate)
+pinia.use(createPersistedState())
 
 // 安装插件和路由
 app.use(pinia)

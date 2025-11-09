@@ -71,15 +71,10 @@ const useUserInfoStore = defineStore(
    * 设置额外的store配置
    */
   {
-    // 配置Pinia持久化插件
-    persist: {
-      // 使用localStorage作为存储方式
-      storage: localStorage,
-      // 持久化所有状态
-      paths: ['info'],
-      // 自定义键名
-      key: 'userInfo'
-    }
+    // 开启数据持久化
+    // 设为true时，Pinia会自动将状态存入本地存储（localStorage）
+    // 应用重新加载时自动恢复状态
+    persist: true
   }
 )
 

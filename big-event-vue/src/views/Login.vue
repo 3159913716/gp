@@ -18,18 +18,21 @@ import { useTokenStore } from '@/stores/token.js'
 const form = ref(null) // 用于引用表单DOM元素
 const isLoading = ref(false) // 加载状态，控制按钮的加载动画
 const isRegister = ref(false) // 标记当前是注册模式还是登录模式
-const isForgotPassword = ref(false) // 标记当前是忘记密码模式
+const isForgotPassword = ref(false) // 标记当前是找回密码模式
+const isEmailRegister = ref(true) // 标记当前是邮箱注册还是手机号注册
 const tokenStore = useTokenStore() // 使用token存储实例
 
 // 注册数据模型（响应式对象，用于绑定表单数据）
 const registerData = ref({
-  email: '', // 邮箱输入（替换原用户名）
+  username: '', // 用户名输入
+  email: '', // 邮箱输入
+  phone: '', // 手机号输入
   password: '', // 密码输入
   rePassword: '', // 重复密码输入
-  code: '' // 邮箱验证码
+  code: '' // 验证码
 })
 
-// 忘记密码数据模型
+// 找回密码数据模型
 const forgotPasswordData = ref({
   email: '', // 邮箱输入
   code: '', // 验证码
@@ -46,6 +49,12 @@ let timer = null
  * 自定义验证函数：验证邮箱
  */
 const validateEmail = (rule, value, callback) => {
+  // 如果当前不是邮箱注册模式，则不验证邮箱
+  if (!isEmailRegister.value) {
+    callback()
+    return
+  }
+  
   if (!value) {
     callback(new Error('邮箱不能为空'))
   } else {
@@ -55,6 +64,43 @@ const validateEmail = (rule, value, callback) => {
     } else {
       callback()
     }
+  }
+}
+
+/*
+ * 自定义验证函数：验证手机号
+ */
+const validatePhone = (rule, value, callback) => {
+  // 如果当前不是手机号注册模式，则不验证手机号
+  if (isEmailRegister.value) {
+    callback()
+    return
+  }
+  
+  if (!value) {
+    callback(new Error('手机号不能为空'))
+  } else {
+    const pattern = /^1[3-9]\d{9}$/
+    if (!pattern.test(value)) {
+      callback(new Error('手机号格式不正确'))
+    } else {
+      callback()
+    }
+  }
+}
+
+/*
+ * 自定义验证函数：验证用户名
+ */
+const validateUsername = (rule, value, callback) => {
+  if (!value) {
+    callback(new Error('用户名不能为空'))
+  } else if (value.length < 3 || value.length > 20) {
+    callback(new Error('用户名长度必须为3-20个字符'))
+  } else if (!/^[a-zA-Z0-9_\u4e00-\u9fa5]+$/.test(value)) {
+    callback(new Error('用户名只能包含字母、数字、下划线和中文字符'))
+  } else {
+    callback()
   }
 }
 
@@ -92,7 +138,7 @@ const validateRePassword = (rule, value, callback) => {
 }
 
 /*
- * 自定义验证函数：验证忘记密码时的确认密码
+ * 自定义验证函数：验证找回密码时的确认密码
  */
 const validateConfirmPassword = (rule, value, callback) => {
   if (!value) {
@@ -119,13 +165,15 @@ const validateCode = (rule, value, callback) => {
 
 // 表单验证规则对象
 const rules = {
+  username: [{ validator: validateUsername, trigger: 'blur' }],
   email: [{ validator: validateEmail, trigger: 'blur' }],
+  phone: [{ validator: validatePhone, trigger: 'blur' }],
   password: [{ validator: validatePassword, trigger: 'blur' }],
   rePassword: [{ validator: validateRePassword, trigger: 'blur' }],
   code: [{ validator: validateCode, trigger: 'blur' }]
 }
 
-// 忘记密码表单验证规则
+// 找回密码表单验证规则
 const forgotPasswordRules = {
   email: [{ validator: validateEmail, trigger: 'blur' }],
   code: [{ validator: validateCode, trigger: 'blur' }],
@@ -139,7 +187,9 @@ const forgotPasswordRules = {
  */
 const clearRegisterData = () => {
   registerData.value = {
+    username: '',
     email: '',
+    phone: '',
     password: '',
     rePassword: '',
     code: ''
@@ -147,8 +197,11 @@ const clearRegisterData = () => {
 }
 
 /*
- * 清空忘记密码表单数据
+ * 清空找回密码表单数据
  */
+// 用于存储找回密码过程中的用户ID
+const userId = ref(null)
+
 const clearForgotPasswordData = () => {
   forgotPasswordData.value = {
     email: '',
@@ -156,55 +209,127 @@ const clearForgotPasswordData = () => {
     newPassword: '',
     confirmPassword: ''
   }
+  userId.value = null
 }
 
 /*
- * 发送邮箱验证码
+ * 发送验证码
  * @param {string} type - 验证码类型：'register' 或 'forgotPassword'
  */
 const sendEmailCode = async (type = 'register') => {
   if (countdown.value > 0 || isSending.value) return
-  const email = type === 'register' ? registerData.value.email : forgotPasswordData.value.email
-  const pattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-  if (!pattern.test(email)) {
-    ElMessage.error('请输入有效的邮箱地址')
+  
+  // 根据注册方式获取相应的联系方式
+  let contactInfo = ''
+  let contactType = 'email'
+  let validationPattern = null
+  
+  if (type === 'register') {
+    if (isEmailRegister.value) {
+      contactInfo = registerData.value.email
+      contactType = 'email'
+      validationPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    } else {
+      contactInfo = registerData.value.phone
+      contactType = 'phone'
+      validationPattern = /^1[3-9]\d{9}$/
+    }
+  } else {
+    // 找回密码只支持邮箱
+    contactInfo = forgotPasswordData.value.email
+    contactType = 'email'
+    validationPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+  }
+  
+  if (!validationPattern.test(contactInfo)) {
+    ElMessage.error(`请输入有效的${contactType === 'email' ? '邮箱地址' : '手机号'}`)
     return
   }
+  
   isSending.value = true
   try {
-    // 转换类型参数，确保与后端接口匹配
-    const apiType = type === 'forgotPassword' ? 'forget' : type
-    const res = await emailApi.sendCode(email, apiType)
-    const ok = (res && res.success === true) || (res && res.code === 0)
-    if (ok) {
-      // 移除成功提示，直接启动倒计时
-      // 立即启动60秒冷却期
-      countdown.value = 60
-      if (timer) {
-        clearInterval(timer)
-        timer = null
+    if (type === 'forgotPassword') {
+      // 找回密码流程：先查找用户，再发送验证码
+      
+      // 1. 根据邮箱查找用户 - 使用email.js中的findUserByEmail接口
+      const findUserRes = await emailApi.findUserByEmail(email)
+      
+      // 优化成功状态判断
+      const isFindSuccess = findUserRes.success === true || findUserRes.code === 0
+      if (!isFindSuccess) {
+        console.log('未找到该邮箱对应的用户:', findUserRes.message)
+        isSending.value = false
+        // 即使未找到用户也启动倒计时，避免频繁尝试
+        countdown.value = 60
+        startCountdown()
+        return
       }
-      timer = setInterval(() => {
-        countdown.value--
-        if (countdown.value <= 0) {
-          clearInterval(timer)
-          timer = null
-        }
-      }, 1000)
+      
+      // 2. 保存用户ID
+      userId.value = findUserRes.data?.id
+      
+      // 3. 发送找回密码验证码 - 使用email.js中的sendForgetCode接口
+      const sendCodeRes = await emailApi.sendForgetCode(userId.value, email)
+      
+      // 立即启动60秒冷却期，无论成功失败
+      countdown.value = 60
+      startCountdown()
+      
+      // 控制台记录结果，不显示弹窗提示
+      console.log('找回密码验证码发送结果:', sendCodeRes.success ? '成功' : '失败', sendCodeRes)
     } else {
-      ElMessage.error((res && (res.message || res.msg)) || '验证码发送失败，请稍后再试')
+      // 注册流程：根据注册方式发送不同类型的验证码
+      let res
+      if (isEmailRegister.value) {
+        // 邮箱注册
+        res = await emailApi.sendCode(contactInfo, 'register')
+      } else {
+        // 手机号注册 - 假设API支持手机号验证码
+        res = await emailApi.sendPhoneCode(contactInfo, 'register')
+      }
+      
+      // 增加多种成功状态判断
+      const isSuccess = res && (res.success === true || res.code === 0)
+      
+      // 无论成功失败都启动倒计时，让用户有机会检查验证码
+      countdown.value = 60
+      startCountdown()
+      
+      // 不显示成功或失败提示，让用户自行查收验证码
+      // 只在控制台记录结果以便调试
+      console.log('注册验证码发送结果:', isSuccess ? '成功' : '失败', res)
     }
   } catch (error) {
-    ElMessage.error('验证码发送失败，请稍后再试')
-    console.error('发送验证码错误:', error)
+      // 不显示错误提示，但仍记录日志以便调试
+      console.error('发送验证码错误:', error)
+      // 即使发生错误也启动倒计时，避免用户频繁点击
+      if (countdown.value <= 0) {
+        countdown.value = 60
+        startCountdown()
+      }
   } finally {
     isSending.value = false
   }
 }
 
 /*
- * 处理忘记密码逻辑
+ * 处理找回密码逻辑
  */
+// 倒计时函数封装，避免重复代码
+const startCountdown = () => {
+  if (timer) {
+    clearInterval(timer)
+    timer = null
+  }
+  timer = setInterval(() => {
+    countdown.value--
+    if (countdown.value <= 0) {
+      clearInterval(timer)
+      timer = null
+    }
+  }, 1000)
+}
+
 const handleForgotPassword = async () => {
   isLoading.value = true
   
@@ -216,30 +341,32 @@ const handleForgotPassword = async () => {
     }
     
     try {
-      // 先验证验证码，使用正确的类型参数
-      const verifyRes = await emailApi.verify(
-        forgotPasswordData.value.email,
-        forgotPasswordData.value.code,
-        'forget'
-      )
-      if (!verifyRes.success) {
-        ElMessage.error(verifyRes.message || '验证码错误或已过期')
+      // 确保用户ID已存在（通过发送验证码流程获取）
+      if (!userId.value) {
+        console.log('请先获取验证码')
         isLoading.value = false
         return
       }
       
-      // 调用重置密码API
-      const result = await resetPasswordService({
+      // 使用email.js中的resetPassword接口重置密码
+      const resetData = {
+        userId: userId.value,
         email: forgotPasswordData.value.email,
-        newPassword: forgotPasswordData.value.newPassword
-      })
+        code: forgotPasswordData.value.code,
+        newPwd: forgotPasswordData.value.newPassword,
+        rePwd: forgotPasswordData.value.confirmPassword
+      }
       
-      if (result.code === 0) {
-        ElMessage.success(result.msg || '密码重置成功，请使用新密码登录')
+      const resetResult = await emailApi.resetPassword(resetData)
+      
+      // 优化密码重置成功状态判断
+      const isResetSuccess = resetResult.success === true || resetResult.code === 0
+      if (isResetSuccess) {
+        console.log('密码重置成功，请使用新密码登录')
         isForgotPassword.value = false // 返回登录页
         clearForgotPasswordData()
       } else {
-        ElMessage.error(result.msg || '密码重置失败，请重试')
+        console.log('密码重置失败:', resetResult.message)
       }
     } catch (error) {
       ElMessage.error('网络错误，请稍后再试')
@@ -251,7 +378,7 @@ const handleForgotPassword = async () => {
 }
 
 /*
- * 处理注册逻辑（含邮箱验证码校验）
+ * 处理注册逻辑（含验证码校验）
  */
 const handleRegister = async () => {
   isLoading.value = true // 开始加载，显示加载动画
@@ -267,7 +394,7 @@ const handleRegister = async () => {
     try {
       // 先验证验证码
       const verifyRes = await emailApi.verify(
-        registerData.value.email,
+        isEmailRegister.value ? registerData.value.email : registerData.value.phone,
         registerData.value.code,
         'register'
       )
@@ -277,12 +404,21 @@ const handleRegister = async () => {
         return
       }
 
-      // 调用注册API服务，传入邮箱作为用户名
-      const result = await userRegisterService({
-        username: registerData.value.email, // 后端若仍使用username，这里用邮箱值
-        email: registerData.value.email,
+      // 准备注册数据
+      const registerParams = {
+        username: registerData.value.username,
         password: registerData.value.password
-      })
+      }
+      
+      // 根据注册方式添加相应字段
+      if (isEmailRegister.value) {
+        registerParams.email = registerData.value.email
+      } else {
+        registerParams.phone = registerData.value.phone
+      }
+
+      // 调用注册API服务
+      const result = await userRegisterService(registerParams)
       
       // 检查返回结果状态码
       if (result.code === 0) {
@@ -307,7 +443,7 @@ const handleRegister = async () => {
 const login = async () => {
   isLoading.value = true // 开始加载，显示加载动画
   try {
-    // 使用邮箱作为用户名登录
+    // 使用邮箱登录
     const result = await userLoginService({
       username: registerData.value.email,
       password: registerData.value.password
@@ -316,7 +452,6 @@ const login = async () => {
     if (result.code === 0) {
       ElMessage.success(result.msg || '登录成功')
       tokenStore.setToken(result.data)
-      console.log(result.data)
       router.push('/')
     } else {
       ElMessage.error(result.msg || '邮箱或密码错误，请重试')
@@ -355,16 +490,54 @@ onUnmounted(() => {
         :model="registerData" 
         :rules="rules"
       >
+        <!-- 美化后的注册方式切换按钮 -->
         <el-form-item>
-          <h1>注册</h1>
+          <div class="register-tabs">
+            <el-button 
+              :type="isEmailRegister ? 'primary' : ''" 
+              :class="{ active: isEmailRegister }"
+              @click="isEmailRegister = true"
+              class="tab-button"
+              style="border-radius: 8px 0 0 8px;"
+            >
+              邮箱注册
+            </el-button>
+            <el-button 
+              :type="!isEmailRegister ? 'primary' : ''" 
+              :class="{ active: !isEmailRegister }"
+              @click="isEmailRegister = false"
+              class="tab-button"
+              style="border-radius: 0 8px 8px 0;"
+            >
+              手机号注册
+            </el-button>
+          </div>
         </el-form-item>
         
-        <!-- 邮箱输入框（替换原用户名） -->
-        <el-form-item prop="email">
+        <!-- 用户名输入框 -->
+        <el-form-item prop="username">
+          <el-input 
+            :prefix-icon="User" 
+            placeholder="请输入用户名" 
+            v-model="registerData.username" 
+          />
+        </el-form-item>
+        
+        <!-- 邮箱输入框 -->
+        <el-form-item v-if="isEmailRegister" prop="email">
           <el-input 
             :prefix-icon="User" 
             placeholder="请输入邮箱" 
             v-model="registerData.email" 
+          />
+        </el-form-item>
+        
+        <!-- 手机号输入框 -->
+        <el-form-item v-else prop="phone">
+          <el-input 
+            :prefix-icon="User" 
+            placeholder="请输入手机号" 
+            v-model="registerData.phone" 
           />
         </el-form-item>
         
@@ -429,7 +602,7 @@ onUnmounted(() => {
         </el-form-item>
       </el-form>
 
-      <!-- 忘记密码表单部分 -->
+      <!-- 找回密码表单部分 -->
       <el-form 
         v-else-if="isForgotPassword"
         ref="form" 
@@ -439,7 +612,7 @@ onUnmounted(() => {
         :rules="forgotPasswordRules"
       >
         <el-form-item>
-          <h1>忘记密码</h1>
+          <h1>找回密码</h1>
         </el-form-item>
         
         <!-- 邮箱输入框 -->
@@ -524,7 +697,7 @@ onUnmounted(() => {
           <h1>登录</h1>
         </el-form-item>
         
-        <!-- 邮箱输入框（替换原用户名） -->
+        <!-- 邮箱输入框 -->
         <el-form-item prop="email">
           <el-input 
             :prefix-icon="User" 
@@ -548,7 +721,7 @@ onUnmounted(() => {
           <div class="flex">
             <el-checkbox>记住我</el-checkbox>
             <div class="right-links">
-              <el-link type="primary" @click="isForgotPassword = true">忘记密码？</el-link>
+              <el-link type="primary" @click="isForgotPassword = true">找回密码？</el-link>
             </div>
           </div>
         </el-form-item>
@@ -639,6 +812,32 @@ onUnmounted(() => {
 
     .form-footer :deep(.el-link:hover) {
       color: #409eff;
+    }
+    
+    /* 注册方式切换按钮样式 */
+    .register-tabs {
+      display: flex;
+      width: 100%;
+      margin-bottom: 24px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    
+    .tab-button {
+      flex: 1;
+      padding: 12px 0;
+      font-size: 16px;
+      transition: all 0.3s ease;
+    }
+    
+    .tab-button.active {
+      font-weight: bold;
+      transform: translateY(-2px);
+    }
+    
+    .tab-button:hover {
+      transform: translateY(-1px);
     }
   }
 }
