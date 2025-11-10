@@ -7,9 +7,9 @@ import { useRouter } from 'vue-router'
 // 引入Element Plus的消息提示和消息框组件
 import { ElMessage, ElMessageBox } from 'element-plus'
 // 引入Element Plus的图标组件用于菜单和下拉菜单
-import { Setting,Management, Promotion, UserFilled, User, Crop, EditPen, SwitchButton, CaretBottom } from '@element-plus/icons-vue'
-// 引入默认头像图片
-import avatar from '@/assets/default.png'
+import {  UserFilled,Setting, User, Crop, EditPen, SwitchButton, CaretBottom } from '@element-plus/icons-vue'
+// 使用在线默认头像链接，不再导入本地资源
+const defaultAvatar = 'https://n.sinaimg.cn/sinacn20122/80/w440h440/20181223/62bf-hqqzpku8165766.jpg';
 // 引入获取用户信息的API服务
 import { userInfoService } from '@/api/user.js'
 // 引入管理用户信息的Pinia store
@@ -27,12 +27,23 @@ const userInfoStore = useUserInfoStore() // 使用用户信息存储实例
  * 功能：从API获取当前登录用户的信息并存储到Pinia store中
  */
 const getUserInfo = async () => {
-  // 调用用户信息API服务
-  const result = await userInfoService()
-  // 将获取到的用户信息存入Pinia store
-  userInfoStore.setInfo(result.data)
+  try {
+    console.log('开始获取用户信息')
+    // 调用用户信息API服务
+    const result = await userInfoService()
+    console.log('用户信息API返回结果:', result)
+    // 将获取到的用户信息存入Pinia store
+    userInfoStore.setInfo(result.data)
+    console.log('设置用户信息后store中的数据:', userInfoStore.info)
+  } catch (error) {
+    console.error('获取用户信息失败:', error)
+    console.error('错误详情:', error.response ? error.response.data : error.message)
+    ElMessage.error('获取用户信息失败，请刷新页面重试')
+  }
 }
 // 组件挂载时立即获取用户信息
+console.log('组件挂载，准备获取用户信息')
+console.log('初始userInfoStore状态:', userInfoStore.info)
 getUserInfo()
 
 /*
@@ -66,7 +77,8 @@ const handleCommand = (command) => {
       })
   } else {
     // 其他命令（个人中心相关操作）
-    router.push('/user/' + command) // 导航到对应页面
+    // 使用正确的路径前缀，与路由配置保持一致
+    router.push('/admin/user/' + command) // 导航到对应页面
   }
 }
 </script>
@@ -94,24 +106,16 @@ const handleCommand = (command) => {
           </el-icon>
           <span>我的</span>
         </el-menu-item>
-
-        <!-- 文章分类菜单项 -->
-        <el-menu-item index="/admin/article/category">
+         
+        <!-- 作者中心菜单项 -->
+        <el-menu-item index="/admin/author/author">
           <el-icon>
-            <Management /> <!-- 管理图标 -->
+             <EditPen /><!-- 成为作者图标 -->
           </el-icon>
-          <span>文章分类</span>
+          <span>作者中心</span>
         </el-menu-item>
 
-        <!-- 文章管理菜单项 -->
-        <el-menu-item index="/admin/article/manage">
-          <el-icon>
-            <Promotion /> <!-- 推广图标 -->
-          </el-icon>
-          <span>文章管理</span>
-        </el-menu-item>
-
-        <!-- 个人中心子菜单 -->
+        <!-- 设置子菜单 -->
         <el-sub-menu index="/admin/user-center">
           <!-- 子菜单标题 -->
           <template #title>
@@ -145,17 +149,20 @@ const handleCommand = (command) => {
             <span>修改密码</span>
           </el-menu-item>
         </el-sub-menu>
+
       </el-menu>
     </el-aside>
 
     <!-- 右侧主内容区域 -->
     <el-container>
-      <!-- 顶部头部区域 -->
+      <!-- 顶部头部区域 - 包含用户名、导航栏和头像 -->
       <el-header>
-        <!-- 显示当前登录用户昵称 -->
-        <div>用户：<strong>{{userInfoStore?.info?.nickname || userInfoStore?.info?.username || 
-          '未登录用户'  }}</strong></div>
-
+        <!-- 用户信息区域 - 只显示用户名 -->
+        <div class="username-display">用户：<strong>{{ 
+          userInfoStore?.info?.username || 
+          '未登录用户' 
+        }}</strong></div>
+        
         <!-- 导航栏区域 -->
         <div class="nav-wrapper">
           <router-link to="/" class="nav-item">首页</router-link>
@@ -165,14 +172,12 @@ const handleCommand = (command) => {
           <router-link to="/category/4" class="nav-item">教程学习</router-link>
         </div>
 
-        <!-- 用户操作下拉菜单 -->
-        <!-- // 下拉菜单位置（右下）
-          // 菜单项选择事件处理 -->
+        <!-- 用户头像和下拉菜单 -->
         <el-dropdown placement="bottom-end" @command="handleCommand">
           <!-- 下拉菜单触发器 -->
           <span class="el-dropdown__box">
             <!-- 用户头像 -->
-            <el-avatar :src="userInfoStore.info.userPic ? userInfoStore.info.userPic : avatar" />
+            <el-avatar :src="userInfoStore.info?.userPic ? userInfoStore.info.userPic : defaultAvatar" />
             <!-- 下拉图标 -->
             <el-icon>
               <CaretBottom />
@@ -187,7 +192,7 @@ const handleCommand = (command) => {
               <!-- 更换头像菜单项 -->
               <el-dropdown-item command="avatar" :icon="Crop">更换头像</el-dropdown-item>
               <!-- 重置密码菜单项 -->
-              <el-dropdown-item command="resetpassword" :icon="EditPen">重置密码</el-dropdown-item>
+              <el-dropdown-item command="resetPassword" :icon="EditPen">重置密码</el-dropdown-item>
               <!-- 退出登录菜单项 -->
               <el-dropdown-item command="logout" :icon="SwitchButton">退出登录</el-dropdown-item>
             </el-dropdown-menu>
@@ -229,47 +234,64 @@ const handleCommand = (command) => {
     }
   }
 
-  /* 头部区域样式 */
-  .el-header {
-    background-color: #fff; // 白色背景
+  /* 头部区域样式 - 包含用户名、导航栏和头像 */
+   .el-header {
+     background-color: #fff; // 白色背景
+     display: flex;
+     align-items: center; // 垂直居中
+     justify-content: space-between; // 两端对齐
+     padding: 0 20px; // 添加内边距
+     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1); // 添加阴影效果
+     height: 60px; // 设置高度
+
+     /* 用户名显示样式 */
+     .username-display {
+       font-size: 14px;
+       color: #606266;
+       margin-right: 20px;
+     }
+
+     /* 导航栏样式 - 与HomeLayout保持一致，确保水平居中 */
+      .nav-wrapper {
+        display: flex;
+        align-items: center;
+        justify-content: center; // 水平居中对齐
+        gap: 30px;
+        flex: 1; // 让导航栏占据剩余空间
+        flex-wrap: nowrap; // 防止换行
+        overflow: visible; // 允许内容完整显示
+      }
+
+     /* 下拉菜单容器样式 */
+     .el-dropdown__box {
+       display: flex;
+       align-items: center; // 垂直居中
+       margin-left: 20px;
+
+       /* 下拉图标样式 */
+       .el-icon {
+         color: #999; // 灰色
+         margin-left: 10px; // 左侧间距
+       }
+
+       /* 激活和聚焦状态样式 */
+       &:active,
+       &:focus {
+         outline: none; // 去除轮廓
+       }
+     }
+   }
+
+  /* 底部区域样式 */
+  .el-footer {
     display: flex;
     align-items: center; // 垂直居中
-    justify-content: space-between; // 两端对齐
-    padding: 0 20px; // 添加内边距
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1); // 添加阴影效果
-    height: 60px; // 设置高度
-
-    /* 下拉菜单容器样式 */
-    .el-dropdown__box {
-      display: flex;
-      align-items: center; // 垂直居中
-      margin-left: 20px;
-
-      /* 下拉图标样式 */
-      .el-icon {
-        color: #999; // 灰色
-        margin-left: 10px; // 左侧间距
-      }
-
-      /* 激活和聚焦状态样式 */
-      &:active,
-      &:focus {
-        outline: none; // 去除轮廓
-      }
-    }
+    justify-content: center; // 水平居中
+    font-size: 14px; // 字体大小
+    color: #666; // 字体颜色
   }
-
-  /* 导航栏样式 */
-  .nav-wrapper {
-    display: flex;
-    align-items: center;
-    justify-content: center; // 水平居中对齐
-    gap: 30px;
-    flex: 1; // 让导航栏占据剩余空间
-    flex-wrap: nowrap; // 防止换行
-    overflow: visible; // 允许内容完整显示
-  }
-
+  
+  /* 导航栏样式 - 与HomeLayout保持一致 */
   .nav-item {
     font-size: 16px;
     color: #333;
@@ -309,15 +331,6 @@ const handleCommand = (command) => {
   .nav-item.router-link-active::after {
     width: 100%;
     background-color: #1890ff;
-  }
-
-  /* 底部区域样式 */
-  .el-footer {
-    display: flex;
-    align-items: center; // 垂直居中
-    justify-content: center; // 水平居中
-    font-size: 14px; // 字体大小
-    color: #666; // 字体颜色
   }
 }
 </style>

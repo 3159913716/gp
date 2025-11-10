@@ -566,8 +566,10 @@ articleList()          // 加载文章列表
         :rules - 表单验证规则
         label-width - 标签宽度
         ref - 表单引用标识
+        v-if="visibleDrawer" - 确保表单只在抽屉可见时渲染，避免宽度计算错误
       -->
       <el-form 
+        v-if="visibleDrawer"
         :model="articleModel" 
         label-width="100px" 
         :rules="rules" 

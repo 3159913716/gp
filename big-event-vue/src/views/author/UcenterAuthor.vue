@@ -480,8 +480,11 @@ export default {
     height: 100%;
     object-fit: cover;
     border-radius: 8px;
-    /* 调整图片位置，实现更精确的裁剪效果 */
-    object-position: center 30%;
+    /* 修改为完全居中显示 */
+    object-position: center center;
+    /* 确保图片在容器中居中 */
+    display: block;
+    margin: 0 auto;
   }
 
   .carousel-desc {
@@ -520,7 +523,7 @@ export default {
 
 /* 新闻列表容器 */
 .news-container {
-  padding: 20px 0;
+  padding: 20px;
   width: 100%;
   margin: 0 auto;
 }
@@ -911,18 +914,26 @@ export default {
   overflow: visible;
   border: 1px solid #eaeaea;
   position: relative;
-  box-sizing: border-box; /* 确保内边距不会导致容器超出 */
+  box-sizing: border-box;
+  /* 完全移除所有高度限制 */
+  height: auto !important;
+  min-height: auto !important;
+  /* 确保容器与其他元素隔离 */
+  z-index: 1;
 }
 
 /* 三列网格布局，更合理展示内容 */
 .news-slider {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 1.5rem; /* 调整间距大小 */
-  justify-content: space-between; /* 确保项目均匀分布 */
+  gap: 2rem; /* 增加间距，避免内容重叠 */
+  justify-content: space-between;
   width: 100%;
   box-sizing: border-box;
-  padding: 0 0.5rem; /* 为左右两侧添加额外的内边距 */
+  padding: 1rem;
+  /* 确保网格容器不会限制子元素高度 */
+  min-height: auto;
+  height: auto;
 }
 
 /* 优化新闻项样式 */
@@ -933,11 +944,16 @@ export default {
   transition: all 0.3s ease;
   border: 1px solid #e0e5ff;
   box-shadow: 0 4px 12px rgba(79, 70, 229, 0.05);
-  min-height: 280px;
+  /* 完全移除最小高度限制，让内容决定高度 */
+  min-height: auto;
+  height: auto;
   display: flex;
   flex-direction: column;
   box-sizing: border-box;
   position: relative;
+  overflow: visible;
+  /* 确保每个新闻项独立不相互影响 */
+  isolation: isolate;
 }
 
 /* 标题行样式 */
@@ -964,9 +980,10 @@ export default {
   font-size: 1.1rem;
   font-weight: 600;
   color: #333;
-  margin: 0;
+  margin: 0 0 1rem 0;
   transition: color 0.3s ease;
-  flex: 1;
+  /* 移除flex属性，避免影响高度 */
+  display: block;
 }
 
 /* 描述样式 */
@@ -974,19 +991,21 @@ export default {
   color: #666;
   font-size: 0.95rem;
   line-height: 1.6;
-  display: -webkit-box;
-  -webkit-line-clamp: 4;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  /* 移除文本截断，允许内容完整显示 */
+  display: block;
+  /* 增加行高提高可读性 */
+  line-height: 1.8;
   margin-bottom: 1rem;
+  flex: 1; /* 允许描述区域灵活占用空间 */
 }
 
 /* 底部样式 */
 .news-footer {
   display: flex;
   justify-content: flex-end;
-  margin-top: auto;
+  margin-top: 1rem;
+  /* 确保底部区域在内容下方 */
+  clear: both;
 }
 
 /* 按钮样式 */
@@ -1017,11 +1036,12 @@ export default {
 @media (max-width: 1024px) {
   .news-slider {
     grid-template-columns: repeat(2, 1fr);
-    gap: 1.2rem;
+    gap: 1.5rem;
+    padding: 1rem;
   }
   .news-container {
     margin: 1.5rem auto;
-    padding: 0 1rem;
+    padding: 1.5rem;
   }
 }
 
@@ -1029,6 +1049,8 @@ export default {
   .news-container {
     margin: 1rem;
     padding: 1.2rem;
+    width: calc(100% - 2rem);
+    box-sizing: border-box;
   }
   
   .plan-title h3 {
@@ -1037,12 +1059,19 @@ export default {
   
   .news-slider {
     grid-template-columns: 1fr;
-    gap: 1.2rem;
+    gap: 1.5rem;
+    padding: 0.5rem;
   }
   
   .news-item {
-    min-height: 220px;
+    min-height: auto;
     padding: 1.2rem;
+    overflow: visible;
+  }
+  
+  .news_desc {
+    display: block;
+    line-height: 1.8;
   }
 }
 

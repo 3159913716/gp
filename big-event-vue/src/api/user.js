@@ -116,16 +116,13 @@ export const userInfoUpdateService = (userInfoData) => {
  * 内容类型：application/x-www-form-urlencoded
  */
 export const userAvatarUpdateService = (avatarUrl) => {
-  // 使用URLSearchParams处理单个参数
-  let params = new URLSearchParams();
-  params.append('avatarUrl', avatarUrl);
-  
   /**
-   * 使用PATCH方法：
-   * 1. 部分更新资源
-   * 2. 区别于PUT的完整替换
+   * 根据接口文档要求：
+   * 1. 使用JSON格式发送请求
+   * 2. 参数名必须是avatarUrl
+   * 3. 内容类型应为application/json
    */
-  return request.patch('/user/updateAvatar', params);
+  return request.patch('/user/updateAvatar', { avatarUrl });
 }
 
 /**

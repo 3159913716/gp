@@ -19,16 +19,27 @@
                 <div class="img-cell"><img :src="item.userPic" alt="用户头像" class="user-img"></div>
                 <div class="author-cell">{{ item.followTime }}</div>
                 <div class="time-cell">
-                    <el-button type="primary" size="mini" @click="viewUserProfile(item.id)" class="view-btn">查看资料</el-button>
-                    <el-button type="success" size="mini" @click="followBack(item.id)" class="follow-btn" v-if="!isFollowing(item.id)">回关</el-button>
-                    <el-button type="info" size="mini" disabled class="followed-btn" v-else>已关注</el-button>
+                    <el-button type="primary" size="small" @click="viewUserProfile(item.id)" class="view-btn">查看资料</el-button>
+                    <el-button type="success" size="small" @click="followBack(item.id)" class="follow-btn" v-if="!item.isFollow">回关</el-button>
+                    <el-button type="success" size="small" disabled class="followed-btn" v-else>已回关</el-button>
                 </div>
             </div>
         </div>
     </div>
     <!-- 空数据状态 -->
-    <div class="empty-state" v-show="fansList.length === 0 && !loading">
+    <!-- 错误状态 -->
+    <div class="error-state" v-if="error && !loading">
+        <el-icon class="error-icon"><WarningFilled /></el-icon>
+        <div class="error-text">获取粉丝列表失败</div>
+        <el-button type="primary" size="small" class="reload-btn" @click="fetchFans">
+            <el-icon><Refresh /></el-icon> 重新加载
+        </el-button>
+    </div>
+    
+    <!-- 空数据状态 -->
+    <div class="empty-state" v-show="fansList.length === 0 && !loading && !error">
         <div>暂无粉丝</div>
+        <div class="empty-tip">当其他用户关注您时，会显示在这里</div>
     </div>
     <!-- 加载状态 -->
     <div class="loading-state" v-if="loading">
@@ -39,19 +50,18 @@
 </template>
 
 <script>
-import request from '@/utils/request.js';
-import { Loading } from '@element-plus/icons-vue'; // 引入Element Plus图标
-import { useTokenStore } from '@/stores/token.js';
+import guanzhu from '@/api/guanzhu.js';
+import { Loading, Refresh, WarningFilled } from '@element-plus/icons-vue'; // 引入Element Plus图标
+import defaultAvatar from '@/assets/default.png'; // 导入默认头像图片
 
 export default {
- components: { Loading }, // 注册图标组件
+ components: { Loading, Refresh, WarningFilled }, // 注册图标组件
   // 数据定义
   data() {
     return {
       loading: false,
       error: false,
-      fansList: [], // 粉丝列表数组，直接对应接口返回的data字段
-      followingIds: []
+      fansList: [] // 粉丝列表数组，直接对应接口返回的data字段
     }
   },
   
@@ -68,19 +78,88 @@ export default {
       this.error = false;
       
       try {
-        // 调用真实接口，使用request实例自动携带token
-        const response = await request.get('/user/followers');
+        console.log('开始请求粉丝列表...');
         
-        // 处理接口返回数据
-        if (response.data.success) {
-          this.fansList = response.data.data; // 直接使用一个数组接收data字段
-        } else {
-          this.error = true;
-          console.error('获取粉丝列表失败:', response.data.message);
+        // 并行请求粉丝列表和关注列表
+        const [followersResponse, followingResponse] = await Promise.all([
+          guanzhu.getFollowersList(),
+          guanzhu.getFollowingList()
+        ]);
+        
+        console.log('粉丝列表API响应:', followersResponse);
+        console.log('关注列表API响应:', followingResponse);
+        
+        // 处理粉丝列表数据
+        let fansDataList = [];
+        
+        // 处理粉丝列表响应格式
+        if (followersResponse && followersResponse.code === 0 && Array.isArray(followersResponse.data)) {
+          fansDataList = followersResponse.data;
+        } else if (followersResponse && Array.isArray(followersResponse.data)) {
+          fansDataList = followersResponse.data;
+        } else if (Array.isArray(followersResponse)) {
+          fansDataList = followersResponse;
+        } else if (followersResponse && Array.isArray(followersResponse.list)) {
+          fansDataList = followersResponse.list;
         }
+        
+        // 处理关注列表数据
+        let followingIds = new Set();
+        if (followingResponse && followingResponse.code === 0 && Array.isArray(followingResponse.data)) {
+          followingIds = new Set(followingResponse.data.map(item => 
+            String(item.id || item.userId || item.userid || '')
+          ));
+        } else if (followingResponse && Array.isArray(followingResponse.data)) {
+          followingIds = new Set(followingResponse.data.map(item => 
+            String(item.id || item.userId || item.userid || '')
+          ));
+        } else if (Array.isArray(followingResponse)) {
+          followingIds = new Set(followingResponse.map(item => 
+            String(item.id || item.userId || item.userid || '')
+          ));
+        } else if (followingResponse && Array.isArray(followingResponse.list)) {
+          followingIds = new Set(followingResponse.list.map(item => 
+            String(item.id || item.userId || item.userid || '')
+          ));
+        }
+        
+        console.log('关注用户ID集合:', followingIds);
+        
+        // 标准化粉丝列表数据格式
+        this.fansList = fansDataList.map(item => {
+          const userId = String(item.id || item.userId || item.userid || '');
+          console.log(`处理粉丝数据 - 完整对象:`, item);
+          
+          // 优先使用后端返回的isFollow状态，如果没有则通过关注列表判断
+          let isFollowed = Boolean(item.isFollow);
+          
+          // 如果后端没有明确标记为已关注，则通过关注列表检查
+          if (!isFollowed && followingIds.has(userId)) {
+            isFollowed = true;
+            console.log(`通过关注列表修正粉丝ID: ${userId} 的关注状态为已关注`);
+          }
+          
+          console.log(`粉丝ID: ${userId}, 后端isFollow: ${item.isFollow}, 关注列表包含: ${followingIds.has(userId)}, 最终isFollow: ${isFollowed}`);
+          
+          return {
+            id: userId,
+            nickname: item.nickname || item.username || '未知用户',
+            username: item.username || '未知',
+            userPic: item.userPic || item.avatar || defaultAvatar,
+            followTime: item.followTime || item.create_time || new Date().toLocaleString(),
+            isFollow: isFollowed
+          };
+        });
+        
+        console.log('处理后的粉丝列表:', this.fansList);
       } catch (error) {
         console.error('获取粉丝列表失败:', error);
         this.error = true;
+        // 更详细的错误提示
+        const errorMsg = error.response?.data?.message || error.message || '获取粉丝列表失败，请稍后重试';
+        this.$message.error(errorMsg);
+        // 清空列表数据
+        this.fansList = [];
       } finally {
         this.loading = false;
       }
@@ -101,23 +180,34 @@ export default {
         type: 'info'
       }).then(async () => {
         try {
-          // 调用关注接口，使用request实例自动携带token
-          await request.post(`/user/follow/${Id}`);
+          console.log(`开始关注用户ID: ${Id}`);
+          // 使用guanzhu API模块中的toggleFollow方法
+          await guanzhu.toggleFollow(Id);
           
-          // 更新已关注列表
-          this.followingIds.push(Id);
+          // 更新粉丝列表中的isFollow状态
+          const fanIndex = this.fansList.findIndex(item => item.id === String(Id));
+          if (fanIndex !== -1) {
+            this.fansList[fanIndex].isFollow = true;
+            console.log(`已更新用户ID ${Id} 的关注状态为已关注`);
+          }
+          
           this.$message.success('关注成功');
+          console.log('关注成功');
         } catch (err) {
-          this.$message.error('关注失败，请稍后重试');
+          console.error('关注失败:', err);
+          const errorMsg = err.response?.data?.message || err.message || '关注失败，请稍后重试';
+          this.$message.error(errorMsg);
         }
       }).catch(() => {
         this.$message.info('已取消操作');
       });
     },
     
-    // 判断是否已关注用户
+    // 判断是否已关注用户（备用方法）
     isFollowing(Id) {
-      return this.followingIds.includes(Id);
+      const stringId = String(Id);
+      const fanItem = this.fansList.find(item => item.id === stringId);
+      return fanItem ? Boolean(fanItem.isFollow) : false;
     },
     
     // 由于接口未提供分页参数，这里移除分页相关方法
@@ -129,7 +219,6 @@ export default {
 <style scoped>
 .container {
   width: 100%;
-  max-width: 1200px;
   padding: 15px;
   box-sizing: border-box;
   min-height: calc(100vh - 120px);
@@ -180,6 +269,40 @@ export default {
 
 .table-content::-webkit-scrollbar-thumb:hover {
   background: #a8a8a8;
+}
+
+/* 错误状态样式 */
+.error-state {
+  height: 200px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  color: #f56c6c;
+  font-size: 14px;
+}
+
+.error-icon {
+  font-size: 18px;
+}
+
+.reload-btn {
+  margin-left: 8px;
+  color: #409eff;
+  background-color: rgba(64, 158, 255, 0.1);
+  border-color: transparent;
+}
+
+.reload-btn:hover {
+  background-color: rgba(64, 158, 255, 0.2);
+  border-color: transparent;
+}
+
+/* 空状态提示文本 */
+.empty-tip {
+  margin-top: 8px;
+  color: #909399;
+  font-size: 12px;
 }
 
 /* 表格行样式 */

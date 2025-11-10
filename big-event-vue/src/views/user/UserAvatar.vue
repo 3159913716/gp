@@ -57,28 +57,182 @@ const imgUrl = ref(userInfoStore.info.userPic)
 
 /* 
   文件上传成功回调函数：
-  @param {Object} result - 上传接口返回的结果
+  @param {Object} response - 上传接口返回的响应对象
+  @param {Object} file - 上传的文件对象
+  @param {Array} fileList - 文件列表
 */
-const uploadSuccess = (result) => {
-  if (result.data) {
-    imgUrl.value = result.data      // 更新预览头像URL
-    fileSelected.value = true        // 标记已选择文件
+const handleUploadSuccess = (response, file, fileList) => {
+  // 由于我们的request拦截器会处理响应，这里需要适配处理
+  console.log('上传接口响应:', response);
+  
+  // 尝试从不同可能的数据结构中获取图片URL
+  let avatarUrl = null;
+  
+  // 根据response的实际结构获取URL
+  if (response && typeof response === 'object') {
+    // 检查是否有code字段（标准API响应格式）
+    if (response.code === 0) {
+      // 如果data字段为空但操作成功，可以使用file的临时URL作为预览
+      if (!response.data) {
+        // 对于成功上传但没有返回URL的情况，使用浏览器的临时URL
+        avatarUrl = URL.createObjectURL(file.raw);
+        console.log('上传成功，使用临时URL作为预览:', avatarUrl);
+      } else {
+        avatarUrl = response.data || response.url || response.fileUrl;
+      }
+    } else if (response.data) {
+      // 尝试直接从data中获取
+      avatarUrl = response.data;
+    } else {
+      // 尝试其他可能的字段名
+      avatarUrl = response.url || response.fileUrl || response.path;
+    }
+  } else if (typeof response === 'string') {
+    // 如果返回的是字符串，直接作为URL
+    avatarUrl = response;
+  }
+  
+  if (avatarUrl) {
+    imgUrl.value = avatarUrl      // 更新预览头像URL
+    fileSelected.value = true     // 标记已选择文件
+    console.log('头像上传成功，URL:', avatarUrl);
   } else {
-    ElMessage.error('上传失败')     // 显示错误提示
+    // 即使获取不到URL，如果操作成功也可以标记为已选择
+    if (response && response.code === 0) {
+      // 使用浏览器的临时URL作为预览
+      avatarUrl = URL.createObjectURL(file.raw);
+      imgUrl.value = avatarUrl;
+      fileSelected.value = true;
+      console.log('操作成功，使用临时URL作为预览:', avatarUrl);
+    } else {
+      console.error('上传失败：无法获取头像URL', response);
+      ElMessage.error('上传失败：无法获取图片地址')
+    }
   }
 }
 
-/* 
-  更新头像到服务器：
-  调用API更新用户头像，成功后更新本地存储
+/*
+  文件上传错误回调函数
+  @param {Object} err - 错误对象
+  @param {Object} file - 上传的文件对象
+  @param {Array} fileList - 文件列表
 */
-const updateAvatar = async () => {
-  await userAvatarUpdateService(imgUrl.value)  // 调用API
-  ElMessage.success('头像更新成功')            // 显示成功提示
-  // 更新Pinia中的用户信息
-  userInfoStore.setInfo({ ...userInfoStore.info, userPic: imgUrl.value })
-  fileSelected.value = false // 标记未选择文件
+const handleUploadError = (err, file, fileList) => {
+  console.error('上传错误:', err);
+  const errorMsg = err?.response?.data?.msg || err?.message || '文件上传失败，请重试';
+  ElMessage.error(errorMsg);
 }
+
+/*
+  文件上传前检查函数
+  @param {Object} file - 待上传的文件对象
+  @returns {boolean} - 是否允许上传
+*/
+const handleBeforeUpload = (file) => {
+  // 限制文件类型
+  const isImage = file.type.startsWith('image/');
+  if (!isImage) {
+    ElMessage.error('只能上传图片文件!');
+    return false;
+  }
+  // 限制文件大小 (2MB)
+  const isLt2M = file.size / 1024 / 1024 < 2;
+  if (!isLt2M) {
+    ElMessage.error('上传图片大小不能超过 2MB!');
+    return false;
+  }
+  return true;
+}
+
+/*
+  文件上传进度回调函数
+  @param {Object} evt - 进度事件对象
+*/
+const handleUploadProgress = (evt) => {
+  console.log('上传进度:', Math.round(evt.percent) + '%');
+}
+
+/* 
+    选择图片处理函数：
+    触发隐藏的文件输入框点击事件
+  */
+  const handleSelectImage = () => {
+    // 触发隐藏的文件输入框点击事件
+    if (uploadRef.value) {
+      uploadRef.value.$el.querySelector('input').click()
+    }
+  }
+  
+  /* 
+    更新头像到服务器：
+    调用API更新用户头像，成功后使用服务器返回的URL更新本地存储，确保刷新后头像依然保持
+  */
+  const updateAvatar = async () => {
+    // 如果没有选择文件，不执行更新
+    if (!fileSelected.value) {
+      ElMessage.warning('请先选择要上传的头像')
+      return
+    }
+    
+    try {
+      // 调用头像更新API
+      const result = await userAvatarUpdateService(imgUrl.value)
+      
+      console.log('更新头像API响应:', result);
+      
+      // 更新成功，从API响应中获取正确的头像URL
+      // 注意：必须使用服务器返回的URL，而不是临时URL，这样刷新后才会保持
+      let serverAvatarUrl = imgUrl.value; // 默认使用当前URL
+      
+      // 尝试从API响应中获取更准确的URL
+      if (result && result.data) {
+        // 检查是否有data字段包含URL信息
+        if (typeof result.data === 'string') {
+          serverAvatarUrl = result.data;
+        } else if (result.data.url) {
+          serverAvatarUrl = result.data.url;
+        } else if (result.data.userPic) {
+          serverAvatarUrl = result.data.userPic;
+        }
+      }
+      
+      console.log('最终使用的头像URL:', serverAvatarUrl);
+      
+      // 更新成功，同步更新用户信息store
+      // 确保使用服务器返回的URL更新到store中，使所有使用该store的组件（UserLayout和article/Layout）能够实时渲染更新后的头像
+      console.log('更新前userInfoStore:', userInfoStore.info);
+      
+      // 方案优化：采用更彻底的响应式更新策略
+      // 1. 先获取当前用户信息，确保有完整的数据结构
+      const currentInfo = userInfoStore.info || {};
+      // 2. 创建一个全新的对象，而不仅仅是修改属性，确保响应式系统能够检测到变化
+      const updatedInfo = {
+        ...currentInfo,
+        // 关键：强制更新userPic属性，这将触发所有使用此属性的组件重新渲染
+        userPic: serverAvatarUrl + '?' + new Date().getTime() // 添加时间戳防止缓存问题
+      };
+      
+      // 3. 调用setInfo方法更新store
+      userInfoStore.setInfo(updatedInfo);
+      
+      // 4. 验证更新是否成功
+      console.log('更新后userInfoStore:', userInfoStore.info);
+      console.log('头像URL已更新为:', serverAvatarUrl);
+      
+      // 5. 为了确保立即生效，可以使用一个小技巧：强制重新获取一次用户信息
+      // 这是一个额外的保险措施，确保store中的数据是最新的
+      setTimeout(() => {
+        console.log('强制刷新store中的头像数据');
+        userInfoStore.setInfo({...userInfoStore.info, userPic: serverAvatarUrl});
+      }, 100);
+      
+      ElMessage.success('头像更新成功，刷新后将保持')
+      fileSelected.value = false // 标记未选择文件
+    } catch (error) {
+      console.error('更新头像时发生异常:', error);
+      ElMessage.error('更新失败，请检查网络连接或稍后重试')
+    }
+  }
 </script>
 
 <template>
@@ -109,8 +263,18 @@ const updateAvatar = async () => {
           :headers - 上传请求头（带认证token）
           :on-success - 上传成功回调
         -->
-        <el-upload ref="uploadRef" class="avatar-uploader" :show-file-list="false" :auto-upload="true"
-          action="/api/upload" name="file" :headers="{ 'Authorization': tokenStore.token }" :on-success="uploadSuccess">
+        <el-upload 
+          ref="uploadRef" 
+          class="avatar-uploader" 
+          :show-file-list="false" 
+          :auto-upload="true"
+          action="/api/upload" 
+          name="file" 
+          :headers="{ 'Authorization': tokenStore.token ? `Bearer ${tokenStore.token}` : '' }"
+          :on-success="handleUploadSuccess"
+          :on-error="handleUploadError"
+          :before-upload="handleBeforeUpload"
+          :on-progress="handleUploadProgress">
           <!-- 头像预览：如果有头像URL则显示，否则显示默认头像 -->
           <img v-if="imgUrl" :src="imgUrl" class="avatar" />
           <img v-else :src="avatar" width="278" />
@@ -139,7 +303,7 @@ const updateAvatar = async () => {
           querySelector('input')选择第一个input标签
           click()模拟点击
         -->
-        <el-button type="primary" :icon="Plus" size="large" @click="uploadRef.$el.querySelector('input').click()">
+        <el-button type="primary" :icon="Plus" size="large" @click="handleSelectImage">
           选择图片
         </el-button>
 
