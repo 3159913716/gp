@@ -33,6 +33,7 @@ public class EmailVerifyService {
     // Redis中存储验证码的key前缀，用于区分不同类型的验证码
     private static final String REGISTER_PREFIX = "register:";// 注册验证码的前缀
     private static final String FORGET_PREFIX = "forget:"; // 找回密码验证码的前缀
+    private static final String UPDATE_PWD_PREFIX = "update_pwd:";// 更新密码验证码的前缀
 
     // 从配置文件中读取发件人邮箱地址
     @Value("${spring.mail.username}")
@@ -50,7 +51,7 @@ public class EmailVerifyService {
     /**
      * 发送验证码到指定邮箱
      * @param email 目标邮箱地址，验证码会发送到这个邮箱
-     * @param type 验证码类型：register-用于注册, forget-用于找回密码
+     * @param type 验证码类型：register-用于注册, forget-用于找回密码, update_pwd-用于修改密码
      * @return true-发送成功, false-发送失败
      */
     public boolean sendVerifyCode(String email, String type) {
@@ -118,6 +119,8 @@ public class EmailVerifyService {
             return REGISTER_PREFIX + email; // 注册验证码的key
         } else if ("forget".equals(type)) {
             return FORGET_PREFIX + email; // 找回密码验证码的key
+        } else if ("update_pwd".equals(type)) {
+            return UPDATE_PWD_PREFIX + email; // 更新密码验证码的key
         }
         // 如果传入了不支持的类型，抛出异常
         throw new IllegalArgumentException("不支持的验证码类型: " + type);
@@ -127,7 +130,14 @@ public class EmailVerifyService {
      * 根据验证码类型获取邮件主题
      */
     private String getEmailSubject(String type) {
-        return "register".equals(type) ? "注册验证码" : "密码重置验证码";
+        if ("register".equals(type)) {
+            return "注册验证码"; // 注册验证码主题
+        } else if ("forget".equals(type)) {
+            return "密码重置验证码"; // 找回密码验证码主题
+        } else if ("update_pwd".equals(type)) {
+            return "密码修改验证码"; // 修改密码验证码主题
+        }
+        return "验证码"; // 默认主题
     }
 
 
@@ -135,7 +145,16 @@ public class EmailVerifyService {
      * 根据验证码类型生成邮件内容
      */
     private String getEmailContent(String code, String type) {
-        String action = "register".equals(type) ? "注册" : "重置密码";
+        String action;
+        if ("register".equals(type)) {
+            action = "注册"; // 注册场景
+        } else if ("forget".equals(type)) {
+            action = "重置密码"; // 找回密码场景
+        } else if ("update_pwd".equals(type)) {
+            action = "修改密码"; // 修改密码场景
+        } else {
+            action = "验证身份"; // 默认场景
+        }
         return String.format(
                 "您的验证码是：%s，该验证码用于%s，有效期5分钟，请勿泄露给他人。",
                 code, action

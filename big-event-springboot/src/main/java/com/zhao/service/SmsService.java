@@ -9,7 +9,7 @@ public interface SmsService {
     /**
      * 发送短信验证码
      * @param targets 目标手机号
-     * @param type 验证码类型（如register-注册, login-登录, reset-重置密码等）
+     * @param type 验证码类型（register-注册, login-登录, reset-重置密码, forget-忘记密码）
      * @return 发送结果，true表示成功，false表示失败
      */
     boolean sendVerifyCode(String targets, String type);

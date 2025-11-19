@@ -50,6 +50,8 @@ public class SmsServiceImpl implements SmsService {
     private static final String REGISTER_PREFIX = "sms:register:";
     private static final String LOGIN_PREFIX = "sms:login:";
     private static final String RESET_PREFIX = "sms:reset:";
+    private static final String FORGET_PREFIX = "sms:forget:";
+    private static final String UPDATE_PWD_PREFIX = "sms:update_pwd:";// 更新密码验证码的前缀
     // Redis中存储发送频率限制的key前缀
     private static final String SMS_RATE_LIMIT_PREFIX = "sms:rate:limit:";
     
@@ -72,6 +74,10 @@ public class SmsServiceImpl implements SmsService {
                 return LOGIN_PREFIX + targets;
             case "reset":
                 return RESET_PREFIX + targets;
+            case "update_pwd":
+                return UPDATE_PWD_PREFIX + targets;
+            case "forget":
+                return FORGET_PREFIX + targets;
             default:
                 throw new IllegalArgumentException("不支持的验证码类型: " + type);
         }
@@ -86,7 +92,7 @@ public class SmsServiceImpl implements SmsService {
             }
             
             // 2. 验证类型参数
-            if (!"register".equals(type) && !"login".equals(type) && !"reset".equals(type)) {
+            if (!"register".equals(type) && !"login".equals(type) && !"reset".equals(type) && !"update_pwd".equals(type) && !"forget".equals(type)) {
                 return false;
             }
             
