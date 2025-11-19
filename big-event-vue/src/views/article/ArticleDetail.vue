@@ -11,6 +11,7 @@ import guanzhu from '@/api/guanzhu.js'
 import { useTokenStore } from '@/stores/token.js'
 import useUserInfoStore from '@/stores/userInfo.js'
 import CommentTree from '@/components/front/CommentTree.vue'
+import '@fortawesome/fontawesome-free/css/all.css';
 const route = useRoute()
 const router = useRouter()
 

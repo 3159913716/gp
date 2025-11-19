@@ -480,7 +480,7 @@ const login = async () => {
         
         if (result.code === 0) {
           ElMessage.success(result.msg || '登录成功')
-          tokenStore.setToken(result.message)
+          tokenStore.setToken(result.data)
           router.push('/')
         } else {
           // 不显示失败提示
@@ -498,7 +498,7 @@ const login = async () => {
         if (isLoginSuccess) {
           // 不显示成功提示，直接设置token并跳转
           // 设置token，适配不同的返回格式
-          tokenStore.setToken(result.message || result.data?.token)
+          tokenStore.setToken(result.data || result.data?.token)
           router.push('/')
         } else {
           ElMessage.error(result.msg || result.message || '手机号或验证码错误，请重试')
