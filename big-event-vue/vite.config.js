@@ -14,6 +14,20 @@ export default defineConfig({
       '@': fileURLToPath(new URL('./src', import.meta.url))
     },
   },
+  build: {
+    chunkSizeWarningLimit: 1200, // 提高chunk警告阈值到1200KB
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          // 将大型依赖包单独打包
+          vendor: ['vue', 'vue-router', 'pinia'],
+          elementPlus: ['element-plus'],
+          echarts: ['echarts'],
+          quill: ['@vueup/vue-quill'],
+        }
+      }
+    }
+  },
   //配置代理
   server:{
     proxy:{

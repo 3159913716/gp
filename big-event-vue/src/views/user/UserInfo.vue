@@ -49,7 +49,7 @@ const initialUserInfo = reactive(JSON.parse(JSON.stringify(userInfoStore.info)))
 */
 const userInfo = ref(JSON.parse(JSON.stringify(userInfoStore.info)))
 
-// 如果nickname为空或未定义，设置默认值
+// 当nickname为空或未定义时，默认使用username作为替代值
 if (!userInfo.value.nickname || userInfo.value.nickname.trim() === '') {
   userInfo.value.nickname = userInfo.value.username || '用户' + Date.now().toString().slice(-4)
 }
@@ -62,42 +62,44 @@ if (!userInfo.value.nickname || userInfo.value.nickname.trim() === '') {
 const isFormModified = ref(false)
 
 /* 
+  处理nickname输入事件：
+  移除自动填充默认值的逻辑，允许用户暂时清空昵称
+  限制昵称最大长度为10个字符
+  表单提交时会自动处理空昵称情况
+*/
+const handleNicknameInput = (value) => {
+  // 限制昵称最大长度为10个字符
+  if (value && value.length > 10) {
+    userInfo.value.nickname = value.slice(0, 10);
+    // 可以添加提示，但可能会频繁触发，可以省略
+  }
+  // 移除自动填充逻辑，允许用户自由编辑
+  // 表单提交时会在updateUserInfo函数中处理空值情况
+}
+
+/* 
   深度监听用户信息变化：
   比较当前用户信息与初始用户信息的差异
-  只检查昵称是否有更改
+  使用更可靠的比较方法检测昵称变化
 */
 watch(
-  userInfo,
-  () => {
-    // 检查昵称是否有更改
-    isFormModified.value =
-      userInfo.value.nickname !== initialUserInfo.nickname
+  () => userInfo.value?.nickname,
+  (newNickname, oldNickname) => {
+    // 更可靠地检查昵称是否有更改，处理空值和trim情况
+    const currentNickname = (newNickname || '').trim()
+    const initialNickname = (initialUserInfo.nickname || '').trim()
+    
+    isFormModified.value = currentNickname !== initialNickname
   },
-  { deep: true } // 深度监听，检测对象内部属性变化
+  { immediate: true } // 立即执行一次，确保初始状态正确
 )
 
 /* 
   表单验证规则对象：
-  使用Element Plus的表单验证机制
-  包含字段验证规则和触发条件
+  已移除所有验证规则
 */
 const rules = {
-  // 昵称验证规则
-  nickname: [
-    // 必填验证
-    { 
-      required: true, 
-      message: '请输入用户昵称', // 错误提示信息
-      trigger: 'blur'           // 触发时机：失去焦点
-    },
-    // 格式验证
-    {
-      pattern: /^\S{2,10}$/,    // 2-10位非空字符正则
-      message: '昵称必须是2-10位的非空字符串',
-      trigger: 'blur'           // 触发时机：失去焦点
-    }
-  ],
-  // 邮箱不再需要验证规则，因为是只读字段
+  // 已移除所有验证规则
 }
 
 /* 
@@ -115,10 +117,12 @@ const resetForm = async () => {
   // 重置用户信息，保留用户名和邮箱，并设置默认昵称
   const username = userInfoStore.info?.username || ''
   const email = userInfoStore.info?.email || ''
-  // 设置默认昵称逻辑
-  const defaultNickname = username || '用户' + Date.now().toString().slice(-4);
-  Object.assign(userInfo.value, { username: username, nickname: defaultNickname, email: email })
-  Object.assign(initialUserInfo, { username: username, nickname: defaultNickname, email: email })
+  // 当nickname为空或未定义时，默认使用username作为替代值
+  const nickname = userInfoStore.info?.nickname && userInfoStore.info.nickname.trim() !== '' 
+    ? userInfoStore.info.nickname 
+    : username
+  Object.assign(userInfo.value, { username: username, nickname: nickname, email: email })
+  Object.assign(initialUserInfo, { username: username, nickname: nickname, email: email })
   
   // 重置修改状态
   isFormModified.value = false
@@ -137,40 +141,61 @@ const resetForm = async () => {
   成功处理后更新Pinia store中的数据
 */
 const updateUserInfo = async () => {
-  // 调用Element表单验证方法
-  formRef.value?.validate(async (valid) => {
-    if (valid) {  // 验证通过
-      try {
-        // 调用API更新用户信息
-        await userInfoUpdateService(userInfo.value)
-        ElMessage.success('个人信息更新成功！')  // 显示成功提示
-        
-        /* 
-          更新Pinia store中的用户信息：
-          使用深拷贝更新，避免引用问题
-          保持store中的数据纯净
-        */
-        userInfoStore.setInfo(JSON.parse(JSON.stringify(userInfo.value)))
-        
-        // 更新initialUserInfo以匹配更新后的状态
-        // 这样后续修改时isFormModified才能正确反映变化
-        Object.assign(initialUserInfo, JSON.parse(JSON.stringify(userInfo.value)))
-        
-        // 重置表单修改状态
-        isFormModified.value = false
-        
-      } catch (error) {  // 错误处理
-        console.error('更新用户信息失败:', error)
-        ElMessage.error('更新失败，请稍后重试')  // 显示错误提示
+  console.log('updateUserInfo函数被调用')
+  console.log('当前表单修改状态:', isFormModified.value)
+  console.log('当前用户信息:', userInfo.value)
+  
+  try {
+      // 确保提交数据包含所有必要字段：nickname、email、id、username
+      // 当nickname为空时，使用username作为替代值
+      // 确保昵称不超过10个字符（双重保险）
+      const nicknameValue = userInfo.value.nickname.trim()
+      const finalNickname = nicknameValue !== '' ? nicknameValue.slice(0, 10) : userInfo.value.username
+      const updateData = {
+        nickname: finalNickname,
+        email: userInfo.value.email || '',
+        id: userInfo.value.id || 0,
+        username: userInfo.value.username || ''
       }
-    } else {  // 表单验证失败
-      ElMessage.warning('请检查表单输入是否正确')
-      return false  // 阻止后续流程
-    }
-  })
+      
+      // 调用API更新用户信息
+      const result = await userInfoUpdateService(updateData)
+     
+      // 直接更新userInfo中的nickname字段，立即反映在UI上
+      userInfo.value.nickname = updateData.nickname
+      
+      // 显示成功提示
+      ElMessage.success('个人信息更新成功！')
+      
+      // 合并更新后的数据，保留原有信息
+      const updatedUserInfo = {
+        ...userInfoStore.info,
+        ...updateData
+      }
+      
+      /* 
+        更新Pinia store中的用户信息：
+        使用深拷贝更新，避免引用问题
+        保持store中的数据纯净
+      */
+      userInfoStore.setInfo(JSON.parse(JSON.stringify(updatedUserInfo)))
+      
+      // 更新initialUserInfo以匹配更新后的状态
+      // 这样后续修改时isFormModified才能正确反映变化
+      Object.assign(initialUserInfo, JSON.parse(JSON.stringify(updatedUserInfo)))
+      
+      // 重置表单修改状态
+      isFormModified.value = false
+  } catch (error) {  // 错误处理
+    console.error('更新用户信息失败:', error)
+    console.error('错误详情:', error.response)
+    // 提供更具体的错误信息
+    const errorMsg = error.response?.data?.message || error.message || '更新失败，请稍后重试'
+    ElMessage.error(errorMsg)
+  }
 }
 
-// 组件挂载时重置表单并监听路由变化
+// 组件挂载时重置表单并监听路由变化和store变化
 onMounted(() => {
   resetForm()
   
@@ -183,6 +208,17 @@ onMounted(() => {
         resetForm()
       }
     }
+  )
+  
+  // 监听userInfoStore的变化，当切换用户登录时更新表单
+  watch(
+    () => userInfoStore.info,
+    (newInfo) => {
+      if (newInfo) {
+        resetForm()
+      }
+    },
+    { deep: true }
   )
 })
 
@@ -225,8 +261,8 @@ onBeforeUnmount(() => {
           :key="formKey"
           autocomplete="off"
         >
-          <!-- 登录名称字段（只读） -->
-          <el-form-item label="登录邮箱">
+          <!-- 用户名字段（只读） -->
+          <el-form-item label="用户名">
             <!-- 
               禁用状态输入框：
               v-model - 双向绑定用户名字段
@@ -241,14 +277,23 @@ onBeforeUnmount(() => {
             <el-input v-model="userInfo.email" disabled></el-input>
           </el-form-item>
           
-          <!-- 用户昵称字段（带验证） -->
-          <el-form-item label="用户昵称" prop="nickname">
+          <!-- 用户昵称编辑字段（限制10个字符） -->
+          <el-form-item label="用户昵称">
             <!-- 
               双向绑定昵称字段：
               可编辑状态
               禁用自动填充
+              maxlength属性限制最大输入长度
             -->
-            <el-input v-model="userInfo.nickname" autocomplete="new-nickname"></el-input>
+            <div class="nickname-container">
+              <el-input 
+                v-model="userInfo.nickname" 
+                @input="handleNicknameInput" 
+                autocomplete="new-nickname"
+                maxlength="10"
+                show-word-limit
+              ></el-input>
+            </div>
           </el-form-item>
 
           <!-- 表单提交按钮 -->
@@ -286,5 +331,19 @@ onBeforeUnmount(() => {
   padding: 20px;
   box-sizing: border-box;
   font-size: 16px;
+}
+
+/* 昵称输入框容器样式 */
+.nickname-container {
+  position: relative;
+  width: 100%;
+}
+
+/* 自定义字数统计样式 */
+:deep(.el-input__count) {
+  color: #606266;
+  font-size: 12px;
+  line-height: 1;
+  padding: 0 5px;
 }
 </style>

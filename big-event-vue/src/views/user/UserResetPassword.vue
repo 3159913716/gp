@@ -13,10 +13,9 @@
   useRouter - Vue路由实例
 */
 import { ref, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, type FormInstance } from 'element-plus'
 import useUserInfoStore from '@/stores/userInfo.js'
-import { useRouter } from 'vue-router'
 import { redirectToLogin } from '@/router/index.js'
 import request from '@/utils/request.js'
 import { userUpdatePasswordService } from '@/api/user.js'
@@ -42,7 +41,7 @@ const formKey = ref(0)  // 用于强制重新渲染表单
 */
 // 添加验证码倒计时状态
 const countdown = ref(0)
-let timer = null
+let timer: number | null = null
 
 // 密码可见性控制变量
 const showNewPwd = ref(false)
@@ -59,14 +58,13 @@ const toggleRePwdVisibility = () => {
 }
 
 const pwdModel = ref({
-  oldPwd: '',
   newPwd: '',
   rePwd: '',
   email: '',
   code: ''
 })
 
-/* 
+/*
   自定义确认密码验证函数：
   确保"确认密码"与"新密码"一致
   @param {any} rule - 验证规则对象
@@ -80,46 +78,6 @@ const validateRePwd = (rule: any, value: string, callback: any) => {
     callback(new Error("确认密码与新密码不匹配"))  // 密码不一致错误
   } else {
     callback()  // 验证通过
-  }
-}
-
-/*
-  邮箱格式验证函数
-  @param {any} rule - 验证规则对象
-  @param {string} value - 用户输入值
-  @param {Function} callback - 验证回调函数
-*/
-const validateEmail = (rule: any, value: string, callback: any) => {
-  if (value === '') {
-    callback(new Error('请输入邮箱地址'))
-  } else {
-    // 简单的邮箱格式正则表达式
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-    if (!emailRegex.test(value)) {
-      callback(new Error('请输入有效的邮箱地址'))
-    } else {
-      callback()
-    }
-  }
-}
-
-/*
-  验证码验证函数
-  @param {any} rule - 验证规则对象
-  @param {string} value - 用户输入值
-  @param {Function} callback - 验证回调函数
-*/
-const validateCode = (rule: any, value: string, callback: any) => {
-  if (value === '') {
-    callback(new Error('请输入验证码'))
-  } else {
-    // 验证是否为6位数字
-    const codeRegex = /^\d{6}$/
-    if (!codeRegex.test(value)) {
-      callback(new Error('验证码应为6位数字'))
-    } else {
-      callback()
-    }
   }
 }
 
@@ -161,7 +119,13 @@ const sendCode = async () => {
       // 开始倒计时
       startCountdown()
     } else {
-      ElMessage.error(result && result.message || '发送验证码失败')
+      // 确保传递给ElMessage.error的是字符串类型
+      const errorMessage = typeof result === 'string' 
+        ? result 
+        : (result && typeof result.message === 'string' 
+          ? result.message 
+          : '发送验证码失败')
+      ElMessage.error(errorMessage)
     }
   } catch (error) {
     console.error('发送验证码失败:', error)
@@ -196,14 +160,6 @@ const startCountdown = () => {
   结合了必填、格式和自定义验证
 */
 const rules = {
-  // 原密码验证规则
-  oldPwd: [
-    {
-      pattern: /^\S{6,16}$/,  // 6-16位非空字符
-      message: '密码长度必须是6-16位的非空字符串',
-      trigger: 'blur'
-    }
-  ],
   // 邮箱验证规则
   email: [
     {
@@ -242,17 +198,7 @@ const rules = {
       message: '密码长度必须是6-16位的非空字符串',
       trigger: 'blur'
     },
-    // 自定义验证：新密码不能与原密码相同
-    {
-      validator: (rule: any, value: string, callback: any) => {
-        if (value === pwdModel.value.oldPwd) {
-          callback(new Error('新密码不能与原密码相同'))
-        } else {
-          callback()
-        }
-      },
-      trigger: 'blur'  // 触发条件：失去焦点
-    }
+
   ],
   // 确认密码验证规则
   rePwd: [
@@ -282,7 +228,6 @@ const resetForm = () => {
   
   // 先清空表单数据
   pwdModel.value = {
-    oldPwd: '',
     newPwd: '',
     rePwd: '',
     email: '',
@@ -314,14 +259,19 @@ onBeforeUnmount(() => {
     timer = null
   }
 })
-
-/* 
-  表单提交处理：
-  1. 执行表单验证
-  2. 验证邮箱验证码
-  3. 验证通过后提交密码更新请求
-*/
-const submitForm = async () => {
+  
+  // 定义API响应类型
+  interface ApiResponse {
+    success?: boolean;
+    message?: string;
+    code?: number;
+  }
+  
+  // 表单提交处理：
+  // 1. 执行表单验证
+  // 2. 验证邮箱验证码
+  // 3. 验证通过后提交密码更新请求
+  const submitForm = async () => {
   // 表单实例检查
   if (!formRef.value) return
 
@@ -334,7 +284,7 @@ const submitForm = async () => {
          console.log('Verifying code with:', { email: pwdModel.value.email, code: pwdModel.value.code, type: 'forget' })
          
          // 使用完整的API路径格式
-         const verifyResult = await request.post('/api/email/verify', null, {
+         const verifyResult: ApiResponse = await request.post('/api/email/verify', null, {
            params: {
              email: pwdModel.value.email,
              code: pwdModel.value.code,
@@ -345,8 +295,7 @@ const submitForm = async () => {
     // 验证验证码是否成功
     if (verifyResult && verifyResult.success) {
       // 验证码验证通过，调用密码更新API
-      let updateResult = await userUpdatePasswordService({
-        oldPwd: pwdModel.value.oldPwd,
+      let updateResult: ApiResponse = await userUpdatePasswordService({
         newPwd: pwdModel.value.newPwd
       })
       
