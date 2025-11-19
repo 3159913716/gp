@@ -161,8 +161,10 @@ const updateUserInfo = async () => {
       // 调用API更新用户信息
       const result = await userInfoUpdateService(updateData)
      
-      // 直接更新userInfo中的nickname字段，立即反映在UI上
-      userInfo.value.nickname = updateData.nickname
+      if (result.data?.nickname) {
+  userInfo.value.nickname = result.data.nickname; // 优先使用后端返回值
+  // 再更新 Pinia 和 initialUserInfo...
+}
       
       // 显示成功提示
       ElMessage.success('个人信息更新成功！')

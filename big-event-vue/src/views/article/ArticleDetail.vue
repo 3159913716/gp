@@ -897,14 +897,14 @@ watch(() => route.params.id, () => {
               </div>
               <div class="stats">
                 <div class="stat-item">
-                  <!-- <span class="stat-icon fal fa-heart">👍</span> -->
+                  <span class="stat-icon fal fa-heart">👍</span>
                   <i class="fa-solid fa-heart" style="color:#c0c4cc;"></i>
-                  <!-- <i class="fa-regular fa-heart text-red-500" style="color: #ef4444;"></i> -->
+                  <i class="fa-regular fa-heart text-red-500" style="color: #ef4444;"></i>
 
                   <span class="stat-value">{{ localLikeCount }}</span>
                 </div>
                 <div class="stat-item">
-                  <!-- <span class="stat-icon">💬</span> -->
+                  <span class="stat-icon">💬</span>
                   <i class="fa-solid fa-comment" style="color:#c0c4cc;"></i>
 
                   <span class="stat-value">{{ commentsTotal }}</span>
@@ -928,19 +928,19 @@ watch(() => route.params.id, () => {
         <div class="actions-bar">
           <div :loading="likeLoading" :disabled="likeLoading"
             class="action-btn" @click="toggleLike">
-            <!-- <span class="icon">👍</span> -->
+            <span class="icon">👍</span>
             <i  class="fa-solid fa-heart"
               :style="{ color: likedUi ?'#ef4444' :  '#c0c4cc' }"></i>
-            <!-- <span class="label">{{ likedUi ? '已赞' : '点赞' }}</span> -->
+            <span class="label">{{ likedUi ? '已赞' : '点赞' }}</span>
             <span class="count" style="margin-left: 6px; font-weight: bold; font-size: 14px;">{{ localLikeCount
             }}</span>
           </div>
           <div :loading="favoriteLoading" :disabled="favoriteLoading"
             class="action-btn fav" @click="toggleFavorite">
-            <!-- <span class="icon">⭐</span> -->
+            <span class="icon">⭐</span>
               <i  class="fa-solid fa-star"
               :style="{ color: favorited ?'#ffb800' :  '#c0c4cc' }"></i>
-            <!-- <span class="label">{{ favorited ? '已收藏' : '收藏' }}</span> -->
+            <span class="label">{{ favorited ? '已收藏' : '收藏' }}</span>
             <span class="count" style="margin-left: 6px; font-weight: bold; font-size: 14px;">{{ localCollectCount
             }}</span>
           </div>

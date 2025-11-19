@@ -20,8 +20,8 @@
                 <div class="author-cell">{{ item.followTime }}</div>
                 <div class="time-cell">
                     <el-button type="primary" size="small" @click="viewUserProfile(item.id)" class="view-btn">查看资料</el-button>
-                    <el-button type="success" size="small" @click="followBack(item.id)" class="follow-btn" v-if="!item.isFollow">回关</el-button>
-                    <el-button type="success" size="small" disabled class="followed-btn" v-else>已回关</el-button>
+                    <el-button type="success" size="small" @click="toggleFollow(item.id, item.isFollow)" class="follow-btn" v-if="!item.isFollow">回关</el-button>
+                    <el-button type="warning" size="small" @click="toggleFollow(item.id, item.isFollow)" class="followed-btn" v-else>取消回关</el-button>
                 </div>
             </div>
         </div>
@@ -172,30 +172,33 @@ export default {
       this.$router.push(`/user/${Id}`);
     },
     
-    // 回关用户
-    followBack(Id) {
-      this.$confirm('确定要关注这个用户吗？', '提示', {
+    // 切换关注/取消关注状态
+    toggleFollow(Id, isFollowing) {
+      const operationText = isFollowing ? '取消关注' : '关注';
+      const confirmText = isFollowing ? '确定要取消关注这个用户吗？' : '确定要关注这个用户吗？';
+      
+      this.$confirm(confirmText, '提示', {
         confirmButtonText: '确定',
         cancelButtonText: '取消',
-        type: 'info'
+        type: isFollowing ? 'warning' : 'info'
       }).then(async () => {
         try {
-          console.log(`开始关注用户ID: ${Id}`);
+          console.log(`开始${operationText}用户ID: ${Id}`);
           // 使用guanzhu API模块中的toggleFollow方法
           await guanzhu.toggleFollow(Id);
           
           // 更新粉丝列表中的isFollow状态
           const fanIndex = this.fansList.findIndex(item => item.id === String(Id));
           if (fanIndex !== -1) {
-            this.fansList[fanIndex].isFollow = true;
-            console.log(`已更新用户ID ${Id} 的关注状态为已关注`);
+            this.fansList[fanIndex].isFollow = !isFollowing;
+            console.log(`已更新用户ID ${Id} 的关注状态为${this.fansList[fanIndex].isFollow ? '已关注' : '未关注'}`);
           }
           
-          this.$message.success('关注成功');
-          console.log('关注成功');
+          this.$message.success(`${operationText}成功`);
+          console.log(`${operationText}成功`);
         } catch (err) {
-          console.error('关注失败:', err);
-          const errorMsg = err.response?.data?.message || err.message || '关注失败，请稍后重试';
+          console.error(`${operationText}失败:`, err);
+          const errorMsg = err.response?.data?.message || err.message || `${operationText}失败，请稍后重试`;
           this.$message.error(errorMsg);
         }
       }).catch(() => {

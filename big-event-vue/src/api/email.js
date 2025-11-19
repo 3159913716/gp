@@ -71,7 +71,8 @@ const emailAndPasswordAPI = {
       method: 'POST', // 显式指定POST方法
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded'
-      }
+      },
+      timeout: 30000 // 增加超时时间到30秒，减少超时错误
     }).then(normalize);
   },
 

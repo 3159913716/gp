@@ -76,6 +76,7 @@ public class UserServiceImpl implements UserService {
     public void updateAvatar(String avatarUrl) {
         Map<String, Object> map = ThreadLocalUtil.get();
         Integer id = (Integer) map.get("id");
+        log.info("updateAvatar中使用的id为{}",id);
         userMapper.updateAvatar(avatarUrl, id);
     }
 

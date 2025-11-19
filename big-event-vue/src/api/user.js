@@ -113,16 +113,15 @@ export const userInfoUpdateService = (userInfoData) => {
  * @param {string} avatarUrl 头像URL地址
  * @returns {Promise} 包含更新结果的Promise
  * API路径：PATCH /user/updateAvatar
- * 内容类型：application/x-www-form-urlencoded
+ * 注意：avatarUrl必须作为URL查询参数传递
  */
 export const userAvatarUpdateService = (avatarUrl) => {
   /**
    * 根据接口文档要求：
-   * 1. 使用JSON格式发送请求
-   * 2. 参数名必须是avatarUrl
-   * 3. 内容类型应为application/json
+   * 1. avatarUrl必须作为URL查询参数传递
+   * 2. 使用encodeURIComponent确保URL参数的安全性
    */
-  return request.patch('/user/updateAvatar', { avatarUrl });
+  return request.patch(`/user/updateAvatar?avatarUrl=${encodeURIComponent(avatarUrl)}`);
 }
 
 /**

@@ -480,6 +480,7 @@ const login = async () => {
         
         if (result.code === 0) {
           ElMessage.success(result.msg || '登录成功')
+          console.log(result.data)
           tokenStore.setToken(result.data)
           router.push('/')
         } else {
