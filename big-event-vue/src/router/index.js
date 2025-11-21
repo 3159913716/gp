@@ -49,8 +49,13 @@ import UcenterFansVue from '@/views/ucenter/UcenterFans.vue';
 //成为作者相关视图
 import UcenterAuthorVue from '@/views/author/UcenterAuthor.vue';
 
-// 统一布局视图组件 - 支持普通用户、作者和管理员
+//用户布局视图
+import UserLayoutVue from '@/views/UserLayout.vue';
+
+// 作者主布局视图组件
 import LayoutVue from '@/views/Layout.vue';
+// 管理员布局
+import AdminLayoutVue from '@/views/admin/AdminLayout.vue';
 /**
  * 创建路由实例
  * 
@@ -210,8 +215,14 @@ router.beforeEach(async (to, from, next) => {
       const adminRoute = router.getRoutes().find(route => route.path === '/admin')
       
       if (adminRoute) {
-        // 统一使用Layout.vue作为布局组件，内部已实现基于role的动态显示
-        adminRoute.components = { default: LayoutVue }
+        // 根据用户角色设置布局组件
+        if (userRole === ROLE.ADMIN) {
+          adminRoute.components = { default: AdminLayoutVue } // 管理员使用AdminLayout
+        } else if (userRole === ROLE.AUTHOR) {
+          adminRoute.components = { default: LayoutVue } // 作者使用LayoutVue
+        } else {
+          adminRoute.components = { default: UserLayoutVue } // 普通用户使用UserLayoutVue
+        }
       }
       
       // 根据角色控制访问权限（可选）

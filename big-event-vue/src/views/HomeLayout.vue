@@ -26,15 +26,45 @@ const isScrolled = ref(false)
 const isMobile = computed(() => window.innerWidth < 768)
 const isLoggedIn = computed(() => !!tokenStore.token)
 
-// 分类列表（模拟数据）
+// 分类列表（接口数据）
 const categories = ref([])
-// 默认分类兜底数据（请求失败时使用）
-const defaultCategories = [
-  { id: 1, categoryName: '技术资讯', categoryAlias: 'tech' },
-  { id: 2, categoryName: '行业动态', categoryAlias: 'industry' },
-  { id: 3, categoryName: '经验分享', categoryAlias: 'experience' },
-  { id: 4, categoryName: '教程学习', categoryAlias: 'tutorial' }
-]
+
+// 按文章数量降序排序分类的辅助函数
+const getSortedCategories = () => {
+  return [...categories.value].sort((a, b) => {
+    const countA = Number(a.articleCount ?? a.article_count ?? 0)
+    const countB = Number(b.articleCount ?? b.article_count ?? 0)
+    return countB - countA
+  })
+}
+
+// 热门分类展示（按文章数量降序排序，取前4个）
+const allCategories = computed(() => {
+  const sorted = getSortedCategories()
+  // 返回前4个热门分类
+  return sorted.slice(0, 4)
+})
+
+// 剩余的分类（用于下拉菜单，保留排序后的顺序）
+const remainingCategories = computed(() => {
+  const sorted = getSortedCategories()
+  // 返回排序后的剩余分类
+  return sorted.slice(4)
+})
+
+// 处理分类点击事件
+const handleCategoryClick = (categoryId) => {
+  if (categoryId === null) {
+    // 点击首页，跳转到首页
+    router.push('/')
+  } else {
+    // 点击分类，跳转到对应分类页面
+    router.push({
+      path: '/',
+      params: { categoryId: categoryId }
+    })
+  }
+}
 
 // 生命周期钩子
 onMounted(() => {
@@ -125,11 +155,6 @@ const simulatePageLoad = () => {
   }, 200)
 }
 
-// 切换移动端菜单
-const toggleMobileMenu = () => {
-  mobileMenuOpen.value = !mobileMenuOpen.value
-}
-
 // 搜索文章（带防抖优化）
 const handleSearch = () => {
   const keyword = searchKeyword.value.trim()
@@ -138,14 +163,7 @@ const handleSearch = () => {
   }
 }
 
-// 处理分类点击
-const handleCategoryClick = (categoryId) => {
-  router.push(`/category/${categoryId}`)
-  // 在移动端点击后关闭菜单
-  if (isMobile.value) {
-    mobileMenuOpen.value = false
-  }
-}
+// 处理分类点击函数已在上方定义
 
 // 处理登录
 const handleLogin = () => {
@@ -199,39 +217,17 @@ const goToProfile = () => {
   router.push('/admin/')
 }
 
-// 加载导航分类（只取前4个）
+// 加载导航分类（显示所有分类，前4个主分类，其余在下拉菜单中）
 const loadNavCategories = async () => {
   try {
-    // 读取当前登录用户ID（兼容多字段）
-    const currentUserId = userInfoStore?.info?.id ?? userInfoStore?.info?.userId
-    const params = (isLoggedIn.value && currentUserId)
-      ? { userId: currentUserId }
-      : {}
-
-    const res = await articleCategoryListService(params)
+    // 不传递userId参数，获取所有分类
+    const res = await articleCategoryListService()
     const payload = res?.data ?? res
     let list = Array.isArray(payload?.items)
       ? payload.items
       : (Array.isArray(payload?.list) ? payload.list : (Array.isArray(payload) ? payload : []))
 
-    // 优先使用后端标识位 userCreated 进行过滤
-    if (isLoggedIn.value) {
-      const filteredByFlag = list.filter(c => {
-        const flag = c.userCreated ?? c.isUserCreated ?? c.is_user_created
-        return flag === true || flag === 'true' || flag === 1 || flag === '1'
-      })
-      if (filteredByFlag.length > 0) list = filteredByFlag
-    }
-
-    // 客户端兜底过滤：若后端未按userId过滤且无标识位，前端按创建者ID过滤
-    if (isLoggedIn.value && currentUserId && (!list.length || list.some(c => c.userCreated == null))) {
-      list = list.filter(c => {
-        const ownerId = c.createUser ?? c.create_user ?? c.userId ?? c.createUserId
-        return ownerId == null ? true : String(ownerId) === String(currentUserId)
-      })
-    }
-
-    categories.value = list.slice(0, 4).map(c => ({
+    categories.value = list.map(c => ({
       id: c.id,
       categoryName: c.categoryName ?? c.category_name ?? '',
       categoryAlias: c.categoryAlias ?? c.category_alias ?? ''
@@ -282,29 +278,34 @@ watch(() => tokenStore.token, (newToken, oldToken) => {
       <header class="navbar" :class="{ 'scrolled': isScrolled }">
       <div class="container">
         <div class="logo">
-          <img src="@/assets/logo.png" alt="大事件" class="logo-img" loading="lazy">
           <h1 class="logo-text">大事件资讯</h1>
-        </div>
-        
-        <!-- 移动端菜单按钮 -->
-        <button class="mobile-menu-btn" v-if="isMobile" @click="toggleMobileMenu">
-          <span class="menu-icon" :class="{ 'open': mobileMenuOpen }"></span>
-        </button>
-        
+        </div>      
         <!-- 导航菜单 -->
-        <nav class="nav-menu" :class="{ 'mobile-open': mobileMenuOpen && isMobile }">
-          <ul class="category-list">
-            <li class="category-item" @click="router.push('/')">首页</li>
-            <li 
-              v-for="category in categories" 
-              :key="category.id" 
-              class="category-item"
-              @click="handleCategoryClick(category.id)"
-            >
-              {{ category.categoryName }}
-            </li>
-          </ul>
-        </nav>
+        <div class="nav-bar" style="display:flex;align-items:center;gap:4px;padding:16px 0 8px 0;">
+          <ElButton type="primary" @click="handleCategoryClick(null)">首页</ElButton>
+          <template v-for="cat in allCategories" :key="cat.id">
+            <ElButton type="default" @click="handleCategoryClick(cat.id)">{{ cat.categoryName }}</ElButton>
+          </template>
+          <!-- 下拉菜单展示剩余分类 -->
+          <ElDropdown v-if="remainingCategories.length > 0">
+            <ElButton type="default" class="dropdown-button">
+              更多分类
+              <span class="el-icon-arrow-down el-icon--right"></span>
+              
+            </ElButton>
+            <template #dropdown>
+              <ElDropdownMenu>
+                <ElDropdownItem 
+                  v-for="cat in remainingCategories" 
+                  :key="cat.id"
+                  @click="handleCategoryClick(cat.id)"
+                >
+                  {{ cat.categoryName }}
+                </ElDropdownItem>
+              </ElDropdownMenu>
+            </template>
+          </ElDropdown>
+        </div>
         
         <!-- 搜索区域 -->
         <div class="search-area">
@@ -329,8 +330,8 @@ watch(() => tokenStore.token, (newToken, oldToken) => {
               </span>
               <template #dropdown>
                 <ElDropdownMenu>
-                  <ElDropdownItem @click="goToProfile">个人中心</ElDropdownItem>
-                  <ElDropdownItem @click="handleLogout">退出登录</ElDropdownItem>
+                  <ElDropdownItem @click="goToProfile" >个人中心</ElDropdownItem>
+                  <ElDropdownItem @click="handleLogout" >退出登录</ElDropdownItem>
                 </ElDropdownMenu>
               </template>
             </ElDropdown>
@@ -493,7 +494,7 @@ watch(() => tokenStore.token, (newToken, oldToken) => {
 /* 导航菜单 */
 .nav-menu {
   flex: 1;
-  margin-left: 60px;
+  margin-left: 30px;
   transition: all 0.3s ease;
 }
 
@@ -510,7 +511,7 @@ watch(() => tokenStore.token, (newToken, oldToken) => {
   color: #333;
   cursor: pointer;
   transition: all 0.3s ease;
-  padding: 8px 0;
+  padding: 4px 0;
   white-space: nowrap;
   position: relative;
 }
@@ -535,11 +536,81 @@ watch(() => tokenStore.token, (newToken, oldToken) => {
   width: 100%;
 }
 
+/* 导航按钮样式定制 */
+.nav-bar {
+  flex: 1;
+  margin-left: 30px;
+}
+
+.nav-bar .el-button {
+   border: none !important;
+   box-shadow: none !important;
+   background: none !important;
+   padding: 8px 6px;
+   position: relative;
+   color: #333;
+   font-size: 16px;
+}
+
+.nav-bar .el-button:hover {
+  color: #1890ff;
+  background: none !important;
+}
+
+.nav-bar .el-button::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 0;
+  height: 2px;
+  background-color: #1890ff;
+  transition: width 0.3s ease;
+}
+
+.nav-bar .el-button:hover::after {
+  width: 80%;
+}
+
+/* 下拉按钮样式调整 - 与导航按钮保持一致 */
+.nav-bar .dropdown-button {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 6px !important;
+}
+
+/* 下拉菜单样式 */
+.el-dropdown-menu {
+  border-radius: 4px;
+  box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
+}
+
+.el-dropdown-item {
+  padding: 8px 16px;
+  transition: all 0.3s ease;
+}
+
+.el-dropdown-item:hover {
+  color: #1890ff;
+  background-color: rgba(24, 144, 255, 0.05);
+}
+
+/* 移除选中按钮的特殊样式 */
+.nav-bar .el-button--primary {
+  color: #333;
+}
+
+.nav-bar .el-button--primary:hover {
+  color: #1890ff;
+}
+
 /* 搜索区域 */
 .search-area {
   display: flex;
   align-items: center;
-  margin: 0 40px;
+  margin: 0 35px;
   transition: all 0.3s ease;
   position: relative;
 }
@@ -753,6 +824,49 @@ watch(() => tokenStore.token, (newToken, oldToken) => {
     gap: 15px;
     padding-bottom: 5px;
     justify-content: center;
+  }
+  
+  /* 移动端导航按钮样式 */
+  .nav-bar {
+    margin-left: 0;
+    order: 3;
+    width: 100%;
+    margin-top: 10px;
+    display: flex;
+    flex-direction: row;
+    overflow-x: auto;
+    padding-bottom: 5px;
+    justify-content: center;
+    gap: 10px;
+  }
+  
+  .nav-bar .el-button {
+    white-space: nowrap;
+    font-size: 14px;
+    padding: 6px 12px;
+  }
+  
+  .nav-bar .el-button:active {
+    background-color: rgba(24, 144, 255, 0.05);
+  }
+  
+  /* 移动端下拉按钮样式 - 与导航按钮保持一致 */
+  .nav-bar .dropdown-button {
+    display: flex;
+    align-items: center;
+    padding: 8px 6px !important;
+  }
+  
+  /* 移动端下拉菜单样式 */
+  .el-dropdown-menu {
+    max-width: 200px;
+    width: 100%;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  }
+  
+  .el-dropdown-item {
+    padding: 10px 16px;
+    font-size: 14px;
   }
   
   .search-area,

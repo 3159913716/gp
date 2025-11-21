@@ -1,23 +1,24 @@
 <script setup>
-import { ref, onMounted, onUnmounted, watch, computed } from 'vue'
-import { useRouter, useRoute } from 'vue-router'
-import { ElTabs, ElTabPane, ElCard, ElAvatar, ElPagination } from 'element-plus'
+// 在导入部分添加缺少的组件导入
+import { ElCard, ElAvatar, ElPagination, ElButton } from 'element-plus'
+import { StarFilled } from '@element-plus/icons-vue'
 import articleHomeApi from '@/api/articlehome.js'
 import defaultCover from '@/assets/default.png'
-import coverImgAsset from '@/assets/cover.jpg'
-import logoImgAsset from '@/assets/logo.png'
-import avatarImgAsset from '@/assets/avatar.jpg'
 import { articleCategoryListService } from '@/api/article.js'
 import { useTokenStore } from '@/stores/token.js'
 import useUserInfoStore from '@/stores/userInfo.js'
+import { ElMessage } from 'element-plus' // 添加ElMessage导入
 
-console.log('HomePage.vue 组件加载')
+// 添加avatarImgAsset变量定义，使用defaultCover作为默认头像
+const avatarImgAsset = defaultCover
+
+import { ref, onMounted, onUnmounted, watch, computed } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
+
 
 // 新增：登录状态判断（用于分类过滤逻辑）
 const tokenStore = useTokenStore()
 const isLoggedIn = computed(() => !!tokenStore.token)
-// 排序方式：最新或热门
-const activeSort = ref('latest')
 
 // 文章列表数据
 const articles = ref([])
@@ -59,6 +60,9 @@ const mergePersistedCounts = (list) => {
 
 // 热门分类数据（模拟）
 const hotCategories = ref([])
+
+// 排序方式（目前只支持最新，可扩展）
+const activeSort = ref('new')
 // 默认分类兜底数据（请求失败时使用）
 const defaultCategories = [
   { id: 1, categoryName: '技术资讯', categoryAlias: 'tech' },
@@ -67,14 +71,7 @@ const defaultCategories = [
   { id: 4, categoryName: '教程学习', categoryAlias: 'tutorial' }
 ]
 
-// 最新文章数据（模拟）
-const latestArticles = ref([
-  { id: 101, title: 'Vue 3 Composition API 实战技巧', createTime: '2024-01-20' },
-  { id: 102, title: 'React 18 新特性深度解析', createTime: '2024-01-19' },
-  { id: 103, title: 'Node.js 性能优化指南', createTime: '2024-01-18' },
-  { id: 104, title: '前端工程化最佳实践', createTime: '2024-01-17' },
-  { id: 105, title: 'TypeScript 进阶教程', createTime: '2024-01-16' }
-])
+
 
 // 分页数据
 const pageNum = ref(1)
@@ -101,48 +98,23 @@ const onCoverError = (article) => {
 // 头像加载失败时回退默认头像
 const onAvatarError = (article) => {
   if (article) {
-    article.avatar = avatarImgAsset
+    article.avatar = defaultCover
   }
 }
 
 // 生成模拟文章数据（兜底展示）
-const generateMockArticles = (page, size) => {
-  const mockArticles = []
-  const startId = (page - 1) * size + 1
-  for (let i = 0; i < size; i++) {
-    const id = startId + i
-    mockArticles.push({
-      id,
-      title: `大事件资讯第${id}期 - 前端开发技术前沿动态`,
-      coverImg: id % 3 === 0 ? coverImgAsset : (id % 3 === 1 ? logoImgAsset : defaultCover),
-      content: '这是一篇关于前端开发技术的精彩文章，包含了最新的技术动态、实战经验分享和行业趋势分析...',
-      categoryId: (id % 4) + 1,
-      categoryName: ['技术资讯', '行业动态', '经验分享', '教程学习'][id % 4],
-      author: `作者${id % 10 + 1}`,
-      avatar: avatarImgAsset,
-      createTime: `2024-01-${String(20 - (id % 15)).padStart(2, '0')}`,
-      // 移除阅读量相关字段
-      likeCount: Math.floor(Math.random() * 200) + 10,
-      commentCount: Math.floor(Math.random() * 50) + 5,
-      collectCount: Math.floor(Math.random() * 50)
-    })
-  }
-  return mockArticles
-}
 
-// 根据当前排序选项对文章列表进行排序
+// 随机打乱文章列表（Fisher–Yates 洗牌）——用于在客户端随机展示当前返回的文章集合
 const sortArticles = (list) => {
   if (!Array.isArray(list)) return []
-  if (activeSort.value === 'hot') {
-    // 热门：按点赞数从大到小
-    return [...list].sort((a, b) => Number(b.likeCount || 0) - Number(a.likeCount || 0))
+  const arr = [...list]
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1))
+    const tmp = arr[i]
+    arr[i] = arr[j]
+    arr[j] = tmp
   }
-  // 最新：按发布时间从新到旧
-  return [...list].sort((a, b) => {
-    const ta = new Date(a.createTime || 0).getTime()
-    const tb = new Date(b.createTime || 0).getTime()
-    return tb - ta
-  })
+  return arr
 }
 
 // 加载文章列表（接入真实接口，失败兜底为模拟数据）
@@ -188,8 +160,10 @@ const loadArticles = async () => {
       pageSize: pageSize.value,
       // 分类筛选（若未选择则不传）
       categoryId: selectedCategoryId.value ?? undefined,
-      // 强制首页最新文章只显示已发布内容（与角色无关）
-      state: '已发布'
+      // 强制首页只显示已发布内容（与角色无关）
+      state: '已发布',
+      // 排序：使用 activeSort 响应式变量
+      sort: activeSort.value
     }
 
     const res = await articleHomeApi.getHomeArticles(params)
@@ -228,22 +202,9 @@ const loadArticles = async () => {
     console.log('文章列表加载完成，共', articles.value.length, '条数据')
     await loadFullContentsFor(articles.value)
   } catch (error) {
-    console.error('加载文章列表失败，切换到模拟数据:', error?.message || error)
-    // 兜底：使用本地预设的模拟数据展示
-    let mock = generateMockArticles(pageNum.value, pageSize.value)
-    const keyword = selectedKeyword.value?.trim()
-    if (keyword) {
-      mock = mock.filter(a => String(a.title).includes(keyword) || String(a.content).includes(keyword))
-    } else if (selectedCategoryId.value != null) {
-      mock = mock.filter(a => a.categoryId === selectedCategoryId.value)
-    }
-    const merged = mergePersistedCounts(mock)
-    const sorted = sortArticles(merged)
-    articles.value = sorted
-    total.value = 120
-  }
+    ElMessage.error('文章列表加载失败，请稍后重试')
 }
-
+}
 // 加载当前列表的全文内容（并发，错误不打断）
 const loadFullContentsFor = async (list) => {
   if (!Array.isArray(list)) return
@@ -317,53 +278,36 @@ const handleCurrentChange = (num) => {
 const router = useRouter()
 const route = useRoute()
 
-// 同步路由中的分类ID到本地状态
-const syncCategoryFromRoute = () => {
-  const raw = route.params?.id ?? route.query?.categoryId
+// 同步路由中的分类ID到本地状态（增强版，支持多种参数形式）
+const syncCategoryFromRouteEnhanced = () => {
+  // 支持多种参数形式：
+  // 1. route.params.categoryId (来自HomeLayout.vue的跳转)
+  // 2. route.params.id (原有的参数形式)
+  // 3. route.query.categoryId (查询参数形式)
+  const raw = route.params?.categoryId ?? route.params?.id ?? route.query?.categoryId
   const num = Number(raw)
   selectedCategoryId.value = Number.isFinite(num) ? num : null
 }
-// 新增：同步路由中的搜索关键词到本地状态
+
+// 同步路由中的搜索关键词到本地状态
 const syncKeywordFromRoute = () => {
   selectedKeyword.value = String(route.query?.keyword || '').trim()
 }
-// 监听路由中分类ID变化，保持首页最新文章模块按分类展示
-watch(() => route.params.id, () => {
-  syncCategoryFromRoute()
-  // 分类切换时清除搜索状态
-  selectedKeyword.value = ''
-  activeSort.value = 'latest'
-  pageNum.value = 1
-  loadArticles()
-  // 路由参数变化时也滚动到顶部
-  setTimeout(() => {
-    scrollToTop()
-  }, 100)
-})
-// 同时监听查询参数中的categoryId（兼容从其他位置跳转）
-watch(() => route.query.categoryId, () => {
-  syncCategoryFromRoute()
-  // 清除搜索状态
-  selectedKeyword.value = ''
-  activeSort.value = 'latest'
-  pageNum.value = 1
-  loadArticles()
-  // 路由参数变化时也滚动到顶部
-  setTimeout(() => {
-    scrollToTop()
-  }, 100)
-})
-// 新增：监听搜索关键词变化，按关键词检索并展示
-watch(() => route.query.keyword, () => {
+
+// 监听路由参数变化，更新选中的分类和搜索关键词
+watch(() => [route.params, route.query], () => {
+  syncCategoryFromRouteEnhanced()
   syncKeywordFromRoute()
-  activeSort.value = 'latest'
+  
+  // 重置页码并加载文章
   pageNum.value = 1
   loadArticles()
-  // 搜索时也滚动到顶部
+  
+  // 路由参数变化时滚动到顶部
   setTimeout(() => {
     scrollToTop()
   }, 100)
-})
+}, { immediate: true, deep: true })
 
 // 跳转到文章详情
 const goToArticleDetail = (articleId) => {
@@ -381,54 +325,19 @@ const goToCategory = (categoryId) => {
   }, 100)
 }
 
-// 加载右侧“最新文章”板块（仅标题与创建日期）
-const loadLatestArticles = async () => {
-  try {
-    const res = await articleHomeApi.getHomeArticles({ pageNum: 1, pageSize: 5, state: '已发布' })
-    const payload = res?.data ?? res
-    const list = Array.isArray(payload?.item)
-      ? payload.item
-      : (Array.isArray(payload?.items) ? payload.items : (Array.isArray(payload?.list) ? payload.list : []))
+// 右侧热门/最新文章逻辑已移除（仅展示主列表）
 
-    latestArticles.value = list.map(item => ({
-      id: item.id,
-      title: item.title,
-      createTime: item.createTime ?? item.create_time ?? ''
-    }))
-  } catch (error) {
-    console.error('加载最新文章失败:', error?.message || error)
-    latestArticles.value = []
-  }
-}
-// 加载右侧热门分类（只取前4个，登录用户显示自己创建的分类；未登录显示公开分类）
-const loadHotCategories = async () => {
-  try {
-    const res = await articleCategoryListService()
-    const payload = res?.data ?? res
-    let list = Array.isArray(payload?.items)
-      ? payload.items
-      : (Array.isArray(payload?.list) ? payload.list : (Array.isArray(payload) ? payload : []))
+// 计算属性：选中分类与该分类的预览文章
+const selectedCategory = computed(() => {
+  return hotCategories.value.find(c => Number(c.id) === Number(selectedCategoryId.value)) || null
+})
+const selectedCategoryName = computed(() => selectedCategory.value?.categoryName || '')
+const selectedCategoryAlias = computed(() => selectedCategory.value?.categoryAlias || '')
 
-    // 仅在已登录时按 userCreated 过滤为“当前用户创建的分类”
-    if (isLoggedIn.value) {
-      list = list.filter(c => {
-        const flag = c.userCreated ?? c.isUserCreated ?? c.is_user_created
-        return flag === true || flag === 'true' || flag === 1 || flag === '1'
-      })
-    }
-
-    hotCategories.value = list.slice(0, 4).map(c => ({
-      id: c.id,
-      categoryName: c.categoryName ?? c.category_name ?? '',
-      categoryAlias: c.categoryAlias ?? c.category_alias ?? ''
-      // articleCount 可选：若后端提供则展示
-    }))
-  } catch (e) {
-    console.error('加载热门分类失败:', e?.message || e)
-    // 使用默认分类兜底展示（未登录场景提供基础可视内容）
-    hotCategories.value = defaultCategories.slice(0,4)
-  }
-}
+const categoryPreviewArticles = computed(() => {
+  if (!selectedCategoryId.value) return []
+  return articles.value.filter(a => Number(a.categoryId) === Number(selectedCategoryId.value)).slice(0, 5)
+})
 // 返回顶部按钮显示控制
 const showBackToTop = ref(false)
 const handleScroll = () => {
@@ -442,11 +351,22 @@ const scrollToTop = () => {
   window.scrollTo({ top: 0, behavior: 'smooth' })
 }
 
+
+
+// 加载热门分类（补充真实接口，兜底默认）
+const loadHotCategories = async () => {
+  try {
+    const res = await articleCategoryListService()
+    hotCategories.value = Array.isArray(res?.data) ? res.data : defaultCategories
+  } catch {
+    hotCategories.value = defaultCategories
+  }
+}
+
 onMounted(() => {
-  syncCategoryFromRoute()
+  syncCategoryFromRouteEnhanced()
   syncKeywordFromRoute()
   loadArticles()
-  loadLatestArticles()
   loadHotCategories()
   // 监听滚动以控制返回顶部按钮显示
   window.addEventListener('scroll', handleScroll, { passive: true })
@@ -457,19 +377,38 @@ onUnmounted(() => {
   window.removeEventListener('scroll', handleScroll)
 })
 </script>
-
 <template>
   <div class="home-page">
-    <div class="content-wrapper">
+    <!-- 新增：导航栏分类展示 -->
+      <div class="content-wrapper">
       <!-- 左侧文章列表 -->
       <div class="article-list-container">
-        <!-- 排序选项卡 -->
-        <ElTabs v-model="activeSort" @tab-click="handleSortChange" class="sort-tabs">
-          <ElTabPane label="最新文章" name="latest"></ElTabPane>
-          <ElTabPane label="热门文章" name="hot"></ElTabPane>
-        </ElTabs>
-        
+        <!-- 直接展示文章列表 -->
         <!-- 文章列表 -->
+        <!-- 分类详情（当通过分类跳转或选择分类时显示） -->
+        <div v-if="selectedCategoryId" class="category-detail-card">
+          <div class="category-header">
+            <div>
+              <h3 class="category-title">分类：{{ selectedCategoryName }}</h3>
+              <div class="category-alias">别名：{{ selectedCategoryAlias }}</div>
+            </div>
+            <div class="category-actions">
+              <ElButton type="text" @click="goToCategory(selectedCategoryId)">查看该分类更多文章</ElButton>
+            </div>
+          </div>
+          <div class="category-articles">
+            <ElCard v-for="a in categoryPreviewArticles" :key="a.id" class="category-article-card" @click="goToArticleDetail(a.id)">
+              <div class="cat-thumb" v-if="a.coverImg">
+                <img :src="a.coverImg" alt="" @error="onCoverError(a)" />
+              </div>
+              <div class="cat-meta">
+                <div class="cat-title">{{ a.title }}</div>
+                <div class="cat-info">{{ a.createTime }} · {{ a.likeCount }} 👍</div>
+              </div>
+            </ElCard>
+          </div>
+        </div>
+
         <div class="articles">
           <ElCard 
             v-for="article in articles" 
@@ -501,14 +440,16 @@ onUnmounted(() => {
                 <span class="publish-time">{{ article.createTime }}</span>
               </div>
               <div class="list-actions">
-                <ElButton class="action-btn like display-only" type="default">
-                  <span class="icon">👍</span>
-                  
+                <ElButton class="action-btn like display-only" type="default" circle>
+                  <el-icon :size="20" style="color:#409eff;">
+                    <StarFilled />
+                  </el-icon>
                   <span class="count">{{ article.likeCount }}</span>
                 </ElButton>
-                <ElButton class="action-btn fav display-only" type="default">
-                  <span class="icon">⭐</span>
-        
+                <ElButton class="action-btn fav display-only" type="default" circle>
+                  <el-icon :size="20" style="color:#ffb800;">
+                    <StarFilled />
+                  </el-icon>
                   <span class="count">{{ article.collectCount }}</span>
                 </ElButton>
               </div>
@@ -532,37 +473,7 @@ onUnmounted(() => {
       
       <!-- 右侧边栏 -->
       <aside class="sidebar">
-        <!-- 热门分类 -->
-        <div class="sidebar-section">
-          <h3 class="section-title">热门分类</h3>
-          <div class="category-list">
-            <div 
-              v-for="category in hotCategories" 
-              :key="category.id"
-              class="category-item"
-              @click="goToCategory(category.id)"
-            >
-              <span class="category-name">{{ category.categoryName }}</span>
-              <span v-if="category.articleCount !== undefined && category.articleCount !== null" class="article-count">{{ category.articleCount }} 篇</span>
-            </div>
-          </div>
-        </div>
-        
-        <!-- 最新文章 -->
-        <div class="sidebar-section">
-          <h3 class="section-title">最新文章</h3>
-          <div class="latest-articles">
-            <div 
-              v-for="article in latestArticles" 
-              :key="article.id"
-              class="latest-article-item"
-              @click="goToArticleDetail(article.id)"
-            >
-              <span class="article-title">{{ article.title }}</span>
-              <span class="publish-date">{{ article.createTime }}</span>
-            </div>
-          </div>
-        </div>
+          <!-- 右侧：已移除热门/最新文章列表，保留关于我们等内容 -->
         
         <!-- 关于我们 -->
         <div class="sidebar-section">
@@ -727,6 +638,11 @@ onUnmounted(() => {
   overflow: hidden;
 }
 
+/* 标准属性兼容性（补充 line-clamp） */
+.full-text {
+  line-clamp: 6;
+}
+
 /* 确保内容区域有足够的最小高度 */
 .content-wrapper {
   min-height: 500px;
@@ -795,14 +711,11 @@ onUnmounted(() => {
   border: none !important; /* 取消黑色边框 */
   background-color: #fff !important; /* 背景与卡片一致 */
 }
-.list-actions .action-btn .icon {
-  font-size: 16px;
-  margin-right: 6px;
-}
 .list-actions .action-btn .count {
   margin-left: 6px;
   color: #909399;
-  font-size: 12px;
+  font-size: 13px;
+  font-weight: 500;
 }
 
 /* 分页 */
@@ -907,8 +820,103 @@ onUnmounted(() => {
   line-height: 1.5;
   display: -webkit-box;
   -webkit-line-clamp: 2;
+  line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
+}
+
+/* 中间分类详情卡片 */
+.category-detail-card {
+  margin-bottom: 20px;
+}
+.category-detail-card .category-header {
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  margin-bottom:12px;
+}
+.category-title {
+  font-size:18px;
+  margin:0;
+  color:#303133;
+}
+.category-alias {
+  font-size:12px;
+  color:#909399;
+}
+.category-articles {
+  display:flex;
+  gap:12px;
+}
+.category-article-card {
+  display:flex;
+  gap:12px;
+  align-items:center;
+  padding:10px;
+  width:100%;
+  cursor:pointer;
+}
+.category-article-card .cat-thumb img {
+  width:100px;
+  height:64px;
+  object-fit:cover;
+  border-radius:6px;
+}
+.category-article-card .cat-meta {
+  flex:1;
+}
+.cat-title {
+  font-weight:500;
+  color:#303133;
+}
+.cat-info {
+  font-size:12px;
+  color:#909399;
+  margin-top:6px;
+}
+
+
+
+/* 右侧热门文章样式 */
+.popular-section .popular-articles {
+  display:flex;
+  flex-direction:column;
+  gap:12px;
+}
+.popular-item {
+  display:flex;
+  gap:10px;
+  align-items:center;
+  cursor:pointer;
+}
+.popular-thumb {
+  width:64px;
+  height:48px;
+  object-fit:cover;
+  border-radius:6px;
+  flex-shrink:0;
+}
+.popular-text {
+  flex:1;
+}
+.popular-title {
+  font-size:14px;
+  color:#303133;
+  line-height:1.4;
+  display:-webkit-box;
+  -webkit-box-orient:vertical;
+  -webkit-line-clamp:2;
+  line-clamp: 2;
+  overflow:hidden;
+}
+.popular-meta {
+  font-size:12px;
+  color:#909399;
+  margin-top:6px;
+}
+.popular-meta .likes {
+  color:#ff7a45;
+  font-weight:500;
 }
 
 .publish-date {

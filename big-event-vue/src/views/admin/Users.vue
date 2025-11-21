@@ -69,6 +69,7 @@
     <el-dialog title="修改用户角色" v-model="roleDialog.visible" width="500px">
       <div>为用户 <strong>{{ roleDialog.target?.username }}</strong> 选择新角色：</div>
       <el-select v-model="roleDialog.newRole" placeholder="选择角色" style="width:200px; margin-top:12px">
+        <el-option :label="'管理员'" :value="0" />
         <el-option :label="'作者'" :value="1" />
         <el-option :label="'普通用户'" :value="2" />
       </el-select>
@@ -83,7 +84,7 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { getUsers, updateUserRole, updateUserStatus } from '@/api/admin.js'
+import { getUsers, updateUserRole, banUser, unbanUser } from '@/api/admin.js'
 import useUserInfoStore from '@/stores/userInfo.js'
 
 // 数据状态
@@ -211,8 +212,15 @@ const handleChangeStatus = async (row) => {
       '二次确认', 
       { type: 'warning' }
     )
-    
-    const res = await updateUserStatus(row.id, { status: newStatus })
+
+    // 优先使用后端专用的封禁/解封接口（若后端实现 /ban /unban）
+    let res
+    if (newStatus === 1) {
+      res = await banUser(row.id)
+    } else {
+      res = await unbanUser(row.id)
+    }
+
     const msg = (res && (res.msg || res.message)) || `${actionText}成功`
     ElMessage.success(msg)
     loadUsers()

@@ -1,12 +1,13 @@
-<!-- 统一布局页面 - 支持普通用户、作者和管理员 -->
+<!-- 主页面
+ 实现主页面的布局功能 -->
+
 <script setup>
 // 引入Vue Router的useRouter钩子用于路由导航
 import { useRouter } from 'vue-router'
-import { computed } from 'vue'
 // 引入Element Plus的消息提示和消息框组件
 import { ElMessage, ElMessageBox } from 'element-plus'
 // 引入Element Plus的图标组件用于菜单和下拉菜单
-import { Operation, Compass, View,  Setting, Management, Promotion, UserFilled, User, Crop, EditPen, SwitchButton, CaretBottom } from '@element-plus/icons-vue'
+import { Setting,Management, Promotion, UserFilled, User, Crop, EditPen, SwitchButton, CaretBottom } from '@element-plus/icons-vue'
 // 引入默认头像图片
 import avatar from '@/assets/default.png'
 // 引入获取用户信息的API服务
@@ -21,61 +22,18 @@ const router = useRouter() // 获取路由实例
 const tokenStore = useTokenStore() // 使用token存储实例
 const userInfoStore = useUserInfoStore() // 使用用户信息存储实例
 
-// 获取用户角色 - 0:管理员, 1:作者, 2:普通用户
-const userRole = computed(() => {
-  const role = userInfoStore?.info?.role
-  console.log('用户role为:', role)
-  console.log('userInfoStore.info完整内容:', userInfoStore.info)
-  return role === 0 || role === 1 || role === 2 ? role : 2 // 确保返回有效的角色值
-})
-
 /*
  * 获取用户信息
  * 功能：从API获取当前登录用户的信息并存储到Pinia store中
  */
 const getUserInfo = async () => {
-  try {
-    // 调用用户信息API服务
-    const result = await userInfoService()
-    // 将获取到的用户信息存入Pinia store
-    userInfoStore.setInfo(result.data)
-    console.log('获取用户信息成功，角色为:', result.data.role)
-  } catch (error) {
-    console.error('获取用户信息失败:', error)
-  }
+  // 调用用户信息API服务
+  const result = await userInfoService()
+  // 将获取到的用户信息存入Pinia store
+  userInfoStore.setInfo(result.data)
 }
-// 在组件挂载时，先清除可能存在的旧数据，然后重新获取用户信息
-const initUserInfo = async () => {
-  try {
-    // 清除localStorage中的用户信息，避免旧数据干扰
-    const userInfoKey = 'userInfo'
-    console.log(`清除localStorage中的${userInfoKey}数据，确保获取最新信息`)
-    localStorage.removeItem(`pinia-${userInfoKey}`)
-    
-    // 清除store中的用户信息
-    userInfoStore.removeInfo()
-    
-    // 重新获取用户信息
-    await getUserInfo()
-    console.log('初始化完成，当前角色:', userInfoStore.info.role)
-  } catch (error) {
-    console.error('初始化用户信息失败:', error)
-  }
-}
-
-// 用户信息初始化将在组件挂载钩子中执行
-
-// 监听路由变化，确保在路由切换时也重新获取用户信息
-import { watch, onMounted } from 'vue'
-onMounted(() => {
-  console.log('Layout组件已挂载，初始化用户信息')
-  initUserInfo()
-})
-
-watch(() => router.currentRoute.value.path, () => {
-  console.log('路由变化，重新获取用户信息')
-  getUserInfo()
-})
+// 组件挂载时立即获取用户信息
+getUserInfo()
 
 /*
  * 处理菜单命令
@@ -108,7 +66,7 @@ const handleCommand = (command) => {
       })
   } else {
     // 其他命令（个人中心相关操作）
-    router.push('/admin/user/' + command) // 导航到对应页面
+    router.push('/user/' + command) // 导航到对应页面
   }
 }
 </script>
@@ -117,75 +75,7 @@ const handleCommand = (command) => {
   <!-- Element Plus布局容器 -->
   <el-container class="layout-container">
     <!-- 左侧菜单区域 -->
-    <!-- 普通用户的左侧菜单栏 - 仅role=2时显示 -->
-    <el-aside width="200px" class="menu-user" v-if="userRole === 2">
-      <!-- 顶部logo区域 -->
-      <div class="el-aside__logo"></div>
-      <!-- 菜单组件 -->
-      <!-- 
-      active-text-color 激活菜单项文字颜色
-      background-color菜单背景色
-      text-color 菜单文字颜色
-      router 启用路由模式
-       -->
-      <el-menu active-text-color="#ffd04b" background-color="#232323" text-color="#fff" router>
-
-        <!-- 用户中心菜单项 -->
-        <el-menu-item index="/admin/ucenter/mine">
-          <el-icon>
-            <UserFilled /><!-- 我的图标 -->
-          </el-icon>
-          <span>我的</span>
-        </el-menu-item>
-         
-        <!-- 作者中心菜单项 -->
-        <el-menu-item index="/admin/author/author">
-          <el-icon>
-             <EditPen /><!-- 成为作者图标 -->
-          </el-icon>
-          <span>作者中心</span>
-        </el-menu-item>
-
-        <!-- 设置子菜单 -->
-        <el-sub-menu index="/admin/user-center">
-          <!-- 子菜单标题 -->
-          <template #title>
-            <el-icon>
-              <Setting /> <!-- 设置图标 -->
-            </el-icon>
-            <span>设置</span>
-          </template>
-
-          <!-- 基本资料菜单项 -->
-          <el-menu-item index="/admin/user/info">
-            <el-icon>
-              <User /> <!-- 用户图标 -->
-            </el-icon>
-            <span>基本资料</span>
-          </el-menu-item>
-
-          <!-- 更换头像菜单项 -->
-          <el-menu-item index="/admin/user/avatar">
-            <el-icon>
-              <Crop /> <!-- 裁剪图标 -->
-            </el-icon>
-            <span>更换头像</span>
-          </el-menu-item>
-
-          <!-- 重置密码菜单项 -->
-          <el-menu-item index="/admin/user/resetPassword">
-            <el-icon>
-              <EditPen /> <!-- 编辑图标 -->
-            </el-icon>
-            <span>修改密码</span>
-          </el-menu-item>
-        </el-sub-menu>
-
-      </el-menu>
-    </el-aside>
-
-    <!-- 作者的左侧菜单栏 - 仅role=1时显示 -->
-    <el-aside width="200px" class="menu-author" v-if="userRole === 1">
+    <el-aside width="200px">
       <!-- 顶部logo区域 -->
       <div class="el-aside__logo"></div>
       <!-- 菜单组件 -->
@@ -255,89 +145,6 @@ const handleCommand = (command) => {
             <span>修改密码</span>
           </el-menu-item>
         </el-sub-menu>
-      </el-menu>
-    </el-aside>
-
-    <!-- 管理员的左侧菜单栏 - 仅role=0时显示 -->
-    <el-aside width="200px" class="menu-admin" v-if="userRole === 0">
-      <!-- 顶部logo区域 -->
-      <div class="el-aside__logo"></div>
-      <!-- 菜单组件 -->
-      <!-- 
-      active-text-color 激活菜单项文字颜色
-      background-color菜单背景色
-      text-color 菜单文字颜色
-      router 启用路由模式
-       -->
-      <el-menu active-text-color="#ffd04b" background-color="#232323" text-color="#fff" router>
-
-         <!-- 用户中心菜单项 -->
-        <el-menu-item index="/admin/ucenter/mine">
-          <el-icon>
-            <UserFilled /><!-- 我的图标 -->
-          </el-icon>
-          <span>我的</span>
-        </el-menu-item>
-
-        <!-- 仪表盘菜单项 -->
-        <el-menu-item index="/admin/dashboard">
-          <el-icon>
-            <Compass />
-          </el-icon>
-          <span>仪表盘</span>
-        </el-menu-item>
-         
-       <!-- 用户管理菜单项 -->
-        <el-menu-item index="/admin/users">
-          <el-icon>
-            <View />
-          </el-icon>
-          <span>用户管理</span>
-        </el-menu-item>
-
-        <!-- 作者申请菜单项 -->
-        <el-menu-item index="/admin/applications">
-          <el-icon>
-            <Operation />
-          </el-icon>
-          <span>作者申请</span>
-        </el-menu-item>
-
-        <!-- 设置子菜单 -->
-        <el-sub-menu index="/admin/user-center">
-          <!-- 子菜单标题 -->
-          <template #title>
-            <el-icon>
-              <Setting /> <!-- 设置图标 -->
-            </el-icon>
-            <span>设置</span>
-          </template>
-
-          <!-- 基本资料菜单项 -->
-          <el-menu-item index="/admin/user/info">
-            <el-icon>
-              <User /> <!-- 用户图标 -->
-            </el-icon>
-            <span>基本资料</span>
-          </el-menu-item>
-
-          <!-- 更换头像菜单项 -->
-          <el-menu-item index="/admin/user/avatar">
-            <el-icon>
-              <Crop /> <!-- 裁剪图标 -->
-            </el-icon>
-            <span>更换头像</span>
-          </el-menu-item>
-
-          <!-- 重置密码菜单项 -->
-          <el-menu-item index="/admin/user/resetPassword">
-            <el-icon>
-              <EditPen /> <!-- 编辑图标 -->
-            </el-icon>
-            <span>修改密码</span>
-          </el-menu-item>
-        </el-sub-menu>
-
       </el-menu>
     </el-aside>
 

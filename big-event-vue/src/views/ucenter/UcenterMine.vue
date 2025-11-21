@@ -11,7 +11,7 @@
         <div class="list-first">
           <router-link to="/admin/ucenter/collect">文章收藏</router-link>                   
           <router-link to="/admin/ucenter/follow">用户关注</router-link>
-          <router-link to="/admin/ucenter/fans">我的米线</router-link>
+          <router-link to="/admin/ucenter/fans">我的粉丝</router-link>
         </div>
         
         <div class="list-last">
@@ -60,10 +60,8 @@ export default {
       const likeResponse = await request.post(``);
       if (likeResponse.success) {
         this.data.like = likeResponse.data.likeCount; // request.js已经处理了响应，直接访问数据
-        console.log('获取点赞数成功:', this.data.like);
       }
     } catch (err) {
-      console.error('获取点赞数失败:', err);
     }
     
     // 获取收藏数
@@ -71,10 +69,8 @@ export default {
       const collectResponse = await request.post(`/user/collections`);
       if (collectResponse.success) {
         this.data.collect = collectResponse.data.total;
-        console.log('获取收藏数成功:', this.data.collect);
       }
     } catch (err) {
-      console.error('获取收藏数失败:', err);
     }
   }
   }

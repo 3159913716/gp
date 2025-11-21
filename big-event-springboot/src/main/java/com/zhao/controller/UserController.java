@@ -8,11 +8,10 @@ import com.zhao.pojo.Result;
 import com.zhao.pojo.User;
 import com.zhao.service.ArticleService;
 import com.zhao.service.AuthorApplyService;
-import com.zhao.service.impl.EmailVerifyService;
-import com.zhao.service.SmsService;
 import com.zhao.service.UserCollectionService;
 import com.zhao.service.UserFollowService;
 import com.zhao.service.UserService;
+import com.zhao.service.impl.EmailVerifyService;
 import com.zhao.utils.JwtUtil;
 import com.zhao.utils.PasswordUtil;
 import com.zhao.utils.ThreadLocalUtil;
@@ -51,9 +50,6 @@ public class UserController {
     private ArticleService articleService;
     @Autowired
     private EmailVerifyService emailVerifyService;
-    
-    @Autowired
-    private SmsService smsService;
 
     /**
      * 忘记密码 - 根据邮箱获取用户信息（用于验证邮箱是否存在）
@@ -85,108 +81,24 @@ public class UserController {
      * 忘记密码 - 发送验证码
      */
     @PostMapping("/send-forget-code")
-    public Result sendForgetCode(@RequestParam String type, @RequestParam String target) {
-        // 验证类型
-        if (!"email".equalsIgnoreCase(type) && !"phone".equalsIgnoreCase(type)) {
-            return Result.error("验证码类型不正确");
+    public Result sendForgetCode(@RequestParam Integer userId, @RequestParam String email) {
+        // 验证邮箱格式
+        if (!email.matches("^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$")) {
+            return Result.error("邮箱格式不正确");
         }
         
-        // 根据类型验证目标格式
-        User user = null;
-        if ("email".equalsIgnoreCase(type)) {
-            // 验证邮箱格式
-            if (!target.matches("^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$")) {
-                return Result.error("邮箱格式不正确");
-            }
-            // 根据邮箱查询用户
-            user = userService.findByEmail(target);
-        } else if ("phone".equalsIgnoreCase(type)) {
-            // 验证手机号格式
-            if (!target.matches("^1[3-9]\\d{9}$")) {
-                return Result.error("手机号格式不正确");
-            }
-            // 根据手机号查询用户
-            user = userService.findByPhone(target);
-        }
-        
-        // 验证用户是否存在
-        if (user == null) {
-            switch (type){
-                case "email":
-                    return Result.error("该邮箱尚未绑定/注册");
-                case "phone":
-                    return Result.error("该手机号尚未绑定/注册");
-            }
+        // 验证用户ID和邮箱是否匹配
+        User user = userService.findById(userId);
+        if (user == null || !email.equals(user.getEmail())) {
+            return Result.error("用户ID与邮箱不匹配");
         }
         
         // 发送验证码
-        boolean success = false;
-        String message = "";
-        if ("email".equalsIgnoreCase(type)) {
-            success = emailVerifyService.sendVerifyCode(target, "forget");
-            message = "验证码已发送到您的邮箱，有效期5分钟";
-        } else if ("phone".equalsIgnoreCase(type)) {
-            success = smsService.sendVerifyCode(target, "forget");
-            message = "验证码已发送到您的手机，有效期5分钟";
-        }
-        
+        boolean success = emailVerifyService.sendVerifyCode(email, "forget");
         if (success) {
-            return Result.success(message);
+            return Result.success("验证码已发送到您的邮箱，有效期5分钟");
         } else {
             return Result.error("验证码发送失败，请稍后重试");
-        }
-    }
-
-    /**
-     * 发送修改密码验证码
-     */
-    @PostMapping("/send-update-pwd-code")
-    public Result sendUpdatePwdCode(@RequestParam String type, @RequestParam String target) {
-        // type: "email"或"phone"
-        // target: 邮箱或手机号
-        
-        // 验证类型
-        if (!"email".equals(type) && !"phone".equals(type)) {
-            return Result.error("验证码类型不正确");
-        }
-        
-        // 根据类型验证目标格式
-        if ("email".equals(type)) {
-            // 验证邮箱格式
-            if (!target.matches("^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$")) {
-                return Result.error("邮箱格式不正确");
-            }
-            // 验证用户是否存在并绑定该邮箱
-            User user = userService.findByEmail(target);
-            if (user == null) {
-                return Result.error("该邮箱尚未绑定/注册");
-            }
-            // 发送邮箱验证码
-            boolean success = emailVerifyService.sendVerifyCode(target, "update_pwd");
-            if (success) {
-                return Result.success("验证码已发送到您的邮箱，有效期5分钟");
-            } else {
-                return Result.error("验证码发送失败，请稍后重试");
-            }
-        } else {
-            // 验证手机号格式
-            if (!target.matches("^1[3-9]\\d{9}$")) {
-                return Result.error("手机号格式不正确");
-            }
-            // 验证用户是否存在并绑定该手机号
-            User user = userService.findByPhone(target);
-            if (user == null) {
-
-
-                return Result.error("该手机号尚未绑定/注册");
-            }
-            // 发送短信验证码
-            boolean success = smsService.sendVerifyCode(target, "update_pwd");
-            if (success) {
-                return Result.success("验证码已发送到您的手机，有效期5分钟");
-            } else {
-                return Result.error("验证码发送失败，请稍后重试");
-            }
         }
     }
     
@@ -197,38 +109,28 @@ public class UserController {
     public Result resetPassword(@RequestBody Map<String, String> params) {
         try {
             // 获取参数
-            String type = params.get("type");
-            String target = params.get("target");
+            String userIdStr = params.get("userId");
+            String email = params.get("email");
             String code = params.get("code");
             String newPwd = params.get("newPwd");
             String rePwd = params.get("rePwd");
             
             // 参数校验
-            if (!StringUtils.hasLength(type) || !StringUtils.hasLength(target) || 
+            if (!StringUtils.hasLength(userIdStr) || !StringUtils.hasLength(email) || 
                 !StringUtils.hasLength(code) || !StringUtils.hasLength(newPwd) || !StringUtils.hasLength(rePwd)) {
                 return Result.error("缺少必要的参数");
             }
             
-            // 根据target查询用户信息
-            User user;
-            if ("email".equalsIgnoreCase(type)) {
-                // 验证邮箱格式
-                if (!target.matches("^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$")) {
-                    return Result.error("邮箱格式不正确");
-                }
-                user = userService.findByEmail(target);
-            } else if ("phone".equalsIgnoreCase(type)) {
-                // 验证手机号格式
-                if (!target.matches("^1[3-9]\\d{9}$")) {
-                    return Result.error("手机号格式不正确");
-                }
-                user = userService.findByPhone(target);
-            } else {
-                return Result.error("无效的验证类型");
+            Integer userId;
+            try {
+                userId = Integer.parseInt(userIdStr);
+            } catch (NumberFormatException e) {
+                return Result.error("用户ID格式错误");
             }
             
-            if (user == null) {
-                return Result.error("用户不存在");
+            // 验证邮箱格式
+            if (!email.matches("^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$")) {
+                return Result.error("邮箱格式不正确");
             }
             
             // 验证验证码格式
@@ -246,20 +148,20 @@ public class UserController {
                 return Result.error("两次输入的密码不一致");
             }
             
-            // 验证验证码
-            boolean isValid = false;
-            if ("email".equalsIgnoreCase(type)) {
-                isValid = emailVerifyService.verifyCode(target, code, "forget");
-            } else if ("phone".equalsIgnoreCase(type)) {
-                isValid = smsService.verifyCode(target, code, "forget");
+            // 验证用户ID和邮箱是否匹配
+            User user = userService.findById(userId);
+            if (user == null || !email.equals(user.getEmail())) {
+                return Result.error("用户ID与邮箱不匹配");
             }
             
+            // 验证验证码
+            boolean isValid = emailVerifyService.verifyCode(email, code, "forget");
             if (!isValid) {
                 return Result.error("验证码错误或已过期");
             }
             
             // 更新密码
-            userService.updatePasswordById(user.getId(), newPwd);
+            userService.updatePasswordById(userId, newPwd);
             
             return Result.success("密码重置成功");
         } catch (Exception e) {
@@ -269,7 +171,7 @@ public class UserController {
     }
     
     /**
-     * 注册接口（邮箱方式）
+     * 注册接口
      */
     @PostMapping("/register")
     //校验参数是否符合要求
@@ -293,41 +195,9 @@ public class UserController {
         userService.register(username, password, email);
         return Result.success();
     }
-    
-    /**
-     * 注册接口（手机号方式）
-     */
-    @PostMapping("/register-by-phone")
-    public Result registerByPhone(@Pattern(regexp = "^\\S{5,17}$") String username, 
-                                 @Pattern(regexp = "^\\S{5,17}$") String password,
-                                 @Pattern(regexp = "^1[3-9]\\d{9}$") String phone,
-                                 @Pattern(regexp = "^\\d{6}$") String code) {
-        
-        // 查询用户名是否被占用
-        User u = userService.findByUserName(username);
-        if (u != null) {
-            return Result.error("用户名已被占用！");
-        }
-        
-        // 查询手机号是否被占用
-        User phoneUser = userService.findByPhone(phone);
-        if (phoneUser != null) {
-            return Result.error("手机号已被注册！");
-        }
-        
-        // 验证短信验证码
-        boolean isValid = smsService.verifyCode(phone, code, "register");
-        if (!isValid) {
-            return Result.error("验证码错误或已过期");
-        }
-        
-        // 注册
-        userService.registerByPhone(username, password, phone);
-        return Result.success("注册成功");
-    }
 
     /**
-     * 登录接口（用户名密码方式）
+     * 登录接口
      */
     @PostMapping("/login")
     public Result<String> login(@Pattern(regexp = "^\\S{5,17}$") String username, @Pattern(regexp = "^\\S{5,17}$") String password) {
@@ -363,46 +233,6 @@ public class UserController {
         }
         //判断密码是否正确
         return Result.error("用户名或密码错误！");
-    }
-    
-    /**
-     * 登录接口（手机号验证码方式）
-     */
-    @PostMapping("/login-by-phone")
-    public Result<String> loginByPhone(@Pattern(regexp = "^1[3-9]\\d{9}$") String phone, 
-                                      @Pattern(regexp = "^\\d{6}$") String code) {
-        
-        // 查询用户是否存在
-        User loginUser = userService.findByPhone(phone);
-        if (loginUser == null) {
-            return Result.error("该手机号未注册");
-        }
-        
-        // 检查用户状态，如果被禁用则不允许登录
-        if (loginUser.getStatus() != null && loginUser.getStatus() == 1) {
-            return Result.error("账号已被禁用，请联系管理员！");
-        }
-        
-        // 验证短信验证码
-        boolean isValid = smsService.verifyCode(phone, code, "login");
-        if (!isValid) {
-            return Result.error("验证码错误或已过期");
-        }
-        
-        // 登录成功后更新用户的最后登录时间
-        userService.updateLastLoginTime(loginUser.getId());
-        
-        // 登录成功，响应jwt令牌
-        Map<String, Object> claims = new HashMap<>();
-        claims.put("id", loginUser.getId());
-        claims.put("username", loginUser.getUsername());
-        claims.put("role", loginUser.getRole());
-        String token = JwtUtil.genToken(claims);
-        // 把token存储到redis中
-        ValueOperations<String,String> operations = stringRedisTemplate.opsForValue();
-        operations.set(token, token, 12, TimeUnit.HOURS);
-        
-        return Result.success(token);
     }
 
     /**
@@ -447,11 +277,7 @@ public class UserController {
         String oldPwd = params.get("old_pwd");
         String newPwd = params.get("new_pwd");
         String rePwd = params.get("re_pwd");
-        String type = params.get("type");
-        String target = params.get("target");
-        String code = params.get("code");
-        if (!StringUtils.hasLength(oldPwd) || !StringUtils.hasLength(newPwd) || !StringUtils.hasLength(rePwd) ||
-            !StringUtils.hasLength(type) || !StringUtils.hasLength(target) || !StringUtils.hasLength(code)) {
+        if (!StringUtils.hasLength(oldPwd) || !StringUtils.hasLength(newPwd) || !StringUtils.hasLength(rePwd)) {
             return Result.error("缺少必要的参数!");
         }
 
@@ -462,22 +288,6 @@ public class UserController {
         User loginUser = userService.findByUserName(username);
         if(!PasswordUtil.verifyPassword(oldPwd, loginUser.getPassword())) {
             return Result.error("原密码不正确!");
-        }
-
-        //2.验证验证码
-        boolean verifyResult = false;
-        if ("email".equalsIgnoreCase(type)) {
-            //验证邮箱验证码
-            verifyResult = emailVerifyService.verifyCode(target, code, "update_pwd");
-        } else if ("phone".equalsIgnoreCase(type)) {
-            //验证短信验证码
-            verifyResult = smsService.verifyCode(target, code, "update_pwd");
-        } else {
-            return Result.error("验证码类型不正确");
-        }
-
-        if (!verifyResult) {
-            return Result.error("验证码错误或已过期");
         }
 
         //检验newPwd和rePwd是否一致

@@ -52,6 +52,17 @@ export const articleCategoryDeleteService = (id) => {
   return request.delete('/category?id=' + id);
 }
 
+/**
+ * 获取分类详细信息（需要登录权限）
+ * @param {number|string} id 分类ID
+ * @returns {Promise} 包含分类详情的Promise
+ * API路径：GET /category/detail?id={id}
+ */
+export const articleCategoryDetailService = (id) => {
+  // 使用params选项传递查询参数
+  return request.get('/category/detail', { params: { id } });
+}
+
 // ==================== 文章内容相关API ====================
 
 /**

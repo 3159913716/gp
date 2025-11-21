@@ -33,6 +33,24 @@ export const updateUserStatus = async (id, body) => {
   return res
 }
 
+/**
+ * 封禁用户
+ * API: PUT /admin/users/{id}/ban
+ */
+export const banUser = async (id) => {
+  const res = await request.put(`/admin/users/${id}/ban`)
+  return res
+}
+
+/**
+ * 解除封禁用户
+ * API: PUT /admin/users/{id}/unban
+ */
+export const unbanUser = async (id) => {
+  const res = await request.put(`/admin/users/${id}/unban`)
+  return res
+}
+
 // ========== 作者申请审核 ===========
 /**
  * 获取作者申请列表
@@ -70,5 +88,7 @@ export default {
   getAuthorApplies,
   approveAuthorApply,
   rejectAuthorApply,
+  banUser,
+  unbanUser,
   // createLog intentionally removed from default export to avoid accidental usage
 }

@@ -18,8 +18,8 @@ spring:
           min-idle: 0
   mail:
     host: smtp.qq.com
-    username: 2937186435@qq.com
-    password: haolwyaszbwadfbd
+    username: 3486692880@qq.com
+    password: 123456
     properties:
       mail:
         smtp:

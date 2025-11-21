@@ -10,7 +10,14 @@ export default {
    * 获取首页文章列表接口（使用通用 /article 列表接口）
    * @param {Object} params - 请求参数
    * @param {number} params.pageNum - 当前页码，默认1
+    * @param {number} params.page - 别名：page，可用于向后端传递 page
    * @param {number} params.pageSize - 每页条数，默认10
+    * @param {string} params.sort - 排序方式，可选（例如：'new'=最新，'hot'=热门），默认 'new'
+    *
+    * 示例：按最新排序请求第一页 10 条
+    * curl "http://your-backend.example/api/article/home?page=1&pageSize=10&sort=new"
+    * 示例：按热门排序（后端实现如按 likeCount）
+    * curl "http://your-backend.example/api/article/home?page=1&pageSize=10&sort=hot"
    * @returns {Promise<Object>} 返回分页数据
    */
   getHomeArticles(params = {}) {
@@ -30,6 +37,9 @@ export default {
       categoryId: params.categoryId ?? undefined,
       // 兼容后端下划线命名
       category_id: params.categoryId ?? undefined,
+      // 排序参数（new, hot 等），保持原样传给后端以便后端决定排序策略
+      sort: params.sort ?? params.order ?? 'new',
+      order: params.sort ?? params.order ?? 'new',
       state: params.state ?? (tokenStore?.token ? undefined : '已发布')
     }
     // 优先使用通用 /article 列表
@@ -97,29 +107,48 @@ export default {
 
     // 未登录用户优先尝试公开端点
     try {
-      // 1) 显式公开详情：/public-detail/{id}
+      // 1) 显式公开详情：/article/detail-page?id=...
       return await request.get('/article/detail-page', { params: { id } })
     } catch (pub1) {
+      console.warn('[getArticleDetail] /article/detail-page failed:', pub1?.message || pub1)
       try {
-        // 2) 公开详情别名：/article/detail-page?id=...
+        // 2) 公开详情别名（同一路径，再次尝试）
         return await request.get('/article/detail-page', { params: { id } })
       } catch (pub2) {
+        console.warn('[getArticleDetail] second /article/detail-page attempt failed:', pub2?.message || pub2)
+        try {
+          // 2.5) 公开详情另一路径：/article/public-detail/{id}
+          return await request.get(`/article/public-detail/${id}`)
+        } catch (pub25) {
+          console.warn('[getArticleDetail] /article/public-detail/{id} failed:', pub25?.message || pub25)
+          try {
+            // 2.6) 公开详情别名形式：/article/public-detail?id=...
+            return await request.get('/article/public-detail', { params: { id } })
+          } catch (pub26) {
+            console.warn('[getArticleDetail] /article/public-detail?id=... failed:', pub26?.message || pub26)
+            // continue to other fallbacks
+          }
+        }
         try {
           // 3) 常规：/article/detail?id=... （附加状态限制）
           return await request.get('/article/detail', { params: { id, ...baseParams } })
         } catch (e1) {
+          console.warn('[getArticleDetail] /article/detail?id=... failed:', e1?.message || e1)
           try {
             // 4) 其他别名：/article/detail/{id}
             return await request.get(`/article/detail/${id}`, { params: baseParams })
           } catch (e2) {
+            console.warn('[getArticleDetail] /article/detail/{id} failed:', e2?.message || e2)
             try {
               // 5) REST：/article/{id}
               return await request.get(`/article/${id}`, { params: baseParams })
             } catch (e3) {
+              console.warn('[getArticleDetail] /article/{id} failed:', e3?.message || e3)
               try {
                 // 6) 备用：/home/article/detail?id=...
                 return await request.get('/home/article/detail', { params: { id, ...baseParams } })
               } catch (e4) {
+                console.warn('[getArticleDetail] /home/article/detail?id=... failed:', e4?.message || e4)
                 // 7) 最后兜底，避免后端对 /article 读取 pageNum 造成NPE：带上分页参数
                 return await request.get('/article', { params: { id, pageNum: 1, pageSize: 1, ...baseParams } })
               }

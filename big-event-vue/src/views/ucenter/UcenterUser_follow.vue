@@ -34,12 +34,15 @@
                 <div class="img-cell"><img :src="item.userPic" alt="用户头像" class="user-img"></div>
                 <div class="author-cell">{{ item.followTime }}</div>
                 <div class="time-cell">
-                    <el-button type="danger" size="small" @click="removeFollow(item.userId)" class="delete-btn">取消关注</el-button>
+                    <el-button type="danger" size="mini" @click="removeFollow(item.userId)" class="delete-btn">取消关注</el-button>
                 </div>
             </div>
         </div>
         <!-- 新增分页组件 -->
         <div class="pagination">
+          <el-button type="primary" size="small" class="refresh-btn" @click="refreshList">
+            <el-icon><Refresh /></el-icon> 刷新
+          </el-button>
           <el-pagination
             @size-change="handleSizeChange"
             @current-change="handleCurrentChange"
@@ -53,16 +56,16 @@
     </div>
     <!-- 空数据状态 -->
     <div class="empty-state" v-else>
-        <div>{{ isFansPage ? '暂无粉丝' : '暂无关注的用户' }}</div>
-        <div class="empty-tip">{{ isFansPage ? '当其他用户关注您时，会显示在这里' : '您可以在文章详情页关注感兴趣的作者' }}</div>
+        <div>暂无关注的用户</div>
+        <div class="empty-tip">您可以在文章详情页关注感兴趣的作者</div>
     </div>
   </div>
 </template>
 
 <script>
+import request from '@/utils/request.js';
 import guanzhu from '@/api/guanzhu.js';
 import { WarningFilled, Refresh, Loading } from '@element-plus/icons-vue'; // 引入Element Plus图标
-import defaultAvatar from '@/assets/default.png'; // 导入默认头像图片
 
 export default {
  components: { WarningFilled, Refresh, Loading }, // 注册图标组件
@@ -77,85 +80,35 @@ export default {
         list: [],
         total: 0,
         page: 1,
-        pageSize: 10,
-        isFansPage: false // 标识当前是否为粉丝列表页面
+        pageSize: 10
     };
   },
   
   // 组件挂载后调用接口
   mounted() {
-    // 根据路由判断是显示关注列表还是粉丝列表
-    this.isFansPage = this.$route.path.includes('/fans');
-    this.fetchFollowList()
-  },
-  
-  // 监听路由变化
-  watch: {
-    '$route'(to) {
-      this.isFansPage = to.path.includes('/fans');
-      this.fetchFollowList();
-    }
+     this.fetchFollowList()
   },
   
   // 方法定义
   methods: {
     
-    // 获取关注/粉丝列表
+    // 获取关注作者列表
     async fetchFollowList() {    
         this.loading = true;
         this.error = false;
         
         try {
-            // 根据当前页面类型调用对应的API方法
-            const apiMethod = this.isFansPage ? guanzhu.getFollowersList : guanzhu.getFollowingList;
-            const response = await apiMethod();
-            console.log(`${this.isFansPage ? '粉丝' : '关注'}列表API响应数据:`, response); // 添加调试日志
-            
-            // 根据API文档，正确处理响应格式
-            // 考虑多种可能的响应格式，增加健壮性
-            let dataList = [];
-            
-            // 情况1: 响应是{code: 0, message: "操作成功", data: [...]}
-            if (response && response.code === 0 && Array.isArray(response.data)) {
-                dataList = response.data;
-                console.log('识别到code=0格式的响应');
-            }
-            // 情况2: 响应是{success: true, data: [...]}
-            else if (response && response.success && Array.isArray(response.data)) {
-                dataList = response.data;
-                console.log('识别到success=true格式的响应');
-            }
-            // 情况3: 响应直接是数组
-            else if (Array.isArray(response)) {
-                dataList = response;
-                console.log('识别到直接返回数组的响应');
-            }
-            // 情况4: 响应包含list字段
-            else if (response && Array.isArray(response.list)) {
-                dataList = response.list;
-                console.log('识别到包含list字段的响应');
-            }
-            
-            // 标准化数据格式，确保每个项目都有必要的字段
-            this.list = dataList.map(item => ({
-                userId: item.id || item.userId || item.followed_id || '',
-                nickname: item.nickname || item.username || '未知用户',
-                username: item.username || '未知',
-                userPic: item.userPic || item.avatar || defaultAvatar,
-                followTime: item.followTime || item.create_time || new Date().toLocaleString(),
-                isFollow: item.isFollow !== undefined ? item.isFollow : true
-            }));
-            
-            this.total = this.list.length;
-            this.success = this.list.length > 0;
-            
-            console.log(`处理后的${this.isFansPage ? '粉丝' : '关注'}列表:`, this.list);
+            // 使用guanzhu.js中的getFollowingList方法获取关注列表
+            const data = await guanzhu.getFollowingList();
+            // 适配接口直接返回数组的情况
+            this.list = Array.isArray(data) ? data : Array.isArray(data.list) ? data.list : [];
+            this.total = Array.isArray(data) ? data.length : Number(data.total || 0);
+            this.success = true;
         } catch (error) {
-            const listType = this.isFansPage ? '粉丝' : '关注';
-            console.error(`获取${listType}列表失败:`, error);
+            console.error('获取关注作者列表失败:', error);
             this.error = true;
-            this.errorMessage = error?.message || `获取${listType}列表失败`;
-            this.$message.error(`获取${listType}列表失败，请稍后重试`);
+            this.errorMessage = error?.message || '获取关注列表失败';
+            this.$message.error('获取关注列表失败，请稍后重试');
             // 清空列表数据，确保显示空状态
             this.list = [];
             this.total = 0;
@@ -215,6 +168,7 @@ export default {
 <style scoped>
 .container {
   width: 100%;
+  max-width: 1200px;
   padding: 15px;
   box-sizing: border-box;
   min-height: calc(100vh - 120px);
