@@ -109,8 +109,8 @@ export default {
             // 根据当前页面类型调用对应的API方法
             const apiMethod = this.isFansPage ? guanzhu.getFollowersList : guanzhu.getFollowingList;
             const response = await apiMethod();
-            console.log(`${this.isFansPage ? '粉丝' : '关注'}列表API响应数据:`, response); // 添加调试日志
-            
+        
+            console.log('获取关注/粉丝列表响应:', response);
             // 根据API文档，正确处理响应格式
             // 考虑多种可能的响应格式，增加健壮性
             let dataList = [];
@@ -118,22 +118,22 @@ export default {
             // 情况1: 响应是{code: 0, message: "操作成功", data: [...]}
             if (response && response.code === 0 && Array.isArray(response.data)) {
                 dataList = response.data;
-                console.log('识别到code=0格式的响应');
+             
             }
             // 情况2: 响应是{success: true, data: [...]}
             else if (response && response.success && Array.isArray(response.data)) {
                 dataList = response.data;
-                console.log('识别到success=true格式的响应');
+                
             }
             // 情况3: 响应直接是数组
             else if (Array.isArray(response)) {
                 dataList = response;
-                console.log('识别到直接返回数组的响应');
+             
             }
             // 情况4: 响应包含list字段
             else if (response && Array.isArray(response.list)) {
                 dataList = response.list;
-                console.log('识别到包含list字段的响应');
+               
             }
             
             // 标准化数据格式，确保每个项目都有必要的字段
@@ -149,7 +149,7 @@ export default {
             this.total = this.list.length;
             this.success = this.list.length > 0;
             
-            console.log(`处理后的${this.isFansPage ? '粉丝' : '关注'}列表:`, this.list);
+          
         } catch (error) {
             const listType = this.isFansPage ? '粉丝' : '关注';
             console.error(`获取${listType}列表失败:`, error);

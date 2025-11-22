@@ -62,9 +62,7 @@ const imgUrl = ref(userInfoStore.info.userPic)
   只负责预览，不进行实际上传
 */
 const handleChange = (file, fileList) => {
-  console.log('=== 开始处理文件选择 ===');
-  console.log('选择的文件对象:', file);
-  console.log('文件列表:', fileList);
+ 
   
   // 检查文件是否有效
   if (!file || !file.raw) {
@@ -73,18 +71,11 @@ const handleChange = (file, fileList) => {
     return;
   }
   
-  // 记录文件详细信息
-  console.log('文件详细信息:', {
-    name: file.name,
-    type: file.raw.type,
-    size: file.raw.size,
-    sizeKB: (file.raw.size / 1024).toFixed(2) + 'KB',
-    sizeMB: (file.raw.size / 1024 / 1024).toFixed(2) + 'MB'
-  });
+ 
   
   // 验证文件类型
   const isValidType = file.raw.type.startsWith('image/');
-  console.log('文件类型验证结果:', isValidType);
+ 
   
   if (!isValidType) {
     ElMessage.error('只能上传图片文件!');
@@ -93,7 +84,7 @@ const handleChange = (file, fileList) => {
   
   // 验证文件大小 (2MB)
   const isLt2M = file.raw.size / 1024 / 1024 < 2;
-  console.log('文件大小验证结果:', isLt2M);
+ 
   
   if (!isLt2M) {
     ElMessage.error('上传图片大小不能超过 2MB!');
@@ -106,8 +97,7 @@ const handleChange = (file, fileList) => {
   fileSelected.value = true;
   selectedFile.value = file;
   
-  console.log('预览URL创建成功:', fileUrl);
-  console.log('=== 文件选择处理结束 ===');
+
 }
 
 /*
@@ -117,7 +107,6 @@ const handleChange = (file, fileList) => {
   @param {Array} fileList - 文件列表
 */
 const handleUploadError = (err) => {
-  console.error('=== 上传错误 ===');
   console.error('错误对象:', err);
   
   // 显示错误信息
@@ -161,7 +150,7 @@ const handleUploadError = (err) => {
       formData.append('file', selectedFile.value.raw);
       
       // 先上传文件到文件服务器获取URL
-      console.log('开始上传文件获取URL...');
+      
       const uploadResult = await fetch('/api/upload', {
         method: 'POST',
         headers: {
@@ -171,20 +160,20 @@ const handleUploadError = (err) => {
       });
       
       const uploadData = await uploadResult.json();
-      console.log('文件上传响应:', uploadData);
+     console.log('文件上传响应:', uploadData);
       
       if (uploadData.code !== 0) {
         throw new Error(uploadData.message || '文件上传失败');
       }
       
       const avatarUrl = uploadData.data; // 获取上传后的图片URL
-      console.log('获取到的头像URL:', avatarUrl);
+     
       
       // 调用头像更新API
-      console.log('开始更新头像信息...');
+
       const updateResult = await userAvatarUpdateService(avatarUrl);
       
-      console.log('更新头像API响应:', updateResult);
+      
       
       // 只根据code判断是否成功，不关心data字段
       if (updateResult && updateResult.code === 0) {

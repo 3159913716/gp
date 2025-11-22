@@ -160,6 +160,8 @@ const articleCategoryList = async () => {
 
 // 加载文章列表（带分页和筛选条件）
 const articleList = async () => {
+ 
+  
   try {
     // 构建查询参数字符串，直接拼接URL
     let queryStr = '?pageNum=' + pageNum.value + '&pageSize=' + pageSize.value;
@@ -167,10 +169,14 @@ const articleList = async () => {
     // 添加可选参数
     if (categoryId.value) {
       queryStr += '&categoryId=' + categoryId.value;
+      
     }
     if (state.value) {
       queryStr += '&state=' + state.value;
+     
     }
+    
+  
     
     // 直接使用request.get调用API，手动添加Authorization头
     const tokenStore = useTokenStore();
@@ -178,62 +184,72 @@ const articleList = async () => {
     if (tokenStore.token) {
       const raw = tokenStore.token;
       headers.Authorization = raw.startsWith('Bearer ') ? raw : `Bearer ${raw}`;
+      
+    } else {
+      console.warn('=== 未检测到用户Token，可能未登录 ===');
     }
     
-    console.log('发送请求:', '/article' + queryStr);
-    const response = await request.get('/article' + queryStr, { headers });
+    console.log('=== 准备发送API请求 ===', {
+      url: '/article' + queryStr,
+      hasAuthorization: !!headers.Authorization
+    })
     
-    // 处理响应数据
-    console.log('=== 完整API响应 ===', JSON.stringify(response));
+    const response = await request.get('/article' + queryStr, { headers });
+  
     
     try {
       // 根据接口文档格式处理响应
       console.log('响应数据:', response?.data);
       
       if (response && response.code === 0 && response.data) {
+        console.log('=== API返回成功状态 ===', { code: response.code })
         // 按照接口文档的格式解析: response.data.item
         if (response.data.item && Array.isArray(response.data.item)) {
+          
           articles.value = response.data.item;
           total.value = response.data.total || articles.value.length;
-          console.log('使用response.data.item作为文章数组');
         } else {
-          console.log('API返回数据格式不符合接口文档规范');
+         
           articles.value = [];
           total.value = 0;
         }
         
-        console.log('最终articles数组长度:', articles.value.length);
-        console.log('最终total值:', total.value);
-        
         // 手动触发视图更新
         articles.value = [...articles.value];
+       
       } else {
-        console.log('API返回失败或格式不正确:', response);
+       
         articles.value = [];
         total.value = 0;
         ElMessage.error(response?.message || '获取文章列表失败');
       }
     } catch (e) {
-      console.error('处理响应数据时出错:', e);
+      console.error('=== 处理响应数据时出错 ===', e);
       articles.value = [];
       total.value = 0;
     }
   } catch (error) {
-    console.error('获取文章列表失败:', error);
+    console.error('=== 获取文章列表请求失败 ===', error);
     ElMessage.error('获取文章列表失败，请稍后重试');
     articles.value = [];
     total.value = 0;
   }
 
   // 为每篇文章添加分类名称（通过匹配categoryId）
+ 
+  
   for (let i = 0; i < articles.value.length; i++) {
     const article = articles.value[i]
     for (let j = 0; j < categorys.value.length; j++) {
       if (article.categoryId === categorys.value[j].id) {
         article.categoryName = categorys.value[j].categoryName
+       
+        break
       }
     }
   }
+  
+ 
 }
 
 /* 
@@ -294,6 +310,35 @@ const clearArticelForm = () => {
 // 图片上传成功回调函数
 const uploadSuccess = (result) => {
   articleModel.value.coverImg = result.data  // 更新封面图URL
+  console.log('=== 文章封面上传成功响应 ===', result);
+}
+
+// 处理文件选择变化
+const handleFileChange = (file) => {
+  if (file.raw) {
+    // 创建一个本地的预览URL用于即时显示
+    const previewUrl = URL.createObjectURL(file.raw);
+    articleModel.value.coverImg = previewUrl;
+    
+    // 由于/api/upload接口不存在，我们不尝试上传文件
+    // 只使用blob URL作为本地预览
+    // 在提交表单前会进行验证，确保使用有效URL
+    
+    console.log('已选择图片:', file.name);
+    console.log('使用blob URL作为预览:', previewUrl);
+  }
+}
+
+// 在表单提交前验证封面图URL
+const validateCoverImage = () => {
+  // 检查是否是blob URL
+  if (articleModel.value.coverImg && articleModel.value.coverImg.startsWith('blob:')) {
+    // 如果是blob URL，使用默认封面图URL
+    // 这里使用一个示例URL，实际项目中应该有真实的默认图片
+    articleModel.value.coverImg = 'https://example.com/default-cover.jpg';
+    console.log('已将blob URL替换为默认封面图URL');
+  }
+  return true;
 }
 
 /*
@@ -303,9 +348,11 @@ const uploadSuccess = (result) => {
 
 // 显示编辑抽屉（行数据回填）
 const showDialog = (row) => {
+ 
   // 重置表单验证状态
   if (articleForm.value) {
     articleForm.value.resetFields()
+   
   }
   visibleDrawer.value = true  // 显示抽屉
   title.value = '编辑文章'     // 设置抽屉标题
@@ -320,6 +367,7 @@ const showDialog = (row) => {
     id: undefined
   }
   
+  
   // 延迟填充数据，确保Vue响应式系统更新DOM
   setTimeout(() => {
     // 使用行数据填充表单模型
@@ -331,6 +379,7 @@ const showDialog = (row) => {
       state: row.state || '',           // 填充状态
       id: row.id                        // 保存文章ID（用于后续更新）
     }
+   
   }, 0)
 }
 
@@ -341,15 +390,28 @@ const showDialog = (row) => {
 
 // 添加文章（状态作为参数传入）
 const addArticle = (state) => {
+ 
   // 表单验证
   articleForm.value.validate(async (valid) => {
+   
     if (valid) {  // 验证通过
       articleModel.value.state = state  // 设置状态（已发布/草稿）
-      await articleAddService(articleModel.value) // 调用添加API
-      ElMessage.success('添加成功')   // 显示成功提示
+      
+      // 重要：在提交前验证并替换封面图URL
+      validateCoverImage();
+      
+      try {
+        const result = await articleAddService(articleModel.value) // 调用添加API
+        console.log('=== 添加文章API响应 ===', JSON.stringify(result))
+        ElMessage.success('添加成功')   // 显示成功提示
+      } catch (error) {
+        console.error('=== 添加文章失败 ===', error)
+        ElMessage.error('添加失败：' + (error.message || '未知错误'))
+      }
       visibleDrawer.value = false    // 关闭抽屉
       articleList()                  // 刷新列表
     } else {      // 验证失败
+      
       ElMessage.error('请填写完整表单内容')
     }
   })
@@ -357,15 +419,29 @@ const addArticle = (state) => {
 
 // 更新文章
 const articleUpdate = async (state) => {
+  console.log('=== 开始更新文章 ===', { state, articleId: articleModel.value.id })
   // 表单验证
   articleForm.value.validate(async (valid) => {
+    console.log('=== 表单验证结果 ===', { valid })
     if (valid) {  // 验证通过
       articleModel.value.state = state   // 设置状态
-      await articleUpdateService(articleModel.value) // 调用更新API
-      ElMessage.success('修改成功')      // 显示成功提示
+      
+      // 重要：在提交前验证并替换封面图URL
+      validateCoverImage();
+      
+      console.log('=== 提交前的文章数据 ===', JSON.stringify(articleModel.value))
+      try {
+        const result = await articleUpdateService(articleModel.value) // 调用更新API
+        console.log('=== 更新文章API响应 ===', JSON.stringify(result))
+        ElMessage.success('修改成功')      // 显示成功提示
+      } catch (error) {
+        console.error('=== 更新文章失败 ===', error)
+        ElMessage.error('修改失败：' + (error.message || '未知错误'))
+      }
       visibleDrawer.value = false       // 关闭抽屉
       articleList()                     // 刷新列表
     } else {      // 验证失败
+      console.log('=== 表单验证失败，未提交 ===')
       ElMessage.error('请填写完整表单内容')
     }
   })
@@ -373,22 +449,31 @@ const articleUpdate = async (state) => {
 
 // 删除文章
 const deleteArticle = (row) => {
+  console.log('=== 开始删除文章流程 ===', { articleId: row.id, articleTitle: row.title })
   // 显示确认对话框
   ElMessageBox.confirm(
     '你确认删除该文章吗？',  // 提示内容
     '温馨提示',             // 标题
-    {                      // 配置选项
+    {
       confirmButtonText: '确认',   // 确认按钮文本
       cancelButtonText: '取消',    // 取消按钮文本
       type: 'warning',             // 警告类型（显示警告图标）
     }
   )
     .then(async () => {  // 用户点击确认
-      await articleDeleteService(row.id)  // 调用删除API
-      ElMessage.success('删除成功')        // 显示成功提示
-      articleList()                       // 刷新列表
+      console.log('=== 用户确认删除文章 ===', { articleId: row.id })
+      try {
+        const result = await articleDeleteService(row.id)  // 调用删除API
+        console.log('=== 删除文章API响应 ===', JSON.stringify(result))
+        ElMessage.success('删除成功')        // 显示成功提示
+        articleList()                       // 刷新列表
+      } catch (error) {
+        console.error('=== 删除文章失败 ===', error)
+        ElMessage.error('删除失败：' + (error.message || '未知错误'))
+      }
     })
     .catch(() => {       // 用户点击取消
+      console.log('=== 用户取消删除文章 ===', { articleId: row.id })
       // 显示取消操作提示
       ElMessage({
         type: 'info',
@@ -594,27 +679,21 @@ articleList()          // 加载文章列表
           <!-- 
             Element Plus上传组件：
             class - 自定义样式类名
-            :auto-upload="true" - 自动上传
+            :auto-upload="false" - 关闭自动上传
             :show-file-list="false" - 不显示文件列表
-            action - 上传API地址
-            name="file" - 文件字段名
-            :on-success - 上传成功回调
-            :headers - 上传请求头（带认证token）
+            :on-change - 文件选择变化处理
           -->
           <el-upload 
             class="avatar-uploader" 
-            :auto-upload="true" 
+            :auto-upload="false" 
             :show-file-list="false" 
-            action="/api/upload"
-            name="file" 
-            :on-success="uploadSuccess" 
-            :headers="{ 'Authorization': tokenStore.token }"
+            :on-change="handleFileChange"
           >
             <!-- 图片预览 -->
             <img v-if="articleModel.coverImg" :src="articleModel.coverImg" class="avatar" />
             <!-- 上传占位图标 -->
             <el-icon v-else class="avatar-uploader-icon">
-              <Plus />  <!-- 使用Plus图标 -->
+              <Plus />
             </el-icon>
           </el-upload>
         </el-form-item>

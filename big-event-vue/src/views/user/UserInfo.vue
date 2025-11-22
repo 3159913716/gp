@@ -80,16 +80,21 @@ const handleNicknameInput = (value) => {
 /* 
   深度监听用户信息变化：
   比较当前用户信息与初始用户信息的差异
-  使用更可靠的比较方法检测昵称变化
+  检测昵称和邮箱的变化
 */
 watch(
-  () => userInfo.value?.nickname,
-  (newNickname, oldNickname) => {
+  () => [userInfo.value?.nickname, userInfo.value?.email],
+  ([newNickname, newEmail]) => {
     // 更可靠地检查昵称是否有更改，处理空值和trim情况
     const currentNickname = (newNickname || '').trim()
     const initialNickname = (initialUserInfo.nickname || '').trim()
     
-    isFormModified.value = currentNickname !== initialNickname
+    // 检查邮箱是否有更改
+    const currentEmail = (newEmail || '').trim()
+    const initialEmail = (initialUserInfo.email || '').trim()
+    
+    // 任一字段有变化则标记表单已修改
+    isFormModified.value = currentNickname !== initialNickname || currentEmail !== initialEmail
   },
   { immediate: true } // 立即执行一次，确保初始状态正确
 )
@@ -141,10 +146,7 @@ const resetForm = async () => {
   成功处理后更新Pinia store中的数据
 */
 const updateUserInfo = async () => {
-  console.log('updateUserInfo函数被调用')
-  console.log('当前表单修改状态:', isFormModified.value)
-  console.log('当前用户信息:', userInfo.value)
-  
+
   try {
       // 确保提交数据包含所有必要字段：nickname、email、id、username
       // 当nickname为空时，使用username作为替代值
@@ -273,10 +275,10 @@ onBeforeUnmount(() => {
             <el-input v-model="userInfo.username" disabled></el-input>
           </el-form-item>
           
-          <!-- 联系邮箱字段（只读） -->
+          <!-- 联系邮箱字段（可编辑） -->
           <el-form-item label="联系邮箱">
-            <!-- 双向绑定邮箱字段，设为只读 -->
-            <el-input v-model="userInfo.email" disabled></el-input>
+            <!-- 双向绑定邮箱字段，可编辑状态 -->
+            <el-input v-model="userInfo.email" placeholder="请输入联系邮箱"></el-input>
           </el-form-item>
           
           <!-- 用户昵称编辑字段（限制10个字符） -->
