@@ -8,10 +8,10 @@
     <insert id="insert" parameterType="com.zhao.pojo.AuthorApply" useGeneratedKeys="true" keyProperty="id">
         insert into author_apply (
             user_id, real_name, id_card, apply_desc, 
-            status, create_time, audit_time, audit_user_id, reject_reason
+            status, create_time, audit_time, audit_user_id
         ) values (
             #{userId}, #{realName}, #{idCard}, #{applyDesc}, 
-            #{status}, #{createTime}, #{auditTime}, #{auditUserId}, #{rejectReason}
+            #{status}, #{createTime}, #{auditTime}, #{auditUserId}
         )
     </insert>
     
@@ -31,8 +31,7 @@
         set 
             status = #{status}, 
             audit_time = #{auditTime}, 
-            audit_user_id = #{auditUserId}, 
-            reject_reason = #{rejectReason}
+            audit_user_id = #{auditUserId}
         where id = #{id}
     </update>
     

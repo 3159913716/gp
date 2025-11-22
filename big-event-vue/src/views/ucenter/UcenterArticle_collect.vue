@@ -94,7 +94,6 @@ export default {
         // 检查是否存在需要刷新的标志
         const needRefresh = localStorage.getItem('needRefreshCollectList')
         if (needRefresh === 'true') {
-          console.log('检测到收藏状态变更，刷新收藏列表...')
           // 清除标志
           localStorage.removeItem('needRefreshCollectList')
           // 重置页码并刷新列表
@@ -127,7 +126,6 @@ export default {
                 this.list = [];
                 this.total = 0;
                 this.success = true;
-                console.log('API返回数据:', response);
             }
             
         } catch (error) {
@@ -161,25 +159,20 @@ export default {
         type: 'warning'
       }).then(async () => {
         try {
-          // 添加调试日志
-          console.log('尝试取消收藏文章ID:', id);
-          
           // 先将列表清空，提供更好的用户体验
           this.list = [];
           
           // 根据API文档，使用POST方法而不是DELETE方法
           const response = await request.post(`/article/collect/${id}`);
-          console.log('取消收藏API返回:', response);
-          
+
           this.$message.success('取消收藏成功');
           
-          // 重新调用fetchOrders获取最新的收藏列表
-          console.log('重新获取收藏列表...');
+       
           await this.fetchOrders();
-          console.log('收藏列表已更新:', this.list);
+        
           
         } catch (err) {
-          console.error('取消收藏失败:', err);
+          
           this.$message.error('取消收藏失败，请稍后重试');
           // 即使失败也重新获取列表，确保数据一致性
           await this.fetchOrders();

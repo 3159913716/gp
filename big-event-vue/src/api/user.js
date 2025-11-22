@@ -127,9 +127,12 @@ export const userAvatarUpdateService = (avatarUrl) => {
 /**
  * 更新用户密码
  * @param {Object} pwdModel 密码数据对象
- *        - oldPwd: 原密码
- *        - newPwd: 新密码
- *        - rePwd: 确认密码
+ *        - old_pwd: 原密码
+ *        - new_pwd: 新密码
+ *        - re_pwd: 确认密码
+ *        - type: 验证码类型 (email或phone)
+ *        - target: 目标邮箱或手机号
+ *        - code: 验证码
  * @returns {Promise} 包含更新结果的Promise
  * API路径：PATCH /user/updatePwd
  * 内容类型：application/json
@@ -139,11 +142,15 @@ export const userUpdatePasswordService = (pwdModel) => {
    * 重构参数对象：
    * 1. 适配后端参数命名规范
    * 2. 保持前后端命名一致性
+   * 3. 添加验证码相关参数
    */
   const params = {
-    old_pwd: pwdModel.oldPwd,
-    new_pwd: pwdModel.newPwd,
-    re_pwd: pwdModel.rePwd
+    old_pwd: pwdModel.old_pwd,
+    new_pwd: pwdModel.new_pwd,
+    re_pwd: pwdModel.re_pwd,
+    type: pwdModel.type,
+    target: pwdModel.target,
+    code: pwdModel.code
   };
   
   return request.patch('/user/updatePwd', params);

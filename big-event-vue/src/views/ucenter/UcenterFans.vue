@@ -19,7 +19,6 @@
                 <div class="img-cell"><img :src="item.userPic" alt="用户头像" class="user-img"></div>
                 <div class="author-cell">{{ item.followTime }}</div>
                 <div class="time-cell">
-                    <el-button type="primary" size="small" @click="viewUserProfile(item.id)" class="view-btn">查看资料</el-button>
                     <el-button type="success" size="small" @click="toggleFollow(item.id, item.isFollow)" class="follow-btn" v-if="!item.isFollow">回关</el-button>
                     <el-button type="warning" size="small" @click="toggleFollow(item.id, item.isFollow)" class="followed-btn" v-else>取消回关</el-button>
                 </div>
@@ -78,14 +77,13 @@ export default {
       this.error = false;
       
       try {
-        console.log('开始请求粉丝列表...');
+    
         
         // 并行请求粉丝列表和关注列表
         const [followersResponse, followingResponse] = await Promise.all([
           guanzhu.getFollowersList(),
           guanzhu.getFollowingList()
         ]);
-        
         console.log('粉丝列表API响应:', followersResponse);
         console.log('关注列表API响应:', followingResponse);
         
@@ -123,23 +121,22 @@ export default {
           ));
         }
         
-        console.log('关注用户ID集合:', followingIds);
+        
         
         // 标准化粉丝列表数据格式
         this.fansList = fansDataList.map(item => {
           const userId = String(item.id || item.userId || item.userid || '');
-          console.log(`处理粉丝数据 - 完整对象:`, item);
-          
+         
           // 优先使用后端返回的isFollow状态，如果没有则通过关注列表判断
           let isFollowed = Boolean(item.isFollow);
           
           // 如果后端没有明确标记为已关注，则通过关注列表检查
           if (!isFollowed && followingIds.has(userId)) {
             isFollowed = true;
-            console.log(`通过关注列表修正粉丝ID: ${userId} 的关注状态为已关注`);
+        
           }
           
-          console.log(`粉丝ID: ${userId}, 后端isFollow: ${item.isFollow}, 关注列表包含: ${followingIds.has(userId)}, 最终isFollow: ${isFollowed}`);
+    
           
           return {
             id: userId,
@@ -151,7 +148,7 @@ export default {
           };
         });
         
-        console.log('处理后的粉丝列表:', this.fansList);
+      
       } catch (error) {
         console.error('获取粉丝列表失败:', error);
         this.error = true;
@@ -165,13 +162,7 @@ export default {
       }
     },
     
-    // 查看用户资料
-    viewUserProfile(Id) {
-      this.$message.info(`查看用户ID ${Id} 的资料`);
-      // 实际项目中可以跳转到用户详情页面
-      this.$router.push(`/user/${Id}`);
-    },
-    
+   
     // 切换关注/取消关注状态
     toggleFollow(Id, isFollowing) {
       const operationText = isFollowing ? '取消关注' : '关注';
@@ -183,7 +174,7 @@ export default {
         type: isFollowing ? 'warning' : 'info'
       }).then(async () => {
         try {
-          console.log(`开始${operationText}用户ID: ${Id}`);
+         
           // 使用guanzhu API模块中的toggleFollow方法
           await guanzhu.toggleFollow(Id);
           
@@ -191,11 +182,11 @@ export default {
           const fanIndex = this.fansList.findIndex(item => item.id === String(Id));
           if (fanIndex !== -1) {
             this.fansList[fanIndex].isFollow = !isFollowing;
-            console.log(`已更新用户ID ${Id} 的关注状态为${this.fansList[fanIndex].isFollow ? '已关注' : '未关注'}`);
+          
           }
           
           this.$message.success(`${operationText}成功`);
-          console.log(`${operationText}成功`);
+         
         } catch (err) {
           console.error(`${operationText}失败:`, err);
           const errorMsg = err.response?.data?.message || err.message || `${operationText}失败，请稍后重试`;
@@ -370,17 +361,14 @@ export default {
 }
 
 /* 按钮样式 */
-.view-btn, .follow-btn, .followed-btn {
+ .follow-btn, .followed-btn {
   padding: 4px 12px;
   border-radius: 4px;
   font-size: 12px;
   transition: all 0.2s;
 }
 
-.view-btn:hover {
-  opacity: 0.8;
-  transform: scale(1.05);
-}
+
 
 .follow-btn:hover {
   opacity: 0.8;
@@ -548,7 +536,7 @@ export default {
     height: 32px;
   }
   
-  .view-btn, .follow-btn, .followed-btn {
+   .follow-btn, .followed-btn {
     font-size: 11px;
     padding: 3px 6px;
   }

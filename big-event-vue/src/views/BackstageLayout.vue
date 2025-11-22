@@ -22,18 +22,61 @@ const router = useRouter() // 获取路由实例
 const tokenStore = useTokenStore() // 使用token存储实例
 const userInfoStore = useUserInfoStore() // 使用用户信息存储实例
 
+// 获取用户角色 - 0:管理员, 1:作者, 2:普通用户
+const userRole = computed(() => {
+  const role = userInfoStore?.info?.role
+  console.log('用户role为:', role)
+  console.log('userInfoStore.info完整内容:', userInfoStore.info)
+  return role === 0 || role === 1 || role === 2 ? role : 2 // 确保返回有效的角色值
+})
+
 /*
  * 获取用户信息
  * 功能：从API获取当前登录用户的信息并存储到Pinia store中
  */
 const getUserInfo = async () => {
-  // 调用用户信息API服务
-  const result = await userInfoService()
-  // 将获取到的用户信息存入Pinia store
-  userInfoStore.setInfo(result.data)
+  try {
+    // 调用用户信息API服务
+    const result = await userInfoService()
+    // 将获取到的用户信息存入Pinia store
+    userInfoStore.setInfo(result.data)
+    console.log('获取用户信息成功，角色为:', result.data.role)
+  } catch (error) {
+    console.error('获取用户信息失败:', error)
+  }
 }
-// 组件挂载时立即获取用户信息
-getUserInfo()
+// 在组件挂载时，先清除可能存在的旧数据，然后重新获取用户信息
+const initUserInfo = async () => {
+  try {
+    // 清除localStorage中的用户信息，避免旧数据干扰
+    const userInfoKey = 'userInfo'
+    console.log(`清除localStorage中的${userInfoKey}数据，确保获取最新信息`)
+    localStorage.removeItem(`pinia-${userInfoKey}`)
+    
+    // 清除store中的用户信息
+    userInfoStore.removeInfo()
+    
+    // 重新获取用户信息
+    await getUserInfo()
+    console.log('初始化完成，当前角色:', userInfoStore.info.role)
+  } catch (error) {
+    console.error('初始化用户信息失败:', error)
+  }
+}
+
+// 用户信息初始化将在组件挂载钩子中执行
+
+// 监听路由变化，确保在路由切换时也重新获取用户信息
+import { watch, onMounted } from 'vue'
+onMounted(() => {
+  console.log('Layout组件已挂载，初始化用户信息')
+  initUserInfo()
+})
+
+watch(() => router.currentRoute.value.path, () => {
+  console.log('路由变化，重新获取用户信息')
+  getUserInfo()
+})
 
 /*
  * 处理菜单命令
