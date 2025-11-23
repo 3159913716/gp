@@ -44,6 +44,7 @@ import UcenterFansVue from '@/views/ucenter/UcenterFans.vue';
 
 //成为作者相关视图
 import UcenterAuthorVue from '@/views/author/UcenterAuthor.vue';
+import StatusVue from '@/views/author/Status.vue';
 
 
 const router = createRouter({
@@ -82,23 +83,42 @@ const router = createRouter({
       component: () => import('@/views/BackstageLayout.vue'),
       meta: { requiresAuth: true },
       children: [
-        // 公共路由
-        { 
-          path: '', 
-          name: 'UcenterMine', 
-          component: UcenterMineVue, 
-          meta: { requiresAuth: true } 
-        },
-        { 
-          path: 'ucenter/mine', 
-          name: 'UcenterMineDetail', 
-          component: UcenterMineVue, 
-          meta: { requiresAuth: true },
-          children: [
-            { path: '', name: 'UcenterMineDefault', redirect: 'collect' }, // 默认重定向到收藏页面
-            { path: 'collect', name: 'UcenterCollect', component: UcenterArticle_collectVue, meta: { requiresAuth: true } },
-            { path: 'follow', name: 'UcenterFollow', component: UcenterUser_followVue, meta: { requiresAuth: true } },
-            { path: 'fans', name: 'UcenterFansList', component: UcenterFansVue, meta: { requiresAuth: true } }
+        // 用户管理子路由（所有角色共用）
+        // 用户作者相关路由 - 无需admin前缀
+        { path: '/user/author/apply', component: UcenterAuthorVue, meta: { requiresAuth: true } },
+        { path: '/user/author/status', component: StatusVue, meta: { requiresAuth: true } },
+        { path: '/admin/user/avatar', component: UserAvatarVue, meta: { requiresAuth: true } },
+        { path: '/admin/user/info', component: UserInfoVue, meta: { requiresAuth: true } },
+        { path: '/admin/user/resetPassword', component: UserResetPasswordVue, meta: { requiresAuth: true } },
+          // 管理员后台 - 用户管理
+          {
+            path: '/admin/users',
+            name: 'AdminUsers',
+            component: () => import('@/views/admin/Users.vue'),
+            meta: { requiresAuth: true, role: 0 }
+          },
+          {
+            path: '/admin/applications',
+            name: 'AdminApplications',
+            component: () => import('@/views/admin/Applications.vue'),
+            meta: { requiresAuth: true, role: 0 }
+          },
+          {
+            path: '/admin/dashboard',
+            name: 'AdminDashboard',
+            component: () => import('@/views/admin/Dashboard.vue'),
+            meta: { requiresAuth: true, role: 0 }
+          },
+
+        //个人中心（所有角色共用）
+        { path: '/admin/ucenter/mine', 
+          component: UcenterMineVue,
+          redirect: '/admin/ucenter/collect',
+          meta: { requiresAuth: true }, 
+          children:[
+            { path: '/admin/ucenter/collect', component: UcenterArticle_collectVue, meta: { requiresAuth: true } },
+            { path: '/admin/ucenter/follow', component: UcenterUser_followVue, meta: { requiresAuth: true } },
+            { path: '/admin/ucenter/fans', component: UcenterFansVue, meta: { requiresAuth: true } },
           ]
         },
         { 
@@ -120,25 +140,9 @@ const router = createRouter({
           meta: { requiresAuth: true } 
         },
         
-        // 管理员路由
-        { 
-          path: 'dashboard', 
-          name: 'AdminDashboard', 
-          component: () => import('@/views/admin/Dashboard.vue'), 
-          meta: { requiresAuth: true } 
-        },
-        { 
-          path: 'users', 
-          name: 'AdminUsers', 
-          component: () => import('@/views/admin/Users.vue'), 
-          meta: { requiresAuth: true } 
-        },
-        { 
-          path: 'applications', 
-          name: 'AdminApplications', 
-          component: () => import('@/views/admin/Applications.vue'), 
-          meta: { requiresAuth: true } 
-        },
+        // 作者相关路由（所有角色可见，但功能会根据角色控制）
+        { path: '/admin/author/author', component: UcenterAuthorVue, meta: { requiresAuth: true } },
+        { path: '/admin/author/status', component: StatusVue, meta: { requiresAuth: true } },
         
         // 作者路由
         { 

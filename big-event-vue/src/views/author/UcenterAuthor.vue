@@ -230,7 +230,7 @@ export default {
           localStorage.setItem('authorApplyStatus', JSON.stringify(statusData));
           
           // 使用this.$router替代router
-          this.$router.push('/admin/author/state');
+          this.$router.push('/user/author/status'); // 正确的状态页面路径
         }
       } catch (error) {
         console.error('检查申请状态失败:', error);
@@ -245,6 +245,8 @@ export default {
     
     // 提交申请
     async handleSubmit() {
+      // 无论成功与否，用户提交后都应该跳转到状态页面查看状态
+      // 状态页面会通过API获取最新的申请状态
       // 验证表单
       this.$refs.formRef.validate(async (valid) => {
         if (valid) {
@@ -279,7 +281,7 @@ export default {
               }
               
               // 跳转到状态页面
-              this.$router.push('/admin/author/state');
+            this.$router.push('/user/author/status'); // 修改为正确的路径
             } else {
               console.log('服务器返回错误:', response?.message || '未知错误');
               ElMessage.error(response?.message || '提交申请失败，请稍后重试');

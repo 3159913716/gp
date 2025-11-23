@@ -203,7 +203,6 @@ export default {
 <style scoped>
 .container {
   width: 100%;
-  max-width: 1200px;
   padding: 15px;
   box-sizing: border-box;
   min-height: calc(100vh - 120px);
