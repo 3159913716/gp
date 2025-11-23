@@ -1,7 +1,7 @@
 <script setup>
 // 在导入部分添加缺少的组件导入
 import { ElCard, ElAvatar, ElPagination, ElButton } from 'element-plus'
-import { StarFilled } from '@element-plus/icons-vue'
+import { Star } from '@element-plus/icons-vue'
 import articleHomeApi from '@/api/articlehome.js'
 import defaultCover from '@/assets/default.png'
 import { articleCategoryListService } from '@/api/article.js'
@@ -442,13 +442,13 @@ onUnmounted(() => {
               <div class="list-actions">
                 <ElButton class="action-btn like display-only" type="default" circle>
                   <el-icon :size="20" style="color:#409eff;">
-                    <StarFilled />
+                    <Star />
                   </el-icon>
                   <span class="count">{{ article.likeCount }}</span>
                 </ElButton>
                 <ElButton class="action-btn fav display-only" type="default" circle>
                   <el-icon :size="20" style="color:#ffb800;">
-                    <StarFilled />
+                    <Star />
                   </el-icon>
                   <span class="count">{{ article.collectCount }}</span>
                 </ElButton>

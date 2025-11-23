@@ -16,7 +16,6 @@ import { ref, onMounted, onBeforeUnmount, watch, computed, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox, type FormInstance } from 'element-plus'
 import useUserInfoStore from '@/stores/userInfo.js'
-import { useRouter } from 'vue-router'
 import { redirectToLogin } from '@/router/index.js'
 import request from '@/utils/request.js'
 import { userUpdatePasswordService } from '@/api/user.js'
@@ -187,9 +186,12 @@ const sendCode = async () => {
       type: 'forget'
     })
     
-    // 使用专门的emailAndPasswordAPI发送验证码，确保参数格式正确
+    // 直接使用request发送邮箱验证码，确保参数格式正确
     // 将类型改为'forget'，因为后端只接受'register'或'forget'类型
-    const result = await emailAndPasswordAPI.sendCode(pwdModel.value.email, 'forget')
+    const result = await request.post('/user/sendCode', {
+      email: pwdModel.value.email,
+      type: 'forget'
+    })
     
     // 调试信息：响应结果
     console.log('【接口调试】发送邮箱验证码响应结果:', result)
@@ -282,15 +284,15 @@ const sendSmsCode = async () => {
 */
 const resetForm = () => {
   // 清理倒计时定时器
-  if (timer) {
-    clearInterval(timer)
-    timer = null
-    countdown.value = 0
+  if (emailTimer) {
+    clearInterval(emailTimer)
+    emailTimer = null
+    emailCountdown.value = 0
   }
-  if (verifyCodeTimer) {
-    clearInterval(verifyCodeTimer)
-    verifyCodeTimer = null
-    verifyCodeCountdown.value = 0
+  if (smsTimer) {
+    clearInterval(smsTimer)
+    smsTimer = null
+    smsCountdown.value = 0
   }
   
   // 先清空表单数据
@@ -298,9 +300,10 @@ const resetForm = () => {
     oldPwd: '',
     newPwd: '',
     rePwd: '',
-    verifyCode: '',
     email: '',
-    code: ''
+    emailCode: '',
+    phone: '',
+    smsCode: ''
   }
   
   // 重置表单验证状态 - 使用Element Plus的标准方法
@@ -365,7 +368,11 @@ const submitForm = async () => {
       })
       
       // 验证码类型需要与发送时保持一致，使用'forget'
-      const verifyResult = await emailAndPasswordAPI.verify(pwdModel.value.email, pwdModel.value.emailCode, 'forget')
+      const verifyResult = await request.post('/user/verifyCode', {
+        email: pwdModel.value.email,
+        code: pwdModel.value.emailCode,
+        type: 'forget'
+      })
       
       // 调试信息：邮箱验证码验证结果
       console.log('【接口调试】验证邮箱验证码 - 响应结果:', verifyResult)
@@ -610,7 +617,7 @@ onBeforeUnmount(() => {
                   />
                   <el-button 
                     type="primary" 
-                    @click="sendEmailCode"
+                    @click="sendCode"
                     :disabled="emailCountdown > 0"
                     class="code-button"
                   >
@@ -682,7 +689,7 @@ onBeforeUnmount(() => {
           autocomplete="new-password" 
           placeholder="请再次输入新密码" 
           show-password
-          @click:password-toggle="toggleRePwdVisibility"
+          @click:password-toggle="togglePasswordVisibility('rePwd')"
         />
       </el-form-item>
 
@@ -698,10 +705,9 @@ onBeforeUnmount(() => {
           </el-button>
           <el-button @click="resetForm" class="reset-button">重置表单</el-button>
         </el-form-item>
-      </el-form>
-      </el-card>
-  </div>
- 
+    </el-form>
+  </el-card>
+</div>
 </template>
 
 <style lang="scss" scoped>

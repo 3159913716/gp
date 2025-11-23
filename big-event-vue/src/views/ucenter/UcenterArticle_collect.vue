@@ -48,10 +48,10 @@
 
 <script>
 import request from '@/utils/request.js';
-import { WarningFilled } from '@element-plus/icons-vue'; // 引入Element Plus图标
+import { Warning } from '@element-plus/icons-vue'; // 引入Element Plus图标
 
 export default {
-  components: { WarningFilled }, // 注册图标组件
+  components: { Warning }, // 注册图标组件
   // 数据定义
   data() {
     return {

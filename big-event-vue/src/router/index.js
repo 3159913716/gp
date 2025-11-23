@@ -29,11 +29,7 @@ import LoginVue from '@/views/Login.vue';
 // 前台布局和首页组件
 import HomeLayoutVue from '@/views/HomeLayout.vue';
 import HomePageVue from '@/views/HomePage.vue';
-
-// 文章管理相关视图
-import ArticleCategoryVue from '@/views/article/ArticleCategory.vue';
-import ArticleManageVue from '@/views/article/ArticleManage.vue';
-import ArticleDetailVue from '@/views/article/ArticleDetail.vue';
+import ArticleDetailVue from '@/views/article/ArticleDetail.vue'
 
 // 用户管理相关视图
 import UserAvatarVue from '@/views/user/UserAvatar.vue';
@@ -49,25 +45,6 @@ import UcenterFansVue from '@/views/ucenter/UcenterFans.vue';
 //成为作者相关视图
 import UcenterAuthorVue from '@/views/author/UcenterAuthor.vue';
 
-//用户布局视图
-import UserLayoutVue from '@/views/UserLayout.vue';
-
-// 作者主布局视图组件
-import LayoutVue from '@/views/Layout.vue';
-// 管理员布局
-import AdminLayoutVue from '@/views/admin/AdminLayout.vue';
-/**
- * 创建路由实例
- * 
- * @property {Object} history - 使用HTML5 History模式的路由历史记录管理器
- * @property {Array} routes - 定义所有路由路径与组件的映射关系
- */
-// 定义角色常量
-const ROLE = {
-  ADMIN: 0,    // 管理员角色
-  AUTHOR: 1,   // 作者角色
-  USER: 2      // 普通用户角色
-}
 
 const router = createRouter({
   /**
@@ -87,68 +64,105 @@ const router = createRouter({
     // === 前台路由（无需认证）===
     {
       path: '/',
+      name: 'HomeRoot',
       component: HomeLayoutVue,
       meta: { requiresAuth: false },
       children: [
-        { path: '', component: HomePageVue, meta: { requiresAuth: false } },
-        { path: 'category/:id', component: HomePageVue, meta: { requiresAuth: false } },
-        { path: 'search', component: HomePageVue, meta: { requiresAuth: false } },
-        { path: 'article/:id', component: ArticleDetailVue, meta: { requiresAuth: false } }
+        { path: '', name: 'HomePage', component: HomePageVue, meta: { requiresAuth: false } },
+        { path: 'category/:id', name: 'CategoryPage', component: HomePageVue, meta: { requiresAuth: false } },
+        { path: 'search', name: 'SearchPage', component: HomePageVue, meta: { requiresAuth: false } },
+        { path: 'article/:id', name: 'ArticleDetail', component: ArticleDetailVue, meta: { requiresAuth: false } }
       ]
     },
     
-    // === 动态路由占位符（将根据用户角色动态匹配）===
+    // === 后台个人中心路由（需要认证）===
     {
       path: '/admin',
-      // 组件将在路由守卫中动态决定
-      component: LayoutVue, // 临时默认组件，会被路由守卫处理
-      redirect: '/admin/ucenter/mine',
+      name: 'Admin',
+      component: () => import('@/views/BackstageLayout.vue'),
       meta: { requiresAuth: true },
       children: [
-        // 用户管理子路由（所有角色共用）
-        { path: '/admin/user/avatar', component: UserAvatarVue, meta: { requiresAuth: true } },
-        { path: '/admin/user/info', component: UserInfoVue, meta: { requiresAuth: true } },
-        { path: '/admin/user/resetPassword', component: UserResetPasswordVue, meta: { requiresAuth: true } },
-          // 管理员后台 - 用户管理
-          {
-            path: '/admin/users',
-            name: 'AdminUsers',
-            component: () => import('@/views/admin/Users.vue'),
-            meta: { requiresAuth: true, role: 0 }
-          },
-          {
-            path: '/admin/applications',
-            name: 'AdminApplications',
-            component: () => import('@/views/admin/Applications.vue'),
-            meta: { requiresAuth: true, role: 0 }
-          },
-          {
-            path: '/admin/dashboard',
-            name: 'AdminDashboard',
-            component: () => import('@/views/admin/Dashboard.vue'),
-            meta: { requiresAuth: true, role: 0 }
-          },
-
-        //个人中心（所有角色共用）
-        { path: '/admin/ucenter/mine', 
-          component: UcenterMineVue,
-          redirect: '/admin/ucenter/collect',
-          meta: { requiresAuth: true }, 
-          children:[
-            { path: '/admin/ucenter/collect', component: UcenterArticle_collectVue, meta: { requiresAuth: true } },
-            { path: '/admin/ucenter/follow', component: UcenterUser_followVue, meta: { requiresAuth: true } },
-            { path: '/admin/ucenter/fans', component: UcenterFansVue, meta: { requiresAuth: true } },
+        // 公共路由
+        { 
+          path: '', 
+          name: 'UcenterMine', 
+          component: UcenterMineVue, 
+          meta: { requiresAuth: true } 
+        },
+        { 
+          path: 'ucenter/mine', 
+          name: 'UcenterMineDetail', 
+          component: UcenterMineVue, 
+          meta: { requiresAuth: true },
+          children: [
+            { path: '', name: 'UcenterMineDefault', redirect: 'collect' }, // 默认重定向到收藏页面
+            { path: 'collect', name: 'UcenterCollect', component: UcenterArticle_collectVue, meta: { requiresAuth: true } },
+            { path: 'follow', name: 'UcenterFollow', component: UcenterUser_followVue, meta: { requiresAuth: true } },
+            { path: 'fans', name: 'UcenterFansList', component: UcenterFansVue, meta: { requiresAuth: true } }
           ]
         },
+        { 
+          path: 'user/info', 
+          name: 'UserInfo', 
+          component: UserInfoVue, 
+          meta: { requiresAuth: true } 
+        },
+        { 
+          path: 'user/avatar', 
+          name: 'UserAvatar', 
+          component: UserAvatarVue, 
+          meta: { requiresAuth: true } 
+        },
+        { 
+          path: 'user/password', 
+          name: 'UserResetPassword', 
+          component: UserResetPasswordVue, 
+          meta: { requiresAuth: true } 
+        },
         
-        // 作者相关路由（所有角色可见，但功能会根据角色控制）
-        { path: '/admin/author/author', component: UcenterAuthorVue, meta: { requiresAuth: true } },
+        // 管理员路由
+        { 
+          path: 'dashboard', 
+          name: 'AdminDashboard', 
+          component: () => import('@/views/admin/Dashboard.vue'), 
+          meta: { requiresAuth: true } 
+        },
+        { 
+          path: 'users', 
+          name: 'AdminUsers', 
+          component: () => import('@/views/admin/Users.vue'), 
+          meta: { requiresAuth: true } 
+        },
+        { 
+          path: 'applications', 
+          name: 'AdminApplications', 
+          component: () => import('@/views/admin/Applications.vue'), 
+          meta: { requiresAuth: true } 
+        },
         
-        // 文章管理子路由（主要针对作者角色）
-        { path: '/admin/article/category', component: ArticleCategoryVue, meta: { requiresAuth: true } },
-        { path: '/admin/article/manage', component: ArticleManageVue, meta: { requiresAuth: true } },
+        // 作者路由
+        { 
+          path: 'article-category', 
+          name: 'ArticleCategory', 
+          component: () => import('@/views/article/ArticleCategory.vue'), 
+          meta: { requiresAuth: true } 
+        },
+        { 
+          path: 'article-manage', 
+          name: 'ArticleManage', 
+          component: () => import('@/views/article/ArticleManage.vue'), 
+          meta: { requiresAuth: true } 
+        },
+        
+        // 普通用户路由
+        { 
+          path: 'author-center', 
+          name: 'AuthorCenter', 
+          component: UcenterAuthorVue, 
+          meta: { requiresAuth: true } 
+        }
       ]
-    },
+    }
   ],
 })
 
@@ -162,9 +176,9 @@ const router = createRouter({
  */
 router.beforeEach(async (to, from, next) => {
   // 从Pinia store获取认证token和用户信息
-  const tokenStore = useTokenStore()
-  const userInfoStore = useUserInfoStore()
-  const isAuthenticated = !!tokenStore.token  // !!确保转为布尔值
+  const tokenStore = useTokenStore();
+  const userInfoStore = useUserInfoStore();
+  const isAuthenticated = !!tokenStore.token;  // !!确保转为布尔值
   
   /**
    * 检查目标路由是否需要认证：
@@ -175,83 +189,34 @@ router.beforeEach(async (to, from, next) => {
   // 情况1: 需要认证但用户未登录
   if (requiresAuth && !isAuthenticated) {
     // 显示错误提示
-    ElMessage.error('请先登录哟！')
-    /**
-     * 重定向到登录页
-     * replace: true - 替换当前导航（避免历史记录回退到受限页面）
-     * name: 'Login' - 使用命名路由确保正确导航
-     */
-    next({ name: 'Login', replace: true })
-    return
+    ElMessage.error('请先登录哟！');
+    // 重定向到登录页
+    next({ name: 'Login', replace: true });
+    return;
   }
   
   // 情况2: 用户已登录但尝试访问登录页
   else if (to.path === '/login' && isAuthenticated) {
-    /**
-     * 根据用户角色重定向到不同的首页
-     * 确保获取最新的用户信息
-     */
-    await ensureUserInfoLoaded(userInfoStore, tokenStore)
-    const userRole = userInfoStore.info.role
-    
-    if (userRole === ROLE.AUTHOR) {
-      next('/admin/article/manage') // 作者跳转到文章管理
-    } else {
-      next('/admin/ucenter/mine') // 普通用户跳转到个人中心
-    }
+    // 确保获取最新的用户信息
+    await ensureUserInfoLoaded(userInfoStore, tokenStore);
+    // 重定向到个人中心
+    next('/admin/ucenter/mine');
   }
   
-  // 情况3: 需要认证且用户已登录 - 根据角色处理路由
+  // 情况3: 需要认证且用户已登录
   else if (requiresAuth && isAuthenticated) {
     // 确保用户信息已加载
-    await ensureUserInfoLoaded(userInfoStore, tokenStore)
-    
-    // 获取用户角色
-    const userRole = userInfoStore.info.role
-    
-    // 处理/admin路径的特殊逻辑 - 根据角色动态选择布局
-    if (to.path.startsWith('/admin')) {
-      // 获取路由配置中/admin路径的路由记录
-      const adminRoute = router.getRoutes().find(route => route.path === '/admin')
-      
-      if (adminRoute) {
-        // 根据用户角色设置布局组件
-        if (userRole === ROLE.ADMIN) {
-          adminRoute.components = { default: AdminLayoutVue } // 管理员使用AdminLayout
-        } else if (userRole === ROLE.AUTHOR) {
-          adminRoute.components = { default: LayoutVue } // 作者使用LayoutVue
-        } else {
-          adminRoute.components = { default: UserLayoutVue } // 普通用户使用UserLayoutVue
-        }
-      }
-      
-      // 根据角色控制访问权限（可选）
-      if (userRole !== ROLE.AUTHOR && (to.path.startsWith('/admin/article/category') || to.path.startsWith('/admin/article/manage'))) {
-        // 非作者角色尝试访问文章管理相关路由
-        ElMessage.warning('您没有权限访问此页面')
-        next('/admin/ucenter/mine')
-        return
-      }
-    }
-    
-    // 正常放行
-    // 若路由声明了具体 role（如管理员 role=0），则做额外校验
-    if (to.meta && typeof to.meta.role !== 'undefined') {
-      if (userRole !== to.meta.role) {
-        ElMessage.error('无权限访问')
-        next({ name: 'FrontHome' })
-        return
-      }
-    }
-
-    next()
+    await ensureUserInfoLoaded(userInfoStore, tokenStore);
+    next();
   }
   
   // 情况4: 正常访问无需认证的页面
   else {
-    next()  // 放行路由导航
+    next();  // 放行路由导航
   }
 });
+
+// 导出必要的函数
 
 /**
  * 确保用户信息已加载
@@ -263,14 +228,15 @@ router.beforeEach(async (to, from, next) => {
  */
 async function ensureUserInfoLoaded(userInfoStore, tokenStore) {
   // 如果用户信息为空且有token，则获取用户信息
-  if (tokenStore.token && Object.keys(userInfoStore.info).length === 0) {
+  // 使用!userInfoStore.info更严谨地判断用户信息是否已加载
+  if (tokenStore.token && !userInfoStore.info) {
     try {
-      const result = await userInfoService()
-      userInfoStore.setInfo(result.data)
+      const result = await userInfoService();
+      userInfoStore.setInfo(result.data);
     } catch (error) {
-      console.error('获取用户信息失败:', error)
+      console.error('获取用户信息失败:', error);
       // 获取失败时清除token并重定向到登录页
-      redirectToLogin()
+      redirectToLogin();
     }
   }
 }
@@ -289,10 +255,10 @@ async function ensureUserInfoLoaded(userInfoStore, tokenStore) {
  */
 export const redirectToLogin = () => {
   // 获取token store实例
-  const tokenStore = useTokenStore()
+  const tokenStore = useTokenStore();
   
   // 清除token
-  tokenStore.removeToken()
+  tokenStore.removeToken();
 
   /**
    * 跳转到登录页
@@ -301,9 +267,9 @@ export const redirectToLogin = () => {
    */
   router.push({ name: 'Login', replace: true }).then(() => {
     // 显示友好提示
-    ElMessage.warning('您的登录状态已过期，请重新登录')
-  })
-}
+    ElMessage.warning('您的登录状态已过期，请重新登录');
+  });
+};
 
 // 导出配置好的路由实例
-export default router
+export default router;

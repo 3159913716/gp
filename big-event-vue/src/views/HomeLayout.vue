@@ -3,7 +3,7 @@ import { ref, onMounted, computed, watch, onUnmounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useTokenStore } from '@/stores/token.js'
 import useUserInfoStore from '@/stores/userInfo.js'
-import { ElDropdown, ElDropdownMenu, ElDropdownItem, ElAvatar } from 'element-plus'
+import { ElDropdown, ElDropdownMenu, ElDropdownItem, ElAvatar, ElButton } from 'element-plus'
 import { articleCategoryListService } from '@/api/article.js'
 import { ElMessageBox } from 'element-plus'
 // 使用在线默认头像链接，不再导入本地资源
@@ -20,10 +20,8 @@ const hasLoadedUserInfo = ref(false)
 // 响应式数据
 const searchKeyword = ref('')
 const searchTimer = ref(null)
-const mobileMenuOpen = ref(false)
 const progressWidth = ref(0)
 const isScrolled = ref(false)
-const isMobile = computed(() => window.innerWidth < 768)
 const isLoggedIn = computed(() => !!tokenStore.token)
 
 // 分类列表（接口数据）
@@ -69,7 +67,6 @@ const handleCategoryClick = (categoryId) => {
 // 生命周期钩子
 onMounted(() => {
   // 设置响应式监听
-  window.addEventListener('resize', handleResize)
   window.addEventListener('scroll', handleScroll)
   
   // 设置页面标题
@@ -86,7 +83,6 @@ onMounted(() => {
 
 onUnmounted(() => {
   // 清理事件监听
-  window.removeEventListener('resize', handleResize)
   window.removeEventListener('scroll', handleScroll)
   
   // 清理定时器
@@ -120,12 +116,7 @@ watch(searchKeyword, (newVal) => {
   }, 300)
 })
 
-// 处理窗口大小变化
-const handleResize = () => {
-  if (window.innerWidth >= 768 && mobileMenuOpen.value) {
-    mobileMenuOpen.value = false
-  }
-}
+// 窗口大小变化处理已移除，因为相关功能不再需要
 
 // 处理滚动事件
 const handleScroll = () => {
@@ -197,6 +188,7 @@ const handleLogout = async () => {
     if (typeof userInfoStore.removeInfo === 'function') {
       userInfoStore.removeInfo()
     }
+    // 动态路由已移除，无需清除
     // 清理与用户相关的前端缓存
     clearUserCaches()
     // 路由跳转到首页后，强制刷新页面以完全重渲染
@@ -214,7 +206,8 @@ const handleLogout = async () => {
 
 // 跳转到个人中心
 const goToProfile = () => {
-  router.push('/admin/')
+// 直接跳转到个人中心页面
+router.push('/admin')
 }
 
 // 加载导航分类（显示所有分类，前4个主分类，其余在下拉菜单中）
@@ -321,20 +314,20 @@ watch(() => tokenStore.token, (newToken, oldToken) => {
         </div>
         
         <!-- 用户区域 -->
-        <div class="user-area" :class="{ 'mobile-hidden': mobileMenuOpen && isMobile }">
+        <div class="user-area">
           <template v-if="isLoggedIn">
-            <ElDropdown>
-              <span class="user-dropdown">
-              <ElAvatar :src="userInfoStore.info?.userPic ? userInfoStore.info.userPic : 'https://n.sinaimg.cn/sinacn20122/80/w440h440/20181223/62bf-hqqzpku8165766.jpg'" />
-                <span class="username">{{ userInfoStore.info?.nickname || userInfoStore.info?.username || '用户' }}</span>
-              </span>
-              <template #dropdown>
-                <ElDropdownMenu>
-                  <ElDropdownItem @click="goToProfile" >个人中心</ElDropdownItem>
-                  <ElDropdownItem @click="handleLogout" >退出登录</ElDropdownItem>
-                </ElDropdownMenu>
-              </template>
-            </ElDropdown>
+           <ElDropdown>
+  <span class="user-dropdown">
+    <ElAvatar :src="userInfoStore.info?.userPic ? userInfoStore.info.userPic : 'https://n.sinaimg.cn/sinacn20122/80/w440h440/20181223/62bf-hqqzpku8165766.jpg'" />
+    <span class="username">{{ userInfoStore.info?.nickname || userInfoStore.info?.username || '用户' }}</span>
+  </span>
+  <template #dropdown>
+    <ElDropdownMenu>
+      <ElDropdownItem @click="goToProfile">个人中心</ElDropdownItem>
+      <ElDropdownItem @click="handleLogout">退出登录</ElDropdownItem>
+    </ElDropdownMenu>
+  </template>
+</ElDropdown>
           </template>
           <template v-else>
             <button class="login-btn" @click="handleLogin">登录/注册</button>
@@ -353,7 +346,7 @@ watch(() => tokenStore.token, (newToken, oldToken) => {
     <!-- 底部版权栏 -->
     <footer class="footer">
       <div class="container">
-        <p class="copyright">© 2025 大事件资讯 版权所有</p>
+        <p class="copyright">© 2025 大事件资讯 AAA保险 版权所有</p>
       </div>
     </footer>
   </div>
@@ -440,101 +433,7 @@ watch(() => tokenStore.token, (newToken, oldToken) => {
   justify-content: space-between;
 }
 
-/* 移动端菜单按钮 */
-.mobile-menu-btn {
-  display: none;
-  background: none;
-  border: none;
-  cursor: pointer;
-  padding: 8px;
-  z-index: 1001;
-}
-
-.menu-icon {
-  display: block;
-  width: 24px;
-  height: 2px;
-  background-color: #333;
-  position: relative;
-  transition: background-color 0.3s;
-}
-
-.menu-icon::before,
-.menu-icon::after {
-  content: '';
-  position: absolute;
-  width: 24px;
-  height: 2px;
-  background-color: #333;
-  transition: all 0.3s;
-}
-
-.menu-icon::before {
-  top: -6px;
-}
-
-.menu-icon::after {
-  top: 6px;
-}
-
-.menu-icon.open {
-  background-color: transparent;
-}
-
-.menu-icon.open::before {
-  transform: rotate(45deg);
-  top: 0;
-}
-
-.menu-icon.open::after {
-  transform: rotate(-45deg);
-  top: 0;
-}
-
-/* 导航菜单 */
-.nav-menu {
-  flex: 1;
-  margin-left: 30px;
-  transition: all 0.3s ease;
-}
-
-.category-list {
-  display: flex;
-  list-style: none;
-  gap: 30px;
-  margin: 0;
-  padding: 0;
-}
-
-.category-item {
-  font-size: 16px;
-  color: #333;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  padding: 4px 0;
-  white-space: nowrap;
-  position: relative;
-}
-
-.category-item:hover {
-  color: #1890ff;
-  transform: translateY(-2px);
-}
-
-.category-item::after {
-  content: '';
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  width: 0;
-  height: 2px;
-  background-color: #1890ff;
-  transition: width 0.3s ease;
-}
-
-.category-item:hover::after {
-  width: 100%;
-}
+/* 导航菜单样式已简化 */
 
 /* 导航按钮样式定制 */
 .nav-bar {
@@ -777,13 +676,7 @@ watch(() => tokenStore.token, (newToken, oldToken) => {
     width: 200px;
   }
   
-  .nav-menu {
-    margin-left: 40px;
-  }
-  
-  .category-list {
-    gap: 20px;
-  }
+  /* 导航菜单响应式样式已简化 */
 }
 
 @media (max-width: 768px) {
@@ -795,36 +688,7 @@ watch(() => tokenStore.token, (newToken, oldToken) => {
     flex-wrap: wrap;
   }
   
-  .mobile-menu-btn {
-    display: block;
-  }
-  
-  .nav-menu {
-    margin-left: 0;
-    order: 3;
-    width: 100%;
-    margin-top: 15px;
-    max-height: 0;
-    overflow: hidden;
-    opacity: 0;
-    visibility: hidden;
-  }
-  
-  .nav-menu.mobile-open {
-    max-height: 500px;
-    opacity: 1;
-    visibility: visible;
-    margin-top: 10px;
-    padding-bottom: 10px;
-  }
-  
-  .category-list {
-    overflow-x: auto;
-    white-space: nowrap;
-    gap: 15px;
-    padding-bottom: 5px;
-    justify-content: center;
-  }
+  /* 移动端菜单按钮和导航菜单样式已移除 */
   
   /* 移动端导航按钮样式 */
   .nav-bar {

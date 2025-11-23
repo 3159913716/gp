@@ -13,7 +13,7 @@
     
     <!-- 错误状态 -->
     <div class="error-state" v-else-if="error">
-      <el-icon class="error-icon"><WarningFilled /></el-icon>
+      <el-icon class="error-icon"><Warning /></el-icon>
       <div class="error-text">{{ errorMessage }}</div>
       <el-button type="primary" size="small" class="reload-btn" @click="refreshList">
         <el-icon><Refresh /></el-icon> 重新加载
@@ -65,10 +65,10 @@
 <script>
 import request from '@/utils/request.js';
 import guanzhu from '@/api/guanzhu.js';
-import { WarningFilled, Refresh, Loading } from '@element-plus/icons-vue'; // 引入Element Plus图标
+import { Warning, Refresh, Loading } from '@element-plus/icons-vue'; // 引入Element Plus图标
 
 export default {
- components: { WarningFilled, Refresh, Loading }, // 注册图标组件
+ components: { Warning, Refresh, Loading }, // 注册图标组件
   // 数据定义
   data() {
     return {

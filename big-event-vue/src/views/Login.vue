@@ -260,11 +260,7 @@ const sendEmailCode = async (type = 'register') => {
       // 找回密码流程：先查找用户，再发送验证码
       
       // 1. 根据邮箱查找用户 - 使用email.js中的findUserByEmail接口
-<<<<<<< HEAD
       const findUserRes = await emailApi.findUserByEmail(contactInfo)
-=======
-      const findUserRes = await emailApi.findUserByEmail(email)
->>>>>>> 65d050e (完善管理员页面功能，首页导航菜单栏实现，统一后台导航)
       
       // 优化成功状态判断
       const isFindSuccess = findUserRes.success === true || findUserRes.code === 0
@@ -281,11 +277,7 @@ const sendEmailCode = async (type = 'register') => {
       userId.value = findUserRes.data?.id
       
       // 3. 发送找回密码验证码 - 使用email.js中的sendForgetCode接口
-<<<<<<< HEAD
       const sendCodeRes = await emailApi.sendForgetCode(userId.value, contactInfo)
-=======
-      const sendCodeRes = await emailApi.sendForgetCode(userId.value, email)
->>>>>>> 65d050e (完善管理员页面功能，首页导航菜单栏实现，统一后台导航)
       
       // 立即启动60秒冷却期，无论成功失败
       countdown.value = 60
@@ -300,13 +292,8 @@ const sendEmailCode = async (type = 'register') => {
         // 邮箱注册
         res = await emailApi.sendCode(contactInfo, 'register')
       } else {
-<<<<<<< HEAD
         // 手机号注册 - 使用手机验证码API
         res = await sendSmsCode(contactInfo, 'register')
-=======
-        // 手机号注册 - 假设API支持手机号验证码
-        res = await emailApi.sendPhoneCode(contactInfo, 'register')
->>>>>>> 65d050e (完善管理员页面功能，首页导航菜单栏实现，统一后台导航)
       }
       
       // 增加多种成功状态判断
@@ -413,7 +400,6 @@ const handleRegister = async () => {
     }
 
     try {
-<<<<<<< HEAD
       // 根据注册方式使用不同的验证码验证和注册接口
       if (isEmailRegister.value) {
         // 邮箱注册流程
@@ -447,41 +433,6 @@ const handleRegister = async () => {
         } else {
           ElMessage.error(result.msg || '注册失败，请重试')
         }
-=======
-      // 先验证验证码
-      const verifyRes = await emailApi.verify(
-        isEmailRegister.value ? registerData.value.email : registerData.value.phone,
-        registerData.value.code,
-        'register'
-      )
-      if (!verifyRes.success) {
-        ElMessage.error(verifyRes.message || '验证码错误或已过期')
-        isLoading.value = false
-        return
-      }
-
-      // 准备注册数据
-      const registerParams = {
-        username: registerData.value.username,
-        password: registerData.value.password
-      }
-      
-      // 根据注册方式添加相应字段
-      if (isEmailRegister.value) {
-        registerParams.email = registerData.value.email
-      } else {
-        registerParams.phone = registerData.value.phone
-      }
-
-      // 调用注册API服务
-      const result = await userRegisterService(registerParams)
-      
-      // 检查返回结果状态码
-      if (result.code === 0) {
-        ElMessage.success(result.msg || '注册成功')
-        isRegister.value = false // 切换到登录界面
-        clearRegisterData()
->>>>>>> 65d050e (完善管理员页面功能，首页导航菜单栏实现，统一后台导航)
       } else {
         // 手机号注册流程
         // 直接使用手机号注册接口
@@ -517,16 +468,8 @@ const handleRegister = async () => {
 const login = async () => {
   isLoading.value = true // 开始加载，显示加载动画
   try {
-<<<<<<< HEAD
     // 根据注册方式使用不同的登录接口
     let result;
-=======
-    // 使用邮箱登录
-    const result = await userLoginService({
-      username: registerData.value.email,
-      password: registerData.value.password
-    })
->>>>>>> 65d050e (完善管理员页面功能，首页导航菜单栏实现，统一后台导航)
     
     if (isEmailRegister.value) {
         // 用户名登录 - 使用密码登录
@@ -838,61 +781,42 @@ onUnmounted(() => {
         <el-form-item>
           <h1>登录</h1>
         </el-form-item>
-        
-<<<<<<< HEAD
-        <!-- 登录方式切换按钮 -->
-        <el-form-item>
-          <div class="register-tabs">
-            <el-button 
-              :type="isEmailRegister ? 'primary' : ''" 
-              :class="{ active: isEmailRegister }"
-              @click="isEmailRegister = true"
-              class="tab-button"
-              style="border-radius: 8px 0 0 8px;"
-            >
-              用户名登录
-            </el-button>
-            <el-button 
-              :type="!isEmailRegister ? 'primary' : ''" 
-              :class="{ active: !isEmailRegister }"
-              @click="isEmailRegister = false"
-              class="tab-button"
-              style="border-radius: 0 8px 8px 0;"
-            >
-              手机号登录
-            </el-button>
-=======
-        <!-- 邮箱输入框 -->
-        <el-form-item prop="email">
-          <el-input 
-            :prefix-icon="User" 
-            placeholder="请输入邮箱" 
-            v-model="registerData.email" 
-          />
-        </el-form-item>
-        
-        <!-- 密码输入框 -->
-        <el-form-item prop="password">
-          <el-input 
-            :prefix-icon="Lock" 
-            type="password" 
-            placeholder="请输入密码" 
-            v-model="registerData.password" 
-          />
-        </el-form-item>
-        
-        <!-- 记住我和忘记密码选项 -->
-        <el-form-item class="flex">
-          <div class="flex">
-            <el-checkbox>记住我</el-checkbox>
-            <div class="right-links">
-              <el-link type="primary" @click="isForgotPassword = true">找回密码？</el-link>
+          
+          <!-- 登录方式切换按钮 -->
+          <el-form-item>
+            <div class="register-tabs">
+              <el-button 
+                :type="isEmailRegister ? 'primary' : ''" 
+                :class="{ active: isEmailRegister }"
+                @click="isEmailRegister = true"
+                class="tab-button"
+                style="border-radius: 8px 0 0 8px;"
+              >
+                用户名登录
+              </el-button>
+              <el-button 
+                :type="!isEmailRegister ? 'primary' : ''" 
+                :class="{ active: !isEmailRegister }"
+                @click="isEmailRegister = false"
+                class="tab-button"
+                style="border-radius: 0 8px 8px 0;"
+              >
+                手机号登录
+              </el-button>
             </div>
->>>>>>> 65d050e (完善管理员页面功能，首页导航菜单栏实现，统一后台导航)
-          </div>
-        </el-form-item>
-        
-        <!-- 用户名登录相关输入框 -->
+          </el-form-item>
+            
+            <!-- 记住我和忘记密码选项 -->
+            <el-form-item class="flex">
+              <div class="flex">
+                <el-checkbox>记住我</el-checkbox>
+                <div class="right-links">
+                  <el-link type="primary" @click="isForgotPassword = true">找回密码？</el-link>
+                </div>
+              </div>
+            </el-form-item>
+            
+          <!-- 用户名登录相关输入框 -->
         <template v-if="isEmailRegister">
           <!-- 用户名输入框 -->
           <el-form-item prop="username">

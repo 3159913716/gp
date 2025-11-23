@@ -1,19 +1,19 @@
-<!-- 主页面
- 实现主页面的布局功能 -->
-
+<!-- 后台主页面-->
 <script setup>
-// 引入Vue Router的useRouter钩子用于路由导航
+// 引入Vue Router的useRouter钩子
 import { useRouter } from 'vue-router'
 // 引入Element Plus的消息提示和消息框组件
 import { ElMessage, ElMessageBox } from 'element-plus'
 // 引入Element Plus的图标组件用于菜单和下拉菜单
-import { Setting,Management, Promotion, UserFilled, User, Crop, EditPen, SwitchButton, CaretBottom } from '@element-plus/icons-vue'
+import { CaretBottom, User, Setting, PieChart, Avatar, DocumentCopy, Document, Edit } from '@element-plus/icons-vue'
 // 引入默认头像图片
 import avatar from '@/assets/default.png'
 // 引入获取用户信息的API服务
 import { userInfoService } from '@/api/user.js'
 // 引入管理用户信息的Pinia store
 import useUserInfoStore from '@/stores/userInfo.js'
+// 引入Vue的计算属性
+import { computed } from 'vue'
 // 引入管理token的Pinia store
 import { useTokenStore } from '@/stores/token.js'
 
@@ -22,68 +22,29 @@ const router = useRouter() // 获取路由实例
 const tokenStore = useTokenStore() // 使用token存储实例
 const userInfoStore = useUserInfoStore() // 使用用户信息存储实例
 
-// 获取用户角色 - 0:管理员, 1:作者, 2:普通用户
-const userRole = computed(() => {
-  const role = userInfoStore?.info?.role
-  console.log('用户role为:', role)
-  console.log('userInfoStore.info完整内容:', userInfoStore.info)
-  return role === 0 || role === 1 || role === 2 ? role : 2 // 确保返回有效的角色值
-})
+// 计算属性：判断用户角色
+const isAdmin = computed(() => userInfoStore?.info?.role === 0)
+const isAuthor = computed(() => userInfoStore?.info?.role === 1)
 
 /*
  * 获取用户信息
  * 功能：从API获取当前登录用户的信息并存储到Pinia store中
  */
 const getUserInfo = async () => {
-  try {
-    // 调用用户信息API服务
-    const result = await userInfoService()
-    // 将获取到的用户信息存入Pinia store
-    userInfoStore.setInfo(result.data)
-    console.log('获取用户信息成功，角色为:', result.data.role)
-  } catch (error) {
-    console.error('获取用户信息失败:', error)
-  }
+  // 调用用户信息API服务
+  const result = await userInfoService()
+  // 将获取到的用户信息存入Pinia store
+  userInfoStore.setInfo(result.data)
 }
-// 在组件挂载时，先清除可能存在的旧数据，然后重新获取用户信息
-const initUserInfo = async () => {
-  try {
-    // 清除localStorage中的用户信息，避免旧数据干扰
-    const userInfoKey = 'userInfo'
-    console.log(`清除localStorage中的${userInfoKey}数据，确保获取最新信息`)
-    localStorage.removeItem(`pinia-${userInfoKey}`)
-    
-    // 清除store中的用户信息
-    userInfoStore.removeInfo()
-    
-    // 重新获取用户信息
-    await getUserInfo()
-    console.log('初始化完成，当前角色:', userInfoStore.info.role)
-  } catch (error) {
-    console.error('初始化用户信息失败:', error)
-  }
-}
-
-// 用户信息初始化将在组件挂载钩子中执行
-
-// 监听路由变化，确保在路由切换时也重新获取用户信息
-import { watch, onMounted } from 'vue'
-onMounted(() => {
-  console.log('Layout组件已挂载，初始化用户信息')
-  initUserInfo()
-})
-
-watch(() => router.currentRoute.value.path, () => {
-  console.log('路由变化，重新获取用户信息')
-  getUserInfo()
-})
+// 组件挂载时立即获取用户信息
+getUserInfo()
 
 /*
- * 处理菜单命令
+ * 处理下拉菜单命令
  * @param {string} command - 用户选择的命令标识
  * 功能：根据用户在下拉菜单或菜单项的选择执行相应操作
  */
-const handleCommand = (command) => {
+const handleCommand = (command) =>{
   // 如果命令是退出登录
   if (command === 'logout') {
     // 显示确认对话框
@@ -96,20 +57,20 @@ const handleCommand = (command) => {
         type: 'warning', // 对话框类型（警告）
       }
     )
-      .then(() => {
+      .then(() =>{
         // 用户点击确认后的处理
         tokenStore.removeToken() // 清除token
         userInfoStore.removeInfo() // 清除用户信息
         router.push('/') // 跳转到首页
         ElMessage.success('退出成功!') // 显示成功消息
       })
-      .catch(() => {
+      .catch(() =>{
         // 用户点击取消后的处理
         ElMessage({ type: 'info', message: '取消退出' }) // 显示取消消息
       })
-  } else {
-    // 其他命令（个人中心相关操作）
-    router.push('/user/' + command) // 导航到对应页面
+  } else if (command === 'home') {
+    // 返回首页命令
+    router.push('/') // 直接跳转到首页
   }
 }
 </script>
@@ -122,69 +83,79 @@ const handleCommand = (command) => {
       <!-- 顶部logo区域 -->
       <div class="el-aside__logo"></div>
       <!-- 菜单组件 -->
-      <!-- 
-      active-text-color 激活菜单项文字颜色
-      background-color菜单背景色
-      text-color 菜单文字颜色
-      router 启用路由模式
-       -->
       <el-menu active-text-color="#ffd04b" background-color="#232323" text-color="#fff" router>
-
-        <!-- 用户中心菜单项 -->
+        <!-- 公共菜单项 - 所有角色都可见 -->
+        <!-- 我的 -->
         <el-menu-item index="/admin/ucenter/mine">
           <el-icon>
-            <UserFilled /><!-- 我的图标 -->
+            <User />
           </el-icon>
           <span>我的</span>
         </el-menu-item>
-
-        <!-- 文章分类菜单项 -->
-        <el-menu-item index="/admin/article/category">
-          <el-icon>
-            <Management /> <!-- 管理图标 -->
-          </el-icon>
-          <span>文章分类</span>
-        </el-menu-item>
-
-        <!-- 文章管理菜单项 -->
-        <el-menu-item index="/admin/article/manage">
-          <el-icon>
-            <Promotion /> <!-- 推广图标 -->
-          </el-icon>
-          <span>文章管理</span>
-        </el-menu-item>
-
-        <!-- 个人中心子菜单 -->
-        <el-sub-menu index="/admin/user-center">
-          <!-- 子菜单标题 -->
+        
+        <!-- 管理员菜单项 - 仅角色0可见 -->
+        <template v-if="isAdmin">
+          <el-menu-item index="/admin/dashboard">
+            <el-icon>
+                <PieChart />
+              </el-icon>
+              <span>仪表盘</span>
+          </el-menu-item>
+          <el-menu-item index="/admin/users">
+            <el-icon>
+                <Avatar />
+              </el-icon>
+              <span>用户管理</span>
+          </el-menu-item>
+          <el-menu-item index="/admin/applications">
+              <el-icon>
+                <DocumentCopy />
+              </el-icon>
+              <span>作者申请</span>
+          </el-menu-item>
+        </template>
+        
+        <!-- 作者菜单项 - 仅角色1可见 -->
+        <template v-else-if="isAuthor">
+          <el-menu-item index="/admin/article-category">
+              <el-icon>
+                <DocumentCopy />
+              </el-icon>
+              <span>文章分类</span>
+          </el-menu-item>
+          <el-menu-item index="/admin/article-manage">
+              <el-icon>
+                <Edit />
+              </el-icon>
+              <span>文章管理</span>
+          </el-menu-item>
+        </template>
+        
+        <!-- 普通用户菜单项 - 仅角色2可见 -->
+        <template v-else>
+          <el-menu-item index="/admin/author-center">
+              <el-icon>
+        <Document />
+      </el-icon>
+              <span>作者中心</span>
+          </el-menu-item>
+        </template>
+        
+        <!-- 设置菜单 - 所有角色都可见（公共菜单项） -->
+        <el-sub-menu index="/admin/settings">
           <template #title>
             <el-icon>
-              <Setting /> <!-- 设置图标 -->
-            </el-icon>
-            <span>设置</span>
+                <Setting />
+              </el-icon>
+              <span>设置</span>
           </template>
-
-          <!-- 基本资料菜单项 -->
           <el-menu-item index="/admin/user/info">
-            <el-icon>
-              <User /> <!-- 用户图标 -->
-            </el-icon>
             <span>基本资料</span>
           </el-menu-item>
-
-          <!-- 更换头像菜单项 -->
           <el-menu-item index="/admin/user/avatar">
-            <el-icon>
-              <Crop /> <!-- 裁剪图标 -->
-            </el-icon>
             <span>更换头像</span>
           </el-menu-item>
-
-          <!-- 重置密码菜单项 -->
-          <el-menu-item index="/admin/user/resetPassword">
-            <el-icon>
-              <EditPen /> <!-- 编辑图标 -->
-            </el-icon>
+          <el-menu-item index="/admin/user/password">
             <span>修改密码</span>
           </el-menu-item>
         </el-sub-menu>
@@ -195,23 +166,24 @@ const handleCommand = (command) => {
     <el-container>
       <!-- 顶部头部区域 -->
       <el-header>
-        <!-- 显示当前登录用户昵称 -->
-        <div>用户：<strong>{{userInfoStore?.info?.nickname || userInfoStore?.info?.username || 
-          '未登录用户'  }}</strong></div>
-
-        <!-- 导航栏区域 -->
-        <div class="nav-wrapper">
-          <router-link to="/" class="nav-item">首页</router-link>
-          <router-link to="/category/1" class="nav-item">技术资讯</router-link>
-          <router-link to="/category/2" class="nav-item">行业动态</router-link>
-          <router-link to="/category/3" class="nav-item">经验分享</router-link>
-          <router-link to="/category/4" class="nav-item">教程学习</router-link>
+        <!-- 左侧：返回首页按钮 -->
+        <div class="header-left">
+          <router-link to="/" class="nav-item">返回首页</router-link>
+        </div>
+        
+        <!-- 中间：显示当前登录用户昵称 -->
+        <div class="header-center">
+          <div>用户：<strong>{{userInfoStore?.info?.nickname || userInfoStore?.info?.username || 
+            '未登录用户'  }}</strong>
+            <el-tag v-if="isAdmin" type="primary" size="small" style="margin-left:8px">管理员</el-tag>
+            <el-tag v-else-if="isAuthor" type="success" size="small" style="margin-left:8px">作者</el-tag>
+            <el-tag v-else type="info" size="small" style="margin-left:8px">普通用户</el-tag>
+          </div>
         </div>
 
-        <!-- 用户操作下拉菜单 -->
-        <!-- // 下拉菜单位置（右下）
-          // 菜单项选择事件处理 -->
-        <el-dropdown placement="bottom-end" @command="handleCommand">
+        <!-- 右侧：用户操作下拉菜单 -->
+        <div class="header-right">
+          <el-dropdown placement="bottom-end" @command="handleCommand">
           <!-- 下拉菜单触发器 -->
           <span class="el-dropdown__box">
             <!-- 用户头像 -->
@@ -225,17 +197,15 @@ const handleCommand = (command) => {
           <!-- 下拉菜单内容 -->
           <template #dropdown>
             <el-dropdown-menu>
-              <!-- 基本资料菜单项 -->
-              <el-dropdown-item command="info" :icon="User">基本资料</el-dropdown-item>
-              <!-- 更换头像菜单项 -->
-              <el-dropdown-item command="avatar" :icon="Crop">更换头像</el-dropdown-item>
-              <!-- 重置密码菜单项 -->
-              <el-dropdown-item command="resetpassword" :icon="EditPen">重置密码</el-dropdown-item>
+              <!-- 返回首页菜单项 -->
+              <el-dropdown-item command="home">返回首页</el-dropdown-item>
+              
               <!-- 退出登录菜单项 -->
-              <el-dropdown-item command="logout" :icon="SwitchButton">退出登录</el-dropdown-item>
+              <el-dropdown-item command="logout">退出登录</el-dropdown-item>
             </el-dropdown-menu>
           </template>
         </el-dropdown>
+        </div>
       </el-header>
 
       <!-- 中间主内容区域 -->
@@ -245,7 +215,7 @@ const handleCommand = (command) => {
       </el-main>
 
       <!-- 底部区域 -->
-      <el-footer>大事件 ©2023 Created by 黑马程序员 | Rewritten ©2025 by junioriry</el-footer>
+      <el-footer>大事件 ©2025 Created by AAA保险 版权所有</el-footer>
     </el-container>
   </el-container>
 </template>
@@ -281,47 +251,59 @@ const handleCommand = (command) => {
     padding: 0 20px; // 添加内边距
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1); // 添加阴影效果
     height: 60px; // 设置高度
-
-    /* 下拉菜单容器样式 */
-    .el-dropdown__box {
-      display: flex;
-      align-items: center; // 垂直居中
-      margin-left: 20px;
-
-      /* 下拉图标样式 */
-      .el-icon {
-        color: #999; // 灰色
-        margin-left: 10px; // 左侧间距
-      }
-
-      /* 激活和聚焦状态样式 */
-      &:active,
-      &:focus {
-        outline: none; // 去除轮廓
-      }
-    }
   }
-
-  /* 导航栏样式 */
-  .nav-wrapper {
+  
+  /* 头部三栏布局 */
+  .header-left,
+  .header-center,
+  .header-right {
     display: flex;
     align-items: center;
-    justify-content: center; // 水平居中对齐
-    gap: 30px;
-    flex: 1; // 让导航栏占据剩余空间
-    flex-wrap: nowrap; // 防止换行
-    overflow: visible; // 允许内容完整显示
+  }
+  
+  .header-center {
+    flex: 1;
+    justify-content: center;
+    min-width: 0;
+  }
+  
+  .header-right {
+    min-width: 0;
   }
 
+  /* 下拉菜单容器样式 */
+  .el-dropdown__box {
+    display: flex;
+    align-items: center; // 垂直居中
+
+    /* 下拉图标样式 */
+    .el-icon {
+      color: #999; // 灰色
+      margin-left: 10px; // 左侧间距
+    }
+
+    /* 激活和聚焦状态样式 */
+    &:active,
+    &:focus {
+      outline: none; // 去除轮廓
+    }
+  }
+  
+  /* 导航栏样式 - 与首页导航菜单样式完全一致 */
   .nav-item {
     font-size: 16px;
     color: #333;
     text-decoration: none;
     cursor: pointer;
     transition: all 0.3s ease;
-    padding: 8px 0;
+    padding: 8px 8px !important;
     white-space: nowrap;
     position: relative;
+    border: none !important;
+    background: none !important;
+    box-shadow: none !important;
+    font-weight: 500 !important;
+    overflow: hidden;
   }
   
   .nav-item:hover {
@@ -344,7 +326,7 @@ const handleCommand = (command) => {
     transition: width 0.3s ease;
   }
   
-  /* 活动状态样式 */
+  /* 激活状态样式 */
   .nav-item.router-link-active {
     color: #1890ff;
   }
@@ -352,6 +334,22 @@ const handleCommand = (command) => {
   .nav-item.router-link-active::after {
     width: 100%;
     background-color: #1890ff;
+  }
+  
+  /* 移除默认边框和阴影 */
+  .nav-item:focus,
+  .nav-item:active {
+    border: none !important;
+    box-shadow: none !important;
+  }
+  
+  /* 移动端按钮样式调整 */
+  @media (max-width: 768px) {
+    .nav-item {
+      padding: 6px 12px !important;
+      font-size: 15px !important;
+      font-weight: 500 !important;
+    }
   }
 
   /* 底部区域样式 */

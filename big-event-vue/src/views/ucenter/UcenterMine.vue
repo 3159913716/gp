@@ -5,13 +5,25 @@
 
 <template>
   <div class="ucenter-wrapper">
+    <!-- 错误提示 -->
+    <div v-if="error" class="error-message">
+      {{ error }}
+      <button @click="fetchUserInfo" class="retry-btn">重试</button>
+    </div>
+    
+    <!-- 加载状态 -->
+    <div v-if="loading" class="loading-indicator">
+      <div class="loading-spinner"></div>
+      <span>正在加载数据...</span>
+    </div>
+    
     <!-- 我的管理组件 -->
       <div class="ucenter-mine">
         <!-- 排序选项卡 -->
         <div class="list-first">
-          <router-link to="/admin/ucenter/collect">文章收藏</router-link>                   
-          <router-link to="/admin/ucenter/follow">用户关注</router-link>
-          <router-link to="/admin/ucenter/fans">我的粉丝</router-link>
+          <router-link to="collect">文章收藏</router-link>                   
+          <router-link to="follow">用户关注</router-link>
+          <router-link to="fans">我的粉丝</router-link>
         </div>
         
         <div class="list-last">
@@ -40,7 +52,10 @@ export default {
       collectCount: 0,
       likeCount: 0,
       page: 1,
-      pageSize: 10
+      pageSize: 10,
+      // 用户体验优化相关状态
+      loading: false,
+      error: null
     };
   },
   mounted() {
@@ -52,59 +67,59 @@ export default {
     // 创建tokenStore实例
     const tokenStore = useTokenStore();
     
-    // 获取当前文章ID（这里假设通过路由参数获取，实际可能需要根据你的应用逻辑调整）
-    const articleId = this.$route.params.id || 1; // 默认值1作为示例
+    // 设置加载状态
+    this.loading = true;
+    this.error = null;
     
-    // 获取点赞数
+    // 获取点赞数 - 使用专门的计数接口
     try {
       // 使用request.js进行请求，它会自动处理Authorization头
-      const likeResponse = await request.post(``);
-      if (likeResponse.success) {
-        this.likeCount = likeResponse.data.likeCount; // request.js已经处理了响应，直接访问数据
+      const likeResponse = await request.get(`/user/likes/count`);
+      if (likeResponse && likeResponse.code === 200) {
+        this.likeCount = likeResponse.data || 0;
         console.log('获取点赞数成功:', this.likeCount);
+      } else if (likeResponse && likeResponse.success) {
+        // 兼容不同的响应格式
+        this.likeCount = likeResponse.data?.likeCount || 0;
       }
     } catch (err) {
+      console.error('获取点赞数失败:', err);
+      this.likeCount = 0;
+      this.error = '获取点赞数据失败';
     }
     
-    // 获取收藏数
-    // 确保page和pageSize是正确的整数值
-    const page = parseInt(this.page) || 1;
-    const pageSize = parseInt(this.pageSize) || 10;
-   
-    
+    // 获取收藏数 - 使用专门的计数接口
     try {
-      // 尝试获取收藏数据
-      const collectResponse = await request.get(`/user/collections?page=${page}&pageSize=${pageSize}`);
-
+      // 尝试使用专门的计数接口
+      const collectResponse = await request.get(`/user/collections/count`);
       
-      // 极度简化：直接从响应中提取total值，无论code是什么
-      // 只关心能否获取到total数值
-      let total = 0;
-      
-      // 检查响应结构，尝试获取total
-      if (collectResponse && typeof collectResponse === 'object') {
-        // 优先从data.total获取
-        if (collectResponse.data && typeof collectResponse.data.total === 'number') {
-          total = collectResponse.data.total;
-        }
-        // 也可以检查一下是否有其他可能包含总数的字段
-        else if (collectResponse.total && typeof collectResponse.total === 'number') {
-          total = collectResponse.total;
+      // 检查响应格式，支持多种可能的返回格式
+      if (collectResponse && collectResponse.code === 200) {
+        this.collectCount = collectResponse.data || 0;
+        console.log('获取收藏数成功:', this.collectCount);
+      } else if (collectResponse && collectResponse.success) {
+        // 兼容不同的响应格式
+        this.collectCount = collectResponse.data?.total || collectResponse.data?.collectCount || 0;
+        console.log('获取收藏数成功:', this.collectCount);
+      } else {
+        // 如果专门的计数接口失败，尝试从分页接口获取
+        const pageResponse = await request.get(`/user/collections?page=1&pageSize=1`);
+        if (pageResponse && pageResponse.data && typeof pageResponse.data.total === 'number') {
+          this.collectCount = pageResponse.data.total;
         }
       }
-      
-      // 直接设置收藏数
-      this.collectCount = total;
-
-      
     } catch (err) {
-      console.error('获取收藏数出错:', err);
+      console.error('获取收藏数失败:', err);
       this.collectCount = 0;
+      this.error = this.error || '获取收藏数据失败';
+    } finally {
+      // 无论成功失败，都重置加载状态
+      this.loading = false;
     }
     
     // 强制更新视图
-      this.$forceUpdate();
-    },
+    this.$forceUpdate();
+  },
     
     // 其他方法...
   }
@@ -235,5 +250,67 @@ export default {
   .sort-content {
     border-radius: 6px;
   }
+  
+  .error-message {
+    padding: 10px;
+    font-size: 14px;
+  }
+  
+  .loading-indicator {
+    padding: 20px;
+    font-size: 14px;
+  }
+}
+
+/* 错误提示样式 */
+.error-message {
+  background-color: #fff2f0;
+  border: 1px solid #ffccc7;
+  color: #f5222d;
+  padding: 15px 20px;
+  border-radius: 6px;
+  margin-bottom: 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.retry-btn {
+  background-color: #ff4d4f;
+  color: white;
+  border: none;
+  padding: 6px 16px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.retry-btn:hover {
+  background-color: #ff7875;
+}
+
+/* 加载状态样式 */
+.loading-indicator {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+  color: #666;
+}
+
+.loading-spinner {
+  width: 30px;
+  height: 30px;
+  border: 3px solid #f3f3f3;
+  border-top: 3px solid #1890ff;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin-bottom: 10px;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
 }
 </style>

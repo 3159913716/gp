@@ -28,7 +28,7 @@
     <!-- 空数据状态 -->
     <!-- 错误状态 -->
     <div class="error-state" v-if="error && !loading">
-        <el-icon class="error-icon"><WarningFilled /></el-icon>
+        <el-icon class="error-icon"><Warning /></el-icon>
         <div class="error-text">获取粉丝列表失败</div>
         <el-button type="primary" size="small" class="reload-btn" @click="fetchFans">
             <el-icon><Refresh /></el-icon> 重新加载
@@ -50,11 +50,11 @@
 
 <script>
 import guanzhu from '@/api/guanzhu.js';
-import { Loading, Refresh, WarningFilled } from '@element-plus/icons-vue'; // 引入Element Plus图标
+import { Loading, Refresh, Warning } from '@element-plus/icons-vue'; // 引入Element Plus图标
 import defaultAvatar from '@/assets/default.png'; // 导入默认头像图片
 
 export default {
- components: { Loading, Refresh, WarningFilled }, // 注册图标组件
+ components: { Loading, Refresh, Warning }, // 注册图标组件
   // 数据定义
   data() {
     return {
