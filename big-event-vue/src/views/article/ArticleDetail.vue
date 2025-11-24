@@ -12,6 +12,11 @@ import { useTokenStore } from '@/stores/token.js'
 import useUserInfoStore from '@/stores/userInfo.js'
 import CommentTree from '@/components/front/CommentTree.vue'
 import '@fortawesome/fontawesome-free/css/all.css';
+
+// 全局token状态管理
+const tokenStoreTop = useTokenStore()
+// 全局认证状态计算属性
+const hasAuth = computed(() => !!tokenStoreTop?.token)
 const route = useRoute()
 const router = useRouter()
 
@@ -175,9 +180,7 @@ const showFollowButton = computed(() => {
   return currentUserName !== articleAuthorName
 })
 
-// 新增：点赞UI控制计算属性
-const tokenStoreTop = useTokenStore()
-const hasAuth = computed(() => !!tokenStoreTop?.token)
+// 点赞UI控制计算属性 - 已在loadDetail函数中定义，这里删除重复定义
 const likedUi = computed(() => {
   // 只有在已登录且确实已点赞的情况下才显示已赞状态
   return hasAuth.value && liked.value
@@ -212,7 +215,7 @@ const toggleLike = async () => {
     localLikeCount.value = Math.max(0, localLikeCount.value + (liked.value ? 1 : -1))
     article.value.likeCount = localLikeCount.value
     saveInteraction()
-    console.warn('文章点赞接口调用异常：', err?.message || err)
+
   } finally {
     likeLoading.value = false
   }
@@ -267,7 +270,7 @@ const toggleFavorite = async () => {
 
   } catch (err) {
     // 接口调用失败，恢复到操作前的状态
-    console.error('文章收藏接口调用失败：', err?.message || err)
+
     favorited.value = prevFavorited
     localCollectCount.value = prevCount
     article.value.collectCount = prevCount
@@ -361,7 +364,7 @@ const loadDetail = async () => {
         data = payload?.data ?? payload?.item ?? payload?.article ?? payload
       } catch (e) {
         // 备用接口失败不抛出，后续走兜底
-        console.warn('备用公开接口加载失败:', e?.message || e)
+
       }
     }
 
@@ -378,9 +381,7 @@ const loadDetail = async () => {
     const urlIsCollected = route.query.isCollected === 'true'
     const urlCollectCount = Number(route.query.collectCount)
 
-    // 认证用户时优先采用接口返回的个性化状态；否则更信任本地持久化
-    const tokenStoreTop = useTokenStore()
-    const hasAuth = computed(() => !!tokenStoreTop?.token)
+    // 认证用户时优先采用接口返回的个性化状态；否则更信任本地持久化 - 使用全局定义的tokenStoreTop
     if (persisted.liked !== undefined) {
       liked.value = Boolean(persisted.liked)
     } else if (hasAuth && apiIsLikedRaw !== undefined) {
@@ -432,7 +433,7 @@ const loadDetail = async () => {
             const n2 = found?.categoryName ?? found?.category_name ?? found?.name ?? found?.title ?? found?.alias
             if (n2) article.value.categoryName = String(n2)
           } catch (e2) {
-            console.warn('分类列表兜底失败:', e2?.message || e2)
+
           }
         }
       } catch (e) {
@@ -446,10 +447,10 @@ const loadDetail = async () => {
           if (n2) {
             article.value.categoryName = String(n2)
           } else {
-            console.warn('分类名称补齐失败：列表中未找到匹配ID', article.value.categoryId)
+
           }
         } catch (e2) {
-          console.warn('分类名称补充失败且列表兜底也失败:', e2?.message || e2)
+          
         }
       }
     }
@@ -468,7 +469,7 @@ const loadDetail = async () => {
           if (authorId) article.value.authorId = authorId
         }
       } catch (e) {
-        console.warn('从列表接口补齐作者失败:', e?.message || e)
+
       }
     }
 
@@ -489,12 +490,12 @@ const loadDetail = async () => {
             if (avatar) article.value.authorAvatar = avatar
           }
         } catch (e) {
-          console.warn('搜索接口补齐作者失败:', e?.message || e)
+  
         }
       }
     }
   } catch (err) {
-    console.error('加载文章详情失败，切换到模拟数据:', err?.message || err)
+
     // 为避免“读取失败”影响体验，失败时直接使用兜底内容且不提示错误
     errorMsg.value = ''
     article.value = generateMockDetail(articleId.value)
@@ -539,7 +540,7 @@ const onToggleCommentLike = async (comment) => {
   } catch (err) {
     comment.isLiked = !comment.isLiked
     comment.likeCount = Math.max(0, comment.likeCount + (comment.isLiked ? 1 : -1))
-    console.warn('评论点赞接口调用异常：', err?.message || err)
+
 
     // 即使出错也要保存到本地存储，保证本地状态一致性
     saveCommentInteraction(id, comment.isLiked, comment.likeCount)
@@ -586,7 +587,6 @@ const submitComment = async () => {
     ElMessage.success('评论发布成功')
   } catch (err) {
     commentsError.value = err?.message || '评论发布失败，请稍后重试'
-    // ElMessage.error(commentsError.value)
   } finally {
     submittingComment.value = false
   }
@@ -727,7 +727,7 @@ const loadComments = async () => {
     // 同步顶部统计的评论数与列表总数一致
     article.value.commentCount = Math.max(0, Number(commentsTotal.value || 0))
   } catch (err) {
-    console.error('加载评论失败，切换到模拟数据:', err?.message || err)
+
     commentsError.value = err?.message || '评论获取失败，已切换为模拟内容'
     const mock = generateMockComments(articleId.value, commentsPage.value, commentsPageSize.value)
     comments.value = mock.list
@@ -846,7 +846,7 @@ const toggleFollow = async () => {
 
   } catch (err) {
     // 接口调用失败，恢复到操作前的状态
-    console.error('关注操作失败：', err?.message || err)
+
     following.value = prevFollowing
     saveInteraction()
     ElMessage.error('操作失败，请稍后重试')
@@ -866,15 +866,21 @@ watch(() => route.params.id, () => {
 </script>
 
 <template>
+  <!-- 文章详情页主容器 -->
   <div class="article-detail-page">
     <div class="container">
+      <!-- 文章详情卡片 -->
       <ElCard class="detail-card">
+        <!-- 卡片头部区域 -->
         <template #header>
           <div class="detail-header">
+            <!-- 标题区域 -->
             <div class="header-top">
               <h2 class="title">{{ article.title }}</h2>
             </div>
+            <!-- 元信息区域 -->
             <div class="meta">
+              <!-- 作者信息区域 -->
               <div class="author">
                 <span class="author-name">{{ article.authorName }}</span>
                 <ElButton v-if="showFollowButton" :type="followingUi ? 'success' : 'primary'" :loading="followLoading"
@@ -886,27 +892,15 @@ watch(() => route.params.id, () => {
                 }}</ElTag>
                 <span class="time">{{ article.createTime }}</span>
               </div>
-              <div class="stats">
-                <div class="stat-item">
-                  <!-- <span class="stat-icon fal fa-heart">👍</span> -->
-                  <i class="fa-solid fa-heart" style="color:#c0c4cc;"></i>
-                  <!-- <i class="fa-regular fa-heart text-red-500" style="color: #ef4444;"></i> -->
 
-                  <span class="stat-value">{{ localLikeCount }}</span>
-                </div>
-                <div class="stat-item">
-                  <!-- <span class="stat-icon">💬</span> -->
-                  <i class="fa-solid fa-comment" style="color:#c0c4cc;"></i>
-
-                  <span class="stat-value">{{ commentsTotal }}</span>
-                </div>
-              </div>
             </div>
           </div>
         </template>
 
+        <!-- 文章内容加载状态 -->
         <div v-if="loading" class="loading">正在加载文章内容...</div>
         <div v-else>
+          <!-- 文章封面图区域 -->
           <div v-if="article.coverImg && !article.__hideCover" class="cover">
             <img :src="article.coverImg" :alt="article.title" @error="onCoverError" />
           </div>
@@ -915,35 +909,36 @@ watch(() => route.params.id, () => {
           <div class="content">{{ contentPlainText }}</div>
         </div>
 
-        <!-- 操作按钮：点赞 / 收藏（前端本地状态） -->
+        <!-- 操作按钮区域：点赞 / 收藏 / 评论（前端本地状态） -->
         <div class="actions-bar">
-          <div :loading="likeLoading" :disabled="likeLoading"
-            class="action-btn" @click="toggleLike">
-            <!-- <span class="icon">👍</span> -->
-            <i  class="fa-solid fa-heart"
-              :style="{ color: likedUi ?'#ef4444' :  '#c0c4cc' }"></i>
-            <!-- <span class="label">{{ likedUi ? '已赞' : '点赞' }}</span> -->
+          <!-- 点赞按钮 -->
+          <div :loading="likeLoading" :disabled="likeLoading" class="action-btn" @click="toggleLike">
+            <i class="fa-solid fa-heart" :style="{ color: likedUi ? '#ef4444' : '#c0c4cc' }"></i>
             <span class="count" style="margin-left: 6px; font-weight: bold; font-size: 14px;">{{ localLikeCount
             }}</span>
           </div>
-          <div :loading="favoriteLoading" :disabled="favoriteLoading"
-            class="action-btn fav" @click="toggleFavorite">
-            <!-- <span class="icon">⭐</span> -->
-              <i  class="fa-solid fa-star"
-              :style="{ color: favorited ?'#ffb800' :  '#c0c4cc' }"></i>
-            <!-- <span class="label">{{ favorited ? '已收藏' : '收藏' }}</span> -->
+          <!-- 收藏按钮 -->
+          <div :loading="favoriteLoading" :disabled="favoriteLoading" class="action-btn fav" @click="toggleFavorite">
+            <i class="fa-solid fa-star" :style="{ color: favorited ? '#ffb800' : '#c0c4cc' }"></i>
             <span class="count" style="margin-left: 6px; font-weight: bold; font-size: 14px;">{{ localCollectCount
+            }}</span>
+          </div>
+          <!-- 评论数统计项 -->
+          <div class="action-btn comment-count">
+            <i class="fa-solid fa-comment" style="color:#c0c4cc;"></i>
+            <span class="count" style="margin-left: 6px; font-weight: bold; font-size: 14px;">{{ commentsTotal
             }}</span>
           </div>
         </div>
 
+        <!-- 错误信息显示 -->
         <div v-if="errorMsg" class="error">{{ errorMsg }}</div>
 
         <!-- 评论列表区域 -->
         <div class="comments-section">
           <h3 class="comments-title">评论</h3>
 
-          <!-- 新增：发布评论输入框与发布按钮 -->
+          <!-- 评论编辑器：发布评论输入框与发布按钮 -->
           <div class="comment-editor">
             <ElInput v-model="newComment" type="textarea" :autosize="{ minRows: 3, maxRows: 10 }"
               :maxlength="MAX_COMMENT_LEN" show-word-limit placeholder="请输入评论内容（最多200字）" class="comment-textarea" />
@@ -953,6 +948,7 @@ watch(() => route.params.id, () => {
             </div>
           </div>
 
+          <!-- 评论加载状态 -->
           <div v-if="commentsLoading" class="comments-loading">正在加载评论...</div>
           <template v-else>
             <template v-if="comments.length">
@@ -1264,7 +1260,7 @@ title {
 }
 
 .action-btn {
-    cursor: pointer; 
+  cursor: pointer;
 }
 
 .action-btn .icon {

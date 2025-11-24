@@ -13,7 +13,7 @@
     
     <!-- 错误状态 -->
     <div class="error-state" v-else-if="error">
-      <el-icon class="error-icon"><Warning /></el-icon>
+      <el-icon class="error-icon"><WarningFilled /></el-icon>
       <div class="error-text">{{ errorMessage }}</div>
       <el-button type="primary" size="small" class="reload-btn" @click="refreshList">
         <el-icon><Refresh /></el-icon> 重新加载
@@ -65,10 +65,10 @@
 <script>
 import request from '@/utils/request.js';
 import guanzhu from '@/api/guanzhu.js';
-import { Warning, Refresh, Loading } from '@element-plus/icons-vue'; // 引入Element Plus图标
+import { WarningFilled, Refresh, Loading } from '@element-plus/icons-vue'; // 引入Element Plus图标
 
 export default {
- components: { Warning, Refresh, Loading }, // 注册图标组件
+ components: { WarningFilled, Refresh, Loading }, // 注册图标组件
   // 数据定义
   data() {
     return {
@@ -98,47 +98,12 @@ export default {
         this.error = false;
         
         try {
-            // 根据当前页面类型调用对应的API方法
-            // 由于当前组件是关注列表，直接使用getFollowingList
-            const response = await guanzhu.getFollowingList();
-        
-            console.log('获取关注列表响应:', response);
-            // 根据API文档，正确处理响应格式
-            // 考虑多种可能的响应格式，增加健壮性
-            let dataList = [];
-            
-            // 情况1: 响应是{code: 0, message: "操作成功", data: [...]}  
-            if (response && response.code === 0 && Array.isArray(response.data)) {
-                dataList = response.data;
-            }
-            // 情况2: 响应是{success: true, data: [...]}  
-            else if (response && response.success && Array.isArray(response.data)) {
-                dataList = response.data;
-            }
-            // 情况3: 响应直接是数组
-            else if (Array.isArray(response)) {
-                dataList = response;
-            }
-            // 情况4: 响应包含list字段
-            else if (response && Array.isArray(response.list)) {
-                dataList = response.list;
-            }
-            
-            // 设置默认头像
-            const defaultAvatar = '/src/assets/images/default-avatar.png';
-            
-            // 标准化数据格式，确保每个项目都有必要的字段
-            this.list = dataList.map(item => ({
-                userId: item.id || item.userId || item.followed_id || '',
-                nickname: item.nickname || item.username || '未知用户',
-                username: item.username || '未知',
-                userPic: item.userPic || item.avatar || defaultAvatar,
-                followTime: item.followTime || item.create_time || new Date().toLocaleString(),
-                isFollow: item.isFollow !== undefined ? item.isFollow : true
-            }));
-            
-            this.total = this.list.length;
-            this.success = this.list.length > 0;
+            // 使用guanzhu.js中的getFollowingList方法获取关注列表
+            const data = await guanzhu.getFollowingList();
+            // 适配接口直接返回数组的情况
+            this.list = Array.isArray(data) ? data : Array.isArray(data.list) ? data.list : [];
+            this.total = Array.isArray(data) ? data.length : Number(data.total || 0);
+            this.success = true;
         } catch (error) {
             console.error('获取关注作者列表失败:', error);
             this.error = true;

@@ -56,7 +56,7 @@ const validateEmail = (rule, value, callback) => {
     callback()
     return
   }
-  
+
   if (!value) {
     callback(new Error('邮箱不能为空'))
   } else {
@@ -78,7 +78,7 @@ const validatePhone = (rule, value, callback) => {
     callback()
     return
   }
-  
+
   if (!value) {
     callback(new Error('手机号不能为空'))
   } else {
@@ -134,7 +134,7 @@ const validateRePassword = (rule, value, callback) => {
     callback()
     return
   }
-  
+
   if (!value) {
     callback(new Error('请再次输入密码'))
   } else if (value !== registerData.value.password) {
@@ -226,12 +226,12 @@ const clearForgotPasswordData = () => {
  */
 const sendEmailCode = async (type = 'register') => {
   if (countdown.value > 0 || isSending.value) return
-  
+
   // 根据注册方式获取相应的联系方式
   let contactInfo = ''
   let contactType = 'email'
   let validationPattern = null
-  
+
   if (type === 'register') {
     if (isEmailRegister.value) {
       contactInfo = registerData.value.email
@@ -248,20 +248,20 @@ const sendEmailCode = async (type = 'register') => {
     contactType = 'email'
     validationPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
   }
-  
+
   if (!validationPattern.test(contactInfo)) {
     ElMessage.error(`请输入有效的${contactType === 'email' ? '邮箱地址' : '手机号'}`)
     return
   }
-  
+
   isSending.value = true
   try {
     if (type === 'forgotPassword') {
       // 找回密码流程：先查找用户，再发送验证码
-      
+
       // 1. 根据邮箱查找用户 - 使用email.js中的findUserByEmail接口
       const findUserRes = await emailApi.findUserByEmail(contactInfo)
-      
+
       // 优化成功状态判断
       const isFindSuccess = findUserRes.success === true || findUserRes.code === 0
       if (!isFindSuccess) {
@@ -272,17 +272,17 @@ const sendEmailCode = async (type = 'register') => {
         startCountdown()
         return
       }
-      
+
       // 2. 保存用户ID
       userId.value = findUserRes.data?.id
-      
+
       // 3. 发送找回密码验证码 - 使用email.js中的sendForgetCode接口
       const sendCodeRes = await emailApi.sendForgetCode(userId.value, contactInfo)
-      
+
       // 立即启动60秒冷却期，无论成功失败
       countdown.value = 60
       startCountdown()
-      
+
       // 控制台记录结果，不显示弹窗提示
       console.log('找回密码验证码发送结果:', sendCodeRes.success ? '成功' : '失败', sendCodeRes)
     } else {
@@ -295,26 +295,26 @@ const sendEmailCode = async (type = 'register') => {
         // 手机号注册 - 使用手机验证码API
         res = await sendSmsCode(contactInfo, 'register')
       }
-      
+
       // 增加多种成功状态判断
       const isSuccess = res && (res.success === true || res.code === 0)
-      
+
       // 无论成功失败都启动倒计时，让用户有机会检查验证码
       countdown.value = 60
       startCountdown()
-      
+
       // 不显示成功或失败提示，让用户自行查收验证码
       // 只在控制台记录结果以便调试
       console.log('注册验证码发送结果:', isSuccess ? '成功' : '失败', res)
     }
   } catch (error) {
-      // 不显示错误提示，但仍记录日志以便调试
-      console.error('发送验证码错误:', error)
-      // 即使发生错误也启动倒计时，避免用户频繁点击
-      if (countdown.value <= 0) {
-        countdown.value = 60
-        startCountdown()
-      }
+    // 不显示错误提示，但仍记录日志以便调试
+    console.error('发送验证码错误:', error)
+    // 即使发生错误也启动倒计时，避免用户频繁点击
+    if (countdown.value <= 0) {
+      countdown.value = 60
+      startCountdown()
+    }
   } finally {
     isSending.value = false
   }
@@ -340,14 +340,14 @@ const startCountdown = () => {
 
 const handleForgotPassword = async () => {
   isLoading.value = true
-  
+
   // 调用表单验证方法
   form.value.validate(async (valid) => {
     if (!valid) {
       isLoading.value = false
       return
     }
-    
+
     try {
       // 确保用户ID已存在（通过发送验证码流程获取）
       if (!userId.value) {
@@ -355,7 +355,7 @@ const handleForgotPassword = async () => {
         isLoading.value = false
         return
       }
-      
+
       // 使用email.js中的resetPassword接口重置密码
       const resetData = {
         userId: userId.value,
@@ -364,9 +364,9 @@ const handleForgotPassword = async () => {
         newPwd: forgotPasswordData.value.newPassword,
         rePwd: forgotPasswordData.value.confirmPassword
       }
-      
+
       const resetResult = await emailApi.resetPassword(resetData)
-      
+
       // 优化密码重置成功状态判断
       const isResetSuccess = resetResult.success === true || resetResult.code === 0
       if (isResetSuccess) {
@@ -424,7 +424,7 @@ const handleRegister = async () => {
 
         // 调用注册API服务
         const result = await userRegisterService(registerParams)
-        
+
         // 检查返回结果状态码
         if (result.code === 0) {
           ElMessage.success(result.msg || '注册成功')
@@ -442,7 +442,7 @@ const handleRegister = async () => {
           registerData.value.phone,
           registerData.value.code
         )
-        
+
         // 检查返回结果状态码，适配不同的成功状态格式
         const isRegisterSuccess = result.success === true || result.code === 0
         if (isRegisterSuccess) {
@@ -470,40 +470,40 @@ const login = async () => {
   try {
     // 根据注册方式使用不同的登录接口
     let result;
-    
+
     if (isEmailRegister.value) {
-        // 用户名登录 - 使用密码登录
-        result = await userLoginService({
-          username: registerData.value.username,
-          password: registerData.value.password
-        })
-        
-        if (result.code === 0) {
-          ElMessage.success(result.msg || '登录成功')
-          console.log(result.data)
-          tokenStore.setToken(result.data)
-          router.push('/')
-        } else {
-          // 不显示失败提示
-          console.log('登录失败:', result.msg || '邮箱或密码错误')
-        }
+      // 用户名登录 - 使用密码登录
+      result = await userLoginService({
+        username: registerData.value.username,
+        password: registerData.value.password
+      })
+
+      if (result.code === 0) {
+        ElMessage.success(result.msg || '登录成功')
+        console.log(result.data)
+        tokenStore.setToken(result.data)
+        router.push('/')
+      } else {
+        // 不显示失败提示
+        console.log('登录失败:', result.msg || '邮箱或密码错误')
+      }
     } else {
-        // 手机号登录 - 使用验证码登录
-        result = await loginByPhone(
-          registerData.value.phone,
-          registerData.value.code
-        )
-        
-        // 检查返回结果状态码，适配不同的成功状态格式
-        const isLoginSuccess = result.success === true || result.code === 0
-        if (isLoginSuccess) {
-          // 不显示成功提示，直接设置token并跳转
-          // 设置token，适配不同的返回格式
-          tokenStore.setToken(result.data || result.data?.token)
-          router.push('/')
-        } else {
-          ElMessage.error(result.msg || result.message || '手机号或验证码错误，请重试')
-        }
+      // 手机号登录 - 使用验证码登录
+      result = await loginByPhone(
+        registerData.value.phone,
+        registerData.value.code
+      )
+
+      // 检查返回结果状态码，适配不同的成功状态格式
+      const isLoginSuccess = result.success === true || result.code === 0
+      if (isLoginSuccess) {
+        // 不显示成功提示，直接设置token并跳转
+        // 设置token，适配不同的返回格式
+        tokenStore.setToken(result.data || result.data?.token)
+        router.push('/')
+      } else {
+        ElMessage.error(result.msg || result.message || '手机号或验证码错误，请重试')
+      }
     }
   } catch (error) {
     ElMessage.error('网络错误，请稍后再试')
@@ -516,25 +516,25 @@ const login = async () => {
 // 处理手机号登录时发送验证码
 const handleSendSmsCode = async () => {
   if (countdown.value > 0 || isSending.value) return
-  
+
   // 验证手机号格式
   const phone = registerData.value.phone
   const validationPattern = /^1[3-9]\d{9}$/
-  
+
   if (!validationPattern.test(phone)) {
     ElMessage.error('请输入有效的手机号')
     return
   }
-  
+
   isSending.value = true
   try {
     // 调用发送验证码API
     const res = await sendSmsCode(phone, 'login')
-    
+
     // 无论成功失败都启动倒计时
     countdown.value = 60
     startCountdown()
-    
+
     // 控制台记录结果
     console.log('登录验证码发送结果:', res)
   } catch (error) {
@@ -563,205 +563,127 @@ onUnmounted(() => {
   <el-row class="login-page">
     <!-- 左侧背景区域 -->
     <el-col :span="12" class="bg"></el-col>
-    
+
     <!-- 右侧表单区域，偏移3列，占据6列 -->
     <el-col :span="6" :offset="3" class="form">
       <!-- 注册表单部分 -->
-      <el-form 
-        ref="form" 
-        v-if="isRegister" 
-        size="large" 
-        autocomplete="off" 
-        :model="registerData" 
-        :rules="rules"
-      >
-        <!-- 美化后的注册方式切换按钮 -->
+      <el-form ref="form" v-if="isRegister" size="large" autocomplete="off" :model="registerData" :rules="rules">
+        <el-form-item>
+          <h1>注册</h1>
+        </el-form-item>
+        <!-- 静态部分：注册方式切换按钮和用户名输入框 -->
         <el-form-item>
           <div class="register-tabs">
-            <el-button 
-              :type="isEmailRegister ? 'primary' : ''" 
-              :class="{ active: isEmailRegister }"
-              @click="isEmailRegister = true"
-              class="tab-button"
-              style="border-radius: 8px 0 0 8px;"
-            >
+            <el-button :class="{ active: isEmailRegister }"
+              @click="isEmailRegister = true" class="tab-button">
               邮箱注册
             </el-button>
-            <el-button 
-              :type="!isEmailRegister ? 'primary' : ''" 
-              :class="{ active: !isEmailRegister }"
-              @click="isEmailRegister = false"
-              class="tab-button"
-              style="border-radius: 0 8px 8px 0;"
-            >
+            <el-button :class="{ active: !isEmailRegister }"
+              @click="isEmailRegister = false" class="tab-button">
               手机号注册
             </el-button>
           </div>
         </el-form-item>
-        
+
         <!-- 用户名输入框 -->
         <el-form-item prop="username">
-          <el-input 
-            :prefix-icon="User" 
-            placeholder="请输入用户名" 
-            v-model="registerData.username" 
-          />
+          <el-input :prefix-icon="User" placeholder="请输入用户名" v-model="registerData.username" />
         </el-form-item>
-        
-        <!-- 邮箱输入框 -->
-        <el-form-item v-if="isEmailRegister" prop="email">
-          <el-input 
-            :prefix-icon="User" 
-            placeholder="请输入邮箱" 
-            v-model="registerData.email" 
-          />
-        </el-form-item>
-        
-        <!-- 手机号输入框 -->
-        <el-form-item v-else prop="phone">
-          <el-input 
-            :prefix-icon="User" 
-            placeholder="请输入手机号" 
-            v-model="registerData.phone" 
-          />
-        </el-form-item>
-        
-        <!-- 验证码输入框 + 获取按钮 -->
-        <el-form-item prop="code">
-          <div style="display:flex;gap:8px;width:100%">
-            <el-input 
-              placeholder="请输入6位验证码" 
-              v-model="registerData.code" 
-              maxlength="6"
-            />
-            <el-button 
-              type="primary" 
-              @click="sendEmailCode('register')" 
-              :disabled="countdown>0 || isSending"
-              :icon="isSending ? Loading : null"
-            >
-              {{ countdown>0 ? `重新获取(${countdown}s)` : '获取验证码' }}
-            </el-button>
+
+        <!-- 动态部分：邮箱/手机号、验证码、密码、注册按钮等 -->
+        <transition name="form-slide" mode="out-in">
+          <div :key="isEmailRegister ? 'email' : 'phone'" class="dynamic-form-section">
+            <!-- 邮箱记住我和忘记密码选项 -->
+            <el-form-item v-if="isEmailRegister" prop="email">
+              <el-input :prefix-icon="User" placeholder="请输入邮箱" v-model="registerData.email" />
+            </el-form-item>
+
+            <!-- 手机号输入框 -->
+            <el-form-item v-else prop="phone">
+              <el-input :prefix-icon="User" placeholder="请输入手机号" v-model="registerData.phone" />
+            </el-form-item>
+
+            <!-- 验证码输入框 + 获取按钮 -->
+            <el-form-item prop="code">
+              <div style="display:flex;gap:8px;width:100%">
+                <el-input placeholder="请输入6位验证码" v-model="registerData.code" maxlength="6" />
+                <el-button type="primary" @click="sendEmailCode('register')" :disabled="countdown > 0 || isSending"
+                  :icon="isSending ? Loading : null">
+                  {{ countdown > 0 ? `重新获取(${countdown}s)` : '获取验证码' }}
+                </el-button>
+              </div>
+            </el-form-item>
+
+            <!-- 密码输入框 -->
+            <el-form-item prop="password">
+              <el-input :prefix-icon="Lock" type="password" placeholder="请输入密码" v-model="registerData.password" />
+            </el-form-item>
+
+            <!-- 重复密码输入框 -->
+            <el-form-item prop="rePassword">
+              <el-input :prefix-icon="Lock" type="password" placeholder="请输入再次密码" v-model="registerData.rePassword" />
+            </el-form-item>
+
+            <!-- 注册按钮 -->
+            <el-form-item>
+              <el-button class="button" type="primary" auto-insert-space @click="handleRegister" :loading="isLoading"
+                :icon="isLoading ? Loading : null">
+                注册
+              </el-button>
+            </el-form-item>
+
+            <!-- 返回登录链接 -->
+            <el-form-item class="flex">
+              <el-link type="info" @click="isRegister = false; clearRegisterData()">
+                ← 登录
+              </el-link>
+            </el-form-item>
           </div>
-        </el-form-item>
-        
-        <!-- 密码输入框 -->
-        <el-form-item prop="password">
-          <el-input 
-            :prefix-icon="Lock" 
-            type="password" 
-            placeholder="请输入密码" 
-            v-model="registerData.password" 
-          />
-        </el-form-item>
-        
-        <!-- 手机号注册不显示重复密码输入框 -->
-        <el-form-item v-if="isEmailRegister" prop="rePassword">
-          <el-input 
-            :prefix-icon="Lock" 
-            type="password" 
-            placeholder="请输入再次密码" 
-            v-model="registerData.rePassword" 
-          />
-        </el-form-item>
-        
-        <!-- 注册按钮 -->
-        <el-form-item>
-          <el-button 
-            class="button" 
-            type="primary" 
-            auto-insert-space 
-            @click="handleRegister" 
-            :loading="isLoading"
-            :icon="isLoading ? Loading : null"
-          >
-            注册
-          </el-button>
-        </el-form-item>
-        
-        <!-- 返回登录链接 -->
-        <el-form-item class="flex">
-          <el-link type="info" @click="isRegister = false; clearRegisterData()">
-            ← 返回
-          </el-link>
-        </el-form-item>
+        </transition>
       </el-form>
 
       <!-- 找回密码表单部分 -->
-      <el-form 
-        v-else-if="isForgotPassword"
-        ref="form" 
-        size="large" 
-        autocomplete="off" 
-        :model="forgotPasswordData" 
-        :rules="forgotPasswordRules"
-      >
+      <el-form v-else-if="isForgotPassword" ref="form" size="large" autocomplete="off" :model="forgotPasswordData"
+        :rules="forgotPasswordRules">
         <el-form-item>
           <h1>找回密码</h1>
         </el-form-item>
-        
+
         <!-- 邮箱输入框 -->
         <el-form-item prop="email">
-          <el-input 
-            :prefix-icon="User" 
-            placeholder="请输入邮箱" 
-            v-model="forgotPasswordData.email" 
-          />
+          <el-input :prefix-icon="User" placeholder="请输入邮箱" v-model="forgotPasswordData.email" />
         </el-form-item>
-        
+
         <!-- 验证码输入框 + 获取按钮 -->
         <el-form-item prop="code">
           <div style="display:flex;gap:8px;width:100%">
-            <el-input 
-              placeholder="请输入6位验证码" 
-              v-model="forgotPasswordData.code" 
-              maxlength="6"
-            />
-            <el-button 
-              type="primary" 
-              @click="sendEmailCode('forgotPassword')" 
-              :disabled="countdown>0 || isSending"
-              :icon="isSending ? Loading : null"
-            >
-              {{ countdown>0 ? `重新获取(${countdown}s)` : '获取验证码' }}
+            <el-input placeholder="请输入6位验证码" v-model="forgotPasswordData.code" maxlength="6" />
+            <el-button type="primary" @click="sendEmailCode('forgotPassword')" :disabled="countdown > 0 || isSending"
+              :icon="isSending ? Loading : null">
+              {{ countdown > 0 ? `重新获取(${countdown}s)` : '获取验证码' }}
             </el-button>
           </div>
         </el-form-item>
-        
+
         <!-- 新密码输入框 -->
         <el-form-item prop="newPassword">
-          <el-input 
-            :prefix-icon="Lock" 
-            type="password" 
-            placeholder="请输入新密码" 
-            v-model="forgotPasswordData.newPassword" 
-          />
+          <el-input :prefix-icon="Lock" type="password" placeholder="请输入新密码" v-model="forgotPasswordData.newPassword" />
         </el-form-item>
-        
+
         <!-- 确认新密码输入框 -->
         <el-form-item prop="confirmPassword">
-          <el-input 
-            :prefix-icon="Lock" 
-            type="password" 
-            placeholder="请再次输入新密码" 
-            v-model="forgotPasswordData.confirmPassword" 
-          />
+          <el-input :prefix-icon="Lock" type="password" placeholder="请再次输入新密码"
+            v-model="forgotPasswordData.confirmPassword" />
         </el-form-item>
-        
+
         <!-- 重置密码按钮 -->
         <el-form-item>
-          <el-button 
-            class="button" 
-            type="primary" 
-            auto-insert-space 
-            @click="handleForgotPassword" 
-            :loading="isLoading"
-            :icon="isLoading ? Loading : null"
-          >
+          <el-button class="button" type="primary" auto-insert-space @click="handleForgotPassword" :loading="isLoading"
+            :icon="isLoading ? Loading : null">
             重置密码
           </el-button>
         </el-form-item>
-        
+
         <!-- 返回登录链接 -->
         <el-form-item class="flex">
           <el-link type="info" @click="isForgotPassword = false; clearForgotPasswordData()">
@@ -771,70 +693,35 @@ onUnmounted(() => {
       </el-form>
 
       <!-- 登录表单部分（与注册表单类似） -->
-      <el-form 
-        v-else 
-        size="large" 
-        autocomplete="off" 
-        :model="registerData" 
-        :rules="rules"
-      >
+      <el-form v-else size="large" autocomplete="off" :model="registerData" :rules="rules">
         <el-form-item>
           <h1>登录</h1>
         </el-form-item>
-          
-          <!-- 登录方式切换按钮 -->
-          <el-form-item>
-            <div class="register-tabs">
-              <el-button 
-                :type="isEmailRegister ? 'primary' : ''" 
-                :class="{ active: isEmailRegister }"
-                @click="isEmailRegister = true"
-                class="tab-button"
-                style="border-radius: 8px 0 0 8px;"
-              >
-                用户名登录
-              </el-button>
-              <el-button 
-                :type="!isEmailRegister ? 'primary' : ''" 
-                :class="{ active: !isEmailRegister }"
-                @click="isEmailRegister = false"
-                class="tab-button"
-                style="border-radius: 0 8px 8px 0;"
-              >
-                手机号登录
-              </el-button>
-            </div>
-          </el-form-item>
-            
-            <!-- 记住我和忘记密码选项 -->
-            <el-form-item class="flex">
-              <div class="flex">
-                <el-checkbox>记住我</el-checkbox>
-                <div class="right-links">
-                  <el-link type="primary" @click="isForgotPassword = true">找回密码？</el-link>
-                </div>
-              </div>
-            </el-form-item>
-            
-          <!-- 用户名登录相关输入框 -->
+
+        <!-- 登录方式切换按钮 -->
+        <el-form-item>
+          <div class="register-tabs">
+            <el-button plain :class="{ active: isEmailRegister }"
+              @click="isEmailRegister = true" class="tab-button">
+              用户名登录
+            </el-button>
+            <el-button plain :class="{ active: !isEmailRegister }"
+              @click="isEmailRegister = false" class="tab-button">
+              手机号登录
+            </el-button>
+          </div>
+        </el-form-item>
+
+        <!-- 用户名登录相关输入框 -->
         <template v-if="isEmailRegister">
           <!-- 用户名输入框 -->
           <el-form-item prop="username">
-            <el-input 
-              :prefix-icon="User" 
-              placeholder="请输入用户名" 
-              v-model="registerData.username" 
-            />
+            <el-input :prefix-icon="User" placeholder="请输入用户名" v-model="registerData.username" />
           </el-form-item>
-          
+
           <!-- 密码输入框 -->
           <el-form-item prop="password">
-            <el-input 
-              :prefix-icon="Lock" 
-              type="password" 
-              placeholder="请输入密码" 
-              v-model="registerData.password" 
-            />
+            <el-input :prefix-icon="Lock" type="password" placeholder="请输入密码" v-model="registerData.password" />
           </el-form-item>
           
           <!-- 记住我和忘记密码选项 -->
@@ -847,64 +734,50 @@ onUnmounted(() => {
             </div>
           </el-form-item>
         </template>
-        
+
         <!-- 手机号登录相关输入框 -->
         <template v-else>
           <!-- 手机号输入框 -->
           <el-form-item prop="phone">
-            <el-input 
-              :prefix-icon="User" 
-              placeholder="请输入手机号" 
-              v-model="registerData.phone" 
-            />
+            <el-input :prefix-icon="User" placeholder="请输入手机号" v-model="registerData.phone" />
           </el-form-item>
-          
+
           <!-- 验证码输入框 + 获取按钮 -->
           <el-form-item prop="code">
             <div style="display:flex;gap:8px;width:100%">
-              <el-input 
-                placeholder="请输入6位验证码" 
-                v-model="registerData.code" 
-                maxlength="6"
-              />
-              <el-button 
-                type="primary" 
-                @click="handleSendSmsCode" 
-                :disabled="countdown>0 || isSending"
-                :icon="isSending ? Loading : null"
-              >
-                {{ countdown>0 ? `重新获取(${countdown}s)` : '获取验证码' }}
+              <el-input placeholder="请输入6位验证码" v-model="registerData.code" maxlength="6" />
+              <el-button type="primary" @click="handleSendSmsCode" :disabled="countdown > 0 || isSending"
+                :icon="isSending ? Loading : null">
+                {{ countdown > 0 ? `重新获取(${countdown}s)` : '获取验证码' }}
               </el-button>
             </div>
           </el-form-item>
+          
+          <!-- 记住我和忘记密码选项 -->
+          <el-form-item class="flex">
+            <div class="flex">
+              <el-checkbox>记住我</el-checkbox>
+              <div class="right-links">
+                <el-link type="primary" @click="isForgotPassword = true">找回密码？</el-link>
+              </div>
+            </div>
+          </el-form-item>
         </template>
-        
+
         <!-- 登录按钮 -->
         <el-form-item>
-          <el-button 
-            class="button" 
-            type="primary" 
-            auto-insert-space 
-            @click="login"
-            :loading="isLoading"
-            :icon="isLoading ? Loading : null"
-          >
+          <el-button class="button" type="primary" auto-insert-space @click="login" :loading="isLoading"
+            :icon="isLoading ? Loading : null">
             登录
           </el-button>
         </el-form-item>
-        
+
         <!-- 注册 / 返回首页 -->
         <el-form-item class="form-footer">
-          <el-link 
-            type="info" 
-            @click="isRegister = true; clearRegisterData()"
-          >
+          <el-link type="info" @click="isRegister = true; clearRegisterData()">
             注册 →
           </el-link>
-          <el-link 
-            type="info" 
-            @click="router.push('/')"
-          >
+          <el-link type="info" @click="router.push('/')">
             返回首页
           </el-link>
         </el-form-item>
@@ -921,6 +794,26 @@ onUnmounted(() => {
 
 .tab-button {
   flex: 1;
+  border: none;
+  background: none;
+  color: #606266;
+  position: relative;
+  transition: all 0.3s ease;
+}
+
+.tab-button.active {
+  color: #409eff;
+}
+
+.tab-button.active::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 20px;
+  height: 2px;
+  background-color: #409eff;
 }
 
 .button {
@@ -935,7 +828,7 @@ onUnmounted(() => {
   background-color: #fff;
 
   .bg {
-    background: 
+    background:
       url('@/assets/logo2.png') no-repeat 60% center / 240px auto,
       url('@/assets/login_bg.jpg') no-repeat center / cover;
     border-radius: 0 20px 20px 0;
@@ -950,11 +843,11 @@ onUnmounted(() => {
     .title {
       margin: 0 auto;
     }
-    
+
     .button {
       width: 100%;
     }
-    
+
     .flex {
       width: 100%;
       display: flex;
@@ -983,31 +876,74 @@ onUnmounted(() => {
     .form-footer :deep(.el-link:hover) {
       color: #409eff;
     }
-    
-    /* 注册方式切换按钮样式 */
+
+    /* 注册方式切换按钮样式 - 模仿首页导航菜单 */
     .register-tabs {
       display: flex;
       width: 100%;
       margin-bottom: 24px;
-      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-      border-radius: 8px;
+      justify-content: center;
+      gap: 16px;
+    }
+
+    .tab-button {
+      padding: 8px 16px;
+      font-size: 16px;
+      color: #333;
+      border: none !important;
+      box-shadow: none !important;
+      background: none !important;
+      position: relative;
+      transition: all 0.3s ease;
+    }
+
+    .tab-button:hover {
+      color: #1890ff;
+      background: none !important;
+    }
+
+    .tab-button::after {
+      content: '';
+      position: absolute;
+      bottom: 0;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 0;
+      height: 2px;
+      background-color: #1890ff;
+      transition: width 0.3s ease;
+    }
+
+    .tab-button:hover::after,
+    .tab-button.active::after {
+      width: 80%;
+    }
+
+    .tab-button.active {
+      color: #1890ff;
+      font-weight: bold;
+    }
+    
+    /* 动态表单部分的过渡动画 */
+    .form-slide-enter-active,
+    .form-slide-leave-active {
+      transition: all 0.3s ease;
       overflow: hidden;
     }
     
-    .tab-button {
-      flex: 1;
-      padding: 12px 0;
-      font-size: 16px;
-      transition: all 0.3s ease;
+    .form-slide-enter-from {
+      opacity: 0;
+      transform: translateY(-10px);
     }
     
-    .tab-button.active {
-      font-weight: bold;
-      transform: translateY(-2px);
+    .form-slide-leave-to {
+      opacity: 0;
+      transform: translateY(10px);
     }
     
-    .tab-button:hover {
-      transform: translateY(-1px);
+    /* 确保动态部分在动画过程中不影响布局 */
+    .dynamic-form-section {
+      width: 100%;
     }
   }
 }

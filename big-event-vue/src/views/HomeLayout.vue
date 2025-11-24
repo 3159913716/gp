@@ -390,7 +390,7 @@ watch(() => tokenStore.token, (newToken, oldToken) => {
 
 .container {
   width: 1200px;
-  margin: 0 auto;
+  margin: 0 100px 0 50px;
   padding: 0 20px;
 }
 

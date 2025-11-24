@@ -95,7 +95,6 @@ const router = createRouter({
           component: UcenterMineVue, 
           meta: { requiresAuth: true },
           children: [
-            { path: '', name: 'UcenterMineDefault', redirect: 'collect' }, // 默认重定向到收藏页面
             { path: 'collect', name: 'UcenterCollect', component: UcenterArticle_collectVue, meta: { requiresAuth: true } },
             { path: 'follow', name: 'UcenterFollow', component: UcenterUser_followVue, meta: { requiresAuth: true } },
             { path: 'fans', name: 'UcenterFansList', component: UcenterFansVue, meta: { requiresAuth: true } }
