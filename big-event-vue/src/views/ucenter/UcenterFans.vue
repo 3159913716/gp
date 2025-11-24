@@ -19,9 +19,15 @@
                 <div class="img-cell"><img :src="item.userPic" alt="用户头像" class="user-img"></div>
                 <div class="author-cell">{{ item.followTime }}</div>
                 <div class="time-cell">
+<<<<<<< HEAD
                     <el-button type="primary" size="mini" @click="viewUserProfile(item.id)" class="view-btn">查看资料</el-button>
                     <el-button type="success" size="mini" @click="followBack(item.id)" class="follow-btn" v-if="!isFollowing(item.id)">回关</el-button>
                     <el-button type="info" size="mini" disabled class="followed-btn" v-else>已关注</el-button>
+=======
+                    <el-button type="primary" size="small" @click="viewUserProfile(item.id)" class="view-btn">查看资料</el-button>
+                    <el-button type="success" size="small" @click="followBack(item.id)" class="follow-btn" v-if="!item.isFollow">回关</el-button>
+                    <el-button type="success" size="small" disabled class="followed-btn" v-else>已回关</el-button>
+>>>>>>> 5982fa3e6d993fc4849de60c1e4191a30da6dd68
                 </div>
             </div>
         </div>
@@ -101,12 +107,28 @@ export default {
         type: 'info'
       }).then(async () => {
         try {
+<<<<<<< HEAD
           // 调用关注接口，使用request实例自动携带token
           await request.post(`/user/follow/${Id}`);
           
           // 更新已关注列表
           this.followingIds.push(Id);
           this.$message.success('关注成功');
+=======
+          console.log(`开始关注用户ID: ${Id}`);
+          // 使用guanzhu API模块中的toggleFollow方法
+          await guanzhu.toggleFollow(Id);
+          
+          // 更新粉丝列表中的isFollow状态
+          const fanIndex = this.fansList.findIndex(item => item.id === String(Id));
+          if (fanIndex !== -1) {
+            this.fansList[fanIndex].isFollow = true;
+            console.log(`已更新用户ID ${Id} 的关注状态为已关注`);
+          }
+          
+          this.$message.success('关注成功');
+          console.log('关注成功');
+>>>>>>> 5982fa3e6d993fc4849de60c1e4191a30da6dd68
         } catch (err) {
           this.$message.error('关注失败，请稍后重试');
         }

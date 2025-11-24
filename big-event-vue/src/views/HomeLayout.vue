@@ -206,8 +206,8 @@ const handleLogout = async () => {
 
 // 跳转到个人中心
 const goToProfile = () => {
-// 直接跳转到个人中心页面
-router.push('/admin')
+  // 直接跳转到个人中心页面，确保触发到收藏页面的重定向
+  router.push('/admin/ucenter/mine')
 }
 
 // 加载导航分类（显示所有分类，前4个主分类，其余在下拉菜单中）
