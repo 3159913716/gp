@@ -83,7 +83,6 @@ const router = createRouter({
       component: () => import('@/views/BackstageLayout.vue'),
       meta: { requiresAuth: true },
       children: [
-<<<<<<< HEAD
         // 公共路由
         { 
           path: '', 
@@ -91,6 +90,28 @@ const router = createRouter({
           component: UcenterMineVue, 
           meta: { requiresAuth: true } 
         },
+        
+        // 管理员路由
+        { 
+          path: 'dashboard', 
+          name: 'AdminDashboard', 
+          component: () => import('@/views/admin/Dashboard.vue'), 
+          meta: { requiresAuth: true, role: 0 } 
+        },
+        { 
+          path: 'users', 
+          name: 'AdminUsers', 
+          component: () => import('@/views/admin/Users.vue'), 
+          meta: { requiresAuth: true, role: 0 } 
+        },
+        { 
+          path: 'applications', 
+          name: 'AdminApplications', 
+          component: () => import('@/views/admin/Applications.vue'), 
+          meta: { requiresAuth: true, role: 0 } 
+        },
+        
+        // 个人中心路由
         { 
           path: 'ucenter/mine', 
           name: 'UcenterMineDetail', 
@@ -100,44 +121,6 @@ const router = createRouter({
             { path: 'collect', name: 'UcenterCollect', component: UcenterArticle_collectVue, meta: { requiresAuth: true } },
             { path: 'follow', name: 'UcenterFollow', component: UcenterUser_followVue, meta: { requiresAuth: true } },
             { path: 'fans', name: 'UcenterFansList', component: UcenterFansVue, meta: { requiresAuth: true } }
-=======
-        // 用户管理子路由（所有角色共用）
-        // 用户作者相关路由 - 无需admin前缀
-        { path: '/user/author/apply', component: UcenterAuthorVue, meta: { requiresAuth: true } },
-        { path: '/user/author/status', component: StatusVue, meta: { requiresAuth: true } },
-        { path: '/admin/user/avatar', component: UserAvatarVue, meta: { requiresAuth: true } },
-        { path: '/admin/user/info', component: UserInfoVue, meta: { requiresAuth: true } },
-        { path: '/admin/user/resetPassword', component: UserResetPasswordVue, meta: { requiresAuth: true } },
-          // 管理员后台 - 用户管理
-          {
-            path: '/admin/users',
-            name: 'AdminUsers',
-            component: () => import('@/views/admin/Users.vue'),
-            meta: { requiresAuth: true, role: 0 }
-          },
-          {
-            path: '/admin/applications',
-            name: 'AdminApplications',
-            component: () => import('@/views/admin/Applications.vue'),
-            meta: { requiresAuth: true, role: 0 }
-          },
-          {
-            path: '/admin/dashboard',
-            name: 'AdminDashboard',
-            component: () => import('@/views/admin/Dashboard.vue'),
-            meta: { requiresAuth: true, role: 0 }
-          },
-
-        //个人中心（所有角色共用）
-        { path: '/admin/ucenter/mine', 
-          component: UcenterMineVue,
-          redirect: '/admin/ucenter/collect',
-          meta: { requiresAuth: true }, 
-          children:[
-            { path: '/admin/ucenter/collect', component: UcenterArticle_collectVue, meta: { requiresAuth: true } },
-            { path: '/admin/ucenter/follow', component: UcenterUser_followVue, meta: { requiresAuth: true } },
-            { path: '/admin/ucenter/fans', component: UcenterFansVue, meta: { requiresAuth: true } },
->>>>>>> 5982fa3e6d993fc4849de60c1e4191a30da6dd68
           ]
         },
         { 
@@ -158,10 +141,6 @@ const router = createRouter({
           component: UserResetPasswordVue, 
           meta: { requiresAuth: true } 
         },
-        
-        // 作者相关路由（所有角色可见，但功能会根据角色控制）
-        { path: '/admin/author/author', component: UcenterAuthorVue, meta: { requiresAuth: true } },
-        { path: '/admin/author/status', component: StatusVue, meta: { requiresAuth: true } },
         
         // 作者路由
         { 
@@ -185,7 +164,10 @@ const router = createRouter({
           meta: { requiresAuth: true } 
         }
       ]
-    }
+    },
+    // 单独的用户作者相关路由 - 无需admin前缀
+    { path: '/user/author/apply', component: UcenterAuthorVue, meta: { requiresAuth: true } },
+    { path: '/user/author/status', component: StatusVue, meta: { requiresAuth: true } }
   ],
 })
 

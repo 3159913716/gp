@@ -427,7 +427,7 @@ onUnmounted(() => {
             <div>
               <h3 class="category-title">
                 <template v-if="selectedCategoryId">
-                  分类：{{ selectedCategoryName }}
+                  {{ selectedCategoryName }}
                 </template>
                 <template v-else-if="selectedKeyword">
                   搜索结果："{{ selectedKeyword }}"
@@ -437,13 +437,12 @@ onUnmounted(() => {
                 </template>
               </h3>
               <div class="category-info">
-                <span v-if="selectedCategoryId">别名：{{ selectedCategoryAlias }} · </span>
+                <span v-if="selectedCategoryId">分类 · </span>
                 共 {{ total }} 篇文章
               </div>
             </div>
           </div>
         </div>
-        
         <!-- 左侧文章列表区域 -->
         <div class="article-list-container">
           <!-- 主文章列表区域 -->
@@ -506,16 +505,14 @@ onUnmounted(() => {
             </div>
           </ElCard>
         </div>
-
         <!-- 分页组件 -->
         <div class="pagination">
           <ElPagination v-model:current-page="pageNum" v-model:page-size="pageSize" :page-sizes="[5, 10, 20, 50]"
             layout="total, sizes, prev, pager, next, jumper" :total="total" @size-change="handleSizeChange"
             @current-change="handleCurrentChange" />
         </div>
-      </div>
-
-      <!-- 右侧边栏区域 -->
+        </div>
+         <!-- 右侧边栏区域 -->
       <aside class="sidebar">
         <!-- 热门文章区块 -->
         <div class="sidebar-section">
@@ -544,9 +541,11 @@ onUnmounted(() => {
         <div class="sidebar-bottom"></div>
       </aside>
       </div>
-
+        
+      
       <!-- 返回顶部按钮 -->
       <div v-show="showBackToTop" class="back-to-top" @click="scrollToTop" aria-label="返回顶部" title="返回顶部">↑</div>
+      
     </div>
   </div>
 </template>

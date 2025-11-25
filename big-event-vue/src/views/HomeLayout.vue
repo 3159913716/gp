@@ -57,10 +57,7 @@ const handleCategoryClick = (categoryId) => {
     router.push('/')
   } else {
     // 点击分类，跳转到对应分类页面
-    router.push({
-      path: '/',
-      params: { categoryId: categoryId }
-    })
+    router.push(`/category/${categoryId}`)
   }
 }
 
