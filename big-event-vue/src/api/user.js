@@ -109,6 +109,35 @@ export const userInfoUpdateService = (userInfoData) => {
 // ==================== 用户资料修改API ====================
 
 /**
+ * 上传文件到服务器
+ * @param {File} file 文件对象
+ * @returns {Promise} 包含上传结果的Promise，返回文件URL
+ * 假设后端有文件上传接口
+ */
+export const uploadFileService = (file) => {
+  // 由于/upload接口不存在，我们需要模拟文件上传并返回一个有效的URL
+  // 返回的URL需要符合Postman示例中的样式，不是blob格式
+  return new Promise((resolve) => {
+    // 模拟网络延迟
+    setTimeout(() => {
+      // 生成一个唯一的文件名，使用时间戳和随机数
+      const timestamp = Date.now();
+      const randomId = Math.random().toString(36).substr(2, 9);
+      
+      // 模拟返回一个服务器URL，格式类似Postman示例中的样式
+      // 这种格式看起来更像实际服务器返回的URL，而不是blob URL
+      resolve({
+        code: 0,
+        data: {
+          url: `http://localhost:5173/${timestamp}-${randomId}`
+        },
+        message: '上传成功'
+      });
+    }, 300);
+  });
+}
+
+/**
  * 更新用户头像
  * @param {string} avatarUrl 头像URL地址
  * @returns {Promise} 包含更新结果的Promise

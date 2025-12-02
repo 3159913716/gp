@@ -5,8 +5,8 @@
 -->
 
 <script setup>
-/* 从Vue引入ref函数：用于创建响应式数据 */
-import { ref } from 'vue'
+/* 从Vue引入ref函数和生命周期钩子 */
+import { ref, onBeforeUnmount } from 'vue'
 
 /* 
   导入Element Plus图标组件：
@@ -28,8 +28,8 @@ import avatar from '@/assets/default.png'
 import { useTokenStore } from '@/stores/token.js'         // token存储
 import useUserInfoStore from '@/stores/userInfo.js'      // 用户信息存储
 
-/* 导入更新用户头像的API函数 */
-import { userAvatarUpdateService } from '@/api/user.js'
+/* 导入用户相关的API函数 */
+import { userAvatarUpdateService, uploadFileService } from '@/api/user.js'
 
 /* 
   状态管理：
@@ -51,65 +51,114 @@ const uploadRef = ref()
 const fileSelected = ref(false)
 const selectedFile = ref(null)
 
-/* 
-  头像URL响应式数据：
-  初始值为用户信息中的头像URL
-*/
-const imgUrl = ref(userInfoStore.info.userPic)
+  /* 
+    头像URL响应式数据：
+    初始值为用户信息中的头像URL
+  */
+  const imgUrl = ref(userInfoStore.info.userPic)
 
-/* 
-  文件选择变化处理函数：
-  只负责预览，不进行实际上传
-*/
-const handleUploadSuccess = (response, file, fileList) => {
-  // 由于我们的request拦截器会处理响应，这里需要适配处理
-  console.log('上传接口响应:', response);
+  // 存储blob URLs以便后续清理
+  const blobUrls = ref([]);
   
-  // 尝试从不同可能的数据结构中获取图片URL
-  let avatarUrl = null;
+  /*
+    文件选择变化处理函数：
+    当用户选择文件后触发，用于更新文件状态和预览
+  */
+  const handleChange = (file, fileList) => {
+    console.log('文件选择变化:', file);
+    console.log('文件列表:', fileList);
+    
+    // 存储选择的文件对象
+    selectedFile.value = file;
+    fileSelected.value = true;
+    
+    // 如果之前有blob URL，先清理
+    if (imgUrl.value && imgUrl.value.startsWith('blob:')) {
+      cleanBlobUrl(imgUrl.value);
+    }
+    
+    // 创建临时预览URL
+    const tempUrl = URL.createObjectURL(file.raw);
+    imgUrl.value = tempUrl;
+    
+    // 保存blob URL以便后续清理
+    blobUrls.value.push(tempUrl);
+    
+    console.log('已选择文件:', file.name);
+    console.log('文件大小:', file.size, 'bytes');
+    console.log('创建的预览URL:', tempUrl);
+    console.log('fileSelected状态:', fileSelected.value);
+  }
   
-  // 根据response的实际结构获取URL
-  if (response && typeof response === 'object') {
-    // 检查是否有code字段（标准API响应格式）
-    if (response.code === 0) {
-      // 如果data字段为空但操作成功，可以使用file的临时URL作为预览
-      if (!response.data) {
-        // 对于成功上传但没有返回URL的情况，使用浏览器的临时URL
-        avatarUrl = URL.createObjectURL(file.raw);
-        console.log('上传成功，使用临时URL作为预览:', avatarUrl);
-      } else {
-        avatarUrl = response.data || response.url || response.fileUrl;
+  /*
+    清理单个blob URL的辅助函数
+  */
+  const cleanBlobUrl = (url) => {
+    if (url && url.startsWith('blob:')) {
+      try {
+        URL.revokeObjectURL(url);
+        // 从数组中移除已清理的URL
+        blobUrls.value = blobUrls.value.filter(u => u !== url);
+        console.log('已释放blob URL资源:', url);
+      } catch (error) {
+        console.error('释放blob URL时出错:', error);
       }
-    } else if (response.data) {
-      // 尝试直接从data中获取
-      avatarUrl = response.data;
-    } else {
-      // 尝试其他可能的字段名
-      avatarUrl = response.url || response.fileUrl || response.path;
-    }
-  } else if (typeof response === 'string') {
-    // 如果返回的是字符串，直接作为URL
-    avatarUrl = response;
-  }
-  
-  if (avatarUrl) {
-    imgUrl.value = avatarUrl      // 更新预览头像URL
-    fileSelected.value = true     // 标记已选择文件
-    console.log('头像上传成功，URL:', avatarUrl);
-  } else {
-    // 即使获取不到URL，如果操作成功也可以标记为已选择
-    if (response && response.code === 0) {
-      // 使用浏览器的临时URL作为预览
-      avatarUrl = URL.createObjectURL(file.raw);
-      imgUrl.value = avatarUrl;
-      fileSelected.value = true;
-      console.log('操作成功，使用临时URL作为预览:', avatarUrl);
-    } else {
-      console.error('上传失败：无法获取头像URL', response);
-      ElMessage.error('上传失败：无法获取图片地址')
     }
   }
-}
+
+  /* 
+    文件选择变化处理函数：
+    只负责预览，不进行实际上传
+  */
+  const handleUploadSuccess = (response, file, fileList) => {
+    // 由于我们的request拦截器会处理响应，这里需要适配处理
+    console.log('上传接口响应:', response);
+    
+    // 尝试从不同可能的数据结构中获取图片URL
+    let avatarUrl = null;
+    
+    // 根据response的实际结构获取URL
+    if (response && typeof response === 'object') {
+      // 检查是否有code字段（标准API响应格式）
+      if (response.code === 0) {
+        // 如果data字段为空但操作成功，可以使用file的临时URL作为预览
+        if (!response.data) {
+          // 对于成功上传但没有返回URL的情况，使用浏览器的临时URL
+          avatarUrl = URL.createObjectURL(file.raw);
+          console.log('上传成功，使用临时URL作为预览:', avatarUrl);
+        } else {
+          avatarUrl = response.data || response.url || response.fileUrl;
+        }
+      } else if (response.data) {
+        // 尝试直接从data中获取
+        avatarUrl = response.data;
+      } else {
+        // 尝试其他可能的字段名
+        avatarUrl = response.url || response.fileUrl || response.path;
+      }
+    } else if (typeof response === 'string') {
+      // 如果返回的是字符串，直接作为URL
+      avatarUrl = response;
+    }
+    
+    if (avatarUrl) {
+      imgUrl.value = avatarUrl      // 更新预览头像URL
+      fileSelected.value = true     // 标记已选择文件
+      console.log('头像上传成功，URL:', avatarUrl);
+    } else {
+      // 即使获取不到URL，如果操作成功也可以标记为已选择
+      if (response && response.code === 0) {
+        // 使用浏览器的临时URL作为预览
+        avatarUrl = URL.createObjectURL(file.raw);
+        imgUrl.value = avatarUrl;
+        fileSelected.value = true;
+        console.log('操作成功，使用临时URL作为预览:', avatarUrl);
+      } else {
+        console.error('上传失败：无法获取头像URL', response);
+        ElMessage.error('上传失败：无法获取图片地址')
+      }
+    }
+  }
 
 /*
   文件上传错误回调函数
@@ -144,72 +193,149 @@ const handleUploadError = (err, file, fileList) => {
   
   /* 
     更新头像到服务器：
-    调用API更新用户头像，根据后端返回的code和message判断是否成功
+    1. 先上传图片文件到服务器获取URL
+    2. 再使用获取的URL更新用户头像
   */
   const updateAvatar = async () => {
     // 如果没有选择文件，不执行更新
-    if (!fileSelected.value || !selectedFile.value) {
+    if (!fileSelected.value || !selectedFile.value || !selectedFile.value.raw) {
       ElMessage.warning('请先选择要上传的头像')
       return
     }
     
     try {
-      // 调用头像更新API
-      const result = await userAvatarUpdateService(imgUrl.value)
+      console.log('准备上传头像文件:', selectedFile.value.name);
       
-      console.log('更新头像API响应:', result);
+      // 1. 先上传文件到服务器获取URL
+      ElMessage.info('正在上传图片...');
+      const uploadResult = await uploadFileService(selectedFile.value.raw);
       
-      // 更新成功，从API响应中获取正确的头像URL
-      // 注意：必须使用服务器返回的URL，而不是临时URL，这样刷新后才会保持
-      let serverAvatarUrl = imgUrl.value; // 默认使用当前URL
+      console.log('文件上传API响应:', uploadResult);
       
-      // 尝试从API响应中获取更准确的URL
-      if (result && result.data) {
-        // 检查是否有data字段包含URL信息
-        if (typeof result.data === 'string') {
-          serverAvatarUrl = result.data;
-        } else if (result.data.url) {
-          serverAvatarUrl = result.data.url;
-        } else if (result.data.userPic) {
-          serverAvatarUrl = result.data.userPic;
+      // 从上传响应中获取服务器返回的文件URL
+      let serverFileUrl = null;
+      if (uploadResult && uploadResult.code === 0) {
+        if (typeof uploadResult.data === 'string') {
+          serverFileUrl = uploadResult.data;
+        } else if (uploadResult.data && uploadResult.data.url) {
+          serverFileUrl = uploadResult.data.url;
+        } else if (uploadResult.data && uploadResult.data.fileUrl) {
+          serverFileUrl = uploadResult.data.fileUrl;
         }
       }
       
-      console.log('最终使用的头像URL:', serverAvatarUrl);
+      // 如果没有获取到有效的服务器URL，提示失败
+      if (!serverFileUrl) {
+        console.error('上传成功但未获取到有效URL:', uploadResult);
+        ElMessage.error('图片上传失败，请重试');
+        return;
+      }
+      
+      console.log('获取到的服务器图片URL:', serverFileUrl);
+      
+      // 2. 使用服务器返回的URL更新用户头像
+      console.log('准备更新头像URL:', serverFileUrl);
+      const updateResult = await userAvatarUpdateService(serverFileUrl);
+      
+      console.log('更新头像API响应:', updateResult);
+      
+      // 更新成功，从API响应中获取最终的头像URL（可能与上传URL不同）
+      let finalAvatarUrl = serverFileUrl;
+      
+      // 尝试从更新响应中获取更准确的URL
+      if (updateResult && updateResult.data) {
+        if (typeof updateResult.data === 'string') {
+          finalAvatarUrl = updateResult.data;
+        } else if (updateResult.data.url) {
+          finalAvatarUrl = updateResult.data.url;
+        } else if (updateResult.data.userPic) {
+          finalAvatarUrl = updateResult.data.userPic;
+        }
+      }
+      
+      console.log('最终使用的头像URL:', finalAvatarUrl);
+      
+      // 更新imgUrl为服务器返回的URL（不是blob URL）
+      imgUrl.value = finalAvatarUrl;
       
       // 更新成功，同步更新用户信息store
-      // 确保使用服务器返回的URL更新到store中，使所有使用该store的组件（UserLayout和article/Layout）能够实时渲染更新后的头像
+      // 确保使用服务器返回的URL更新到store中，使所有使用该store的组件能够实时渲染更新后的头像
       console.log('更新前userInfoStore:', userInfoStore.info);
       
       // 方案优化：采用更彻底的响应式更新策略
       // 1. 先获取当前用户信息，确保有完整的数据结构
       const currentInfo = userInfoStore.info || {};
-      // 2. 创建一个全新的对象，而不仅仅是修改属性，确保响应式系统能够检测到变化
+      // 2. 创建一个全新的对象，而仅仅是修改属性，确保响应式系统能够检测到变化
       const updatedInfo = {
         ...currentInfo,
-        // 关键：强制更新userPic属性，这将触发所有使用此属性的组件重新渲染
-        userPic: serverAvatarUrl + '?' + new Date().getTime() // 添加时间戳防止缓存问题
+        // 添加时间戳防止缓存
+        userPic: `${finalAvatarUrl}?${Date.now()}`
       };
       
       // 3. 调用setInfo方法更新store
       userInfoStore.setInfo(updatedInfo);
       
-      // 4. 验证更新是否成功
       console.log('更新后userInfoStore:', userInfoStore.info);
-      console.log('头像URL已更新为:', serverAvatarUrl);
       
-      // 5. 为了确保立即生效，可以使用一个小技巧：强制重新获取一次用户信息
-      // 这是一个额外的保险措施，确保store中的数据是最新的
+      // 强制刷新store数据，确保所有组件都能感知到变化
       setTimeout(() => {
-        console.log('强制刷新store中的头像数据');
-        userInfoStore.setInfo({...userInfoStore.info, userPic: serverAvatarUrl});
-      }, 100);
+        userInfoStore.setInfo(userInfoStore.info);
+        console.log('强制刷新后的userInfoStore:', userInfoStore.info);
+      }, 0);
       
-      ElMessage.success('头像更新成功，刷新后将保持')
-      fileSelected.value = false // 标记未选择文件
+      // 显示成功消息
+      ElMessage.success('头像更新成功');
+      
+      // 清理blob URL资源
+      cleanupAfterUpload();
+      
+      // 重置状态
+      fileSelected.value = false;
+      
+      console.log('头像更新流程完成');
     } catch (error) {
-      console.error('更新头像时发生异常:', error);
-      ElMessage.error(error.message || '更新失败，请检查网络连接或稍后重试');
+      console.error('更新头像失败:', error);
+      const errorMsg = error?.response?.data?.msg || error?.message || '头像更新失败，请重试';
+      ElMessage.error(errorMsg);
+    }
+  }
+  
+  /*
+    组件销毁前钩子：
+    清理所有blob URL资源，防止内存泄漏
+  */
+  onBeforeUnmount(() => {
+    console.log('组件销毁，开始清理blob URL资源');
+    
+    // 清理blobUrls数组中所有的blob URL
+    blobUrls.value.forEach(url => {
+      if (url && url.startsWith('blob:')) {
+        try {
+          URL.revokeObjectURL(url);
+          console.log('已释放blob URL资源:', url);
+        } catch (error) {
+          console.error('释放blob URL时出错:', error);
+        }
+      }
+    });
+    
+    // 清空数组
+    blobUrls.value = [];
+    
+    // 额外检查imgUrl是否也是blob URL
+    if (imgUrl.value && imgUrl.value.startsWith('blob:')) {
+      cleanBlobUrl(imgUrl.value);
+    }
+    
+    console.log('blob URL资源清理完成');
+  })
+  
+  /*
+    当上传成功并获取到服务器URL后，清理blob URL
+  */
+  const cleanupAfterUpload = () => {
+    if (imgUrl.value && imgUrl.value.startsWith('blob:')) {
+      cleanBlobUrl(imgUrl.value);
     }
   }
 </script>

@@ -2,7 +2,7 @@
 // 引入Vue的响应式API ref
 import { ref, onUnmounted } from 'vue'
 // 引入Element Plus的图标组件用于表单输入框
-import { User, Lock, Loading } from '@element-plus/icons-vue'
+import { User, Lock, Loading, Plus, Minus } from '@element-plus/icons-vue'
 // 引入Element Plus的消息提示组件
 import { ElMessage } from 'element-plus'
 // 引入Vue Router的路由实例
@@ -23,6 +23,11 @@ const isRegister = ref(false) // 标记当前是注册模式还是登录模式
 const isForgotPassword = ref(false) // 标记当前是找回密码模式
 const isEmailRegister = ref(true) // 标记当前是邮箱注册还是手机号注册
 const tokenStore = useTokenStore() // 使用token存储实例
+// 密码可见性状态
+const showPassword = ref(false) // 控制密码是否可见
+const showRePassword = ref(false) // 控制重复密码是否可见
+const showNewPassword = ref(false) // 控制新密码是否可见
+const showConfirmPassword = ref(false) // 控制确认新密码是否可见
 
 // 注册数据模型（响应式对象，用于绑定表单数据）
 const registerData = ref({
@@ -484,7 +489,8 @@ const login = async () => {
         tokenStore.setToken(result.data)
         router.push('/')
       } else {
-        // 不显示失败提示
+        // 显示失败提示
+        ElMessage.error(result.msg || '邮箱或密码错误')
         console.log('登录失败:', result.msg || '邮箱或密码错误')
       }
     } else {
@@ -616,12 +622,22 @@ onUnmounted(() => {
 
             <!-- 密码输入框 -->
             <el-form-item prop="password">
-              <el-input :prefix-icon="Lock" type="password" placeholder="请输入密码" v-model="registerData.password" />
+              <el-input 
+                :prefix-icon="Lock" 
+                placeholder="请输入密码" 
+                v-model="registerData.password"
+                show-password
+              />
             </el-form-item>
 
             <!-- 重复密码输入框 -->
             <el-form-item prop="rePassword">
-              <el-input :prefix-icon="Lock" type="password" placeholder="请输入再次密码" v-model="registerData.rePassword" />
+              <el-input 
+                :prefix-icon="Lock" 
+                placeholder="请输入再次密码" 
+                v-model="registerData.rePassword"
+                show-password
+              />
             </el-form-item>
 
             <!-- 注册按钮 -->
@@ -667,13 +683,22 @@ onUnmounted(() => {
 
         <!-- 新密码输入框 -->
         <el-form-item prop="newPassword">
-          <el-input :prefix-icon="Lock" type="password" placeholder="请输入新密码" v-model="forgotPasswordData.newPassword" />
+          <el-input 
+            :prefix-icon="Lock" 
+            placeholder="请输入新密码" 
+            v-model="forgotPasswordData.newPassword"
+            show-password
+          />
         </el-form-item>
 
         <!-- 确认新密码输入框 -->
         <el-form-item prop="confirmPassword">
-          <el-input :prefix-icon="Lock" type="password" placeholder="请再次输入新密码"
-            v-model="forgotPasswordData.confirmPassword" />
+          <el-input 
+            :prefix-icon="Lock" 
+            placeholder="请再次输入新密码" 
+            v-model="forgotPasswordData.confirmPassword"
+            show-password
+          />
         </el-form-item>
 
         <!-- 重置密码按钮 -->
@@ -721,7 +746,12 @@ onUnmounted(() => {
 
           <!-- 密码输入框 -->
           <el-form-item prop="password">
-            <el-input :prefix-icon="Lock" type="password" placeholder="请输入密码" v-model="registerData.password" />
+            <el-input 
+              :prefix-icon="Lock" 
+              placeholder="请输入密码" 
+              v-model="registerData.password"
+              show-password
+            />
           </el-form-item>
           
           <!-- 记住我和忘记密码选项 -->

@@ -9,6 +9,7 @@ import { articleCategoryListService } from '@/api/article.js'
 import { useTokenStore } from '@/stores/token.js'
 import useUserInfoStore from '@/stores/userInfo.js'
 import { ElMessage } from 'element-plus' // 添加ElMessage导入
+import '@fortawesome/fontawesome-free/css/all.css';
 
 // 添加avatarImgAsset变量定义，使用defaultCover作为默认头像
 const avatarImgAsset = defaultCover

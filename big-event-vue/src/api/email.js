@@ -1,13 +1,5 @@
 // api/email.js
-import axios from 'axios';
-
-const emailApi = axios.create({
-  baseURL: '/api/email',
-  timeout: 10000,
-  headers: {
-    'Content-Type': 'application/x-www-form-urlencoded'
-  }
-});
+import request from '@/utils/request.js';
 
 // 统一后端返回结构，映射为 { success, message, data }
 const normalize = (resp) => {
@@ -38,24 +30,49 @@ const normalize = (resp) => {
 export default {
   // 发送验证码 - 必须使用 POST 方法
   sendCode(email, type) {
-    const params = new URLSearchParams();
-    params.append('email', email);
-    params.append('type', type);
-    
-    // 确保使用 post 方法而不是 get
-    return emailApi.post('/send-code', params)
-      .then(normalize);
+    // 使用项目统一的request实例
+    return request.post('/api/email/send-code', null, {
+      params: {
+        email: email,
+        type: type
+      }
+    }).then(normalize);
   },
 
   // 验证验证码 - 必须使用 POST 方法
   verify(email, code, type) {
-    const params = new URLSearchParams();
-    params.append('email', email);
-    params.append('code', code);
-    params.append('type', type);
-    
-    // 确保使用 post 方法而不是 get
-    return emailApi.post('/verify', params)
+    // 使用项目统一的request实例
+    return request.post('/api/email/verify', null, {
+      params: {
+        email: email,
+        code: code,
+        type: type
+      }
+    }).then(normalize);
+  },
+  
+  // 根据邮箱查找用户 - 新增方法
+  findUserByEmail(email) {
+    return request.get('/api/email/findUser', {
+      params: {
+        email: email
+      }
+    }).then(normalize);
+  },
+  
+  // 发送找回密码验证码 - 新增方法
+  sendForgetCode(userId, email) {
+    return request.post('/api/email/sendForgetCode', null, {
+      params: {
+        userId: userId,
+        email: email
+      }
+    }).then(normalize);
+  },
+  
+  // 重置密码 - 新增方法
+  resetPassword(resetData) {
+    return request.post('/api/email/resetPassword', resetData)
       .then(normalize);
   }
-}
+};

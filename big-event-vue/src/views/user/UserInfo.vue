@@ -40,12 +40,14 @@ let routeUnwatch = null
   初始用户信息（深拷贝）：
   使用JSON序列化和反序列化创建原始值的完全独立副本
   防止直接引用store中的数据导致意外修改
+  包含手机号码信息
 */
 const initialUserInfo = reactive(JSON.parse(JSON.stringify(userInfoStore.info)))
 
 /* 
   当前用户信息（深拷贝）：
   作为表单的绑定模型
+  包含手机号码信息
 */
 const userInfo = ref(JSON.parse(JSON.stringify(userInfoStore.info)))
 
@@ -80,11 +82,11 @@ const handleNicknameInput = (value) => {
 /* 
   深度监听用户信息变化：
   比较当前用户信息与初始用户信息的差异
-  检测昵称和邮箱的变化
+  检测昵称、邮箱和手机号码的变化
 */
 watch(
-  () => [userInfo.value?.nickname, userInfo.value?.email],
-  ([newNickname, newEmail]) => {
+  () => [userInfo.value?.nickname, userInfo.value?.email, userInfo.value?.phone],
+  ([newNickname, newEmail, newPhone]) => {
     // 更可靠地检查昵称是否有更改，处理空值和trim情况
     const currentNickname = (newNickname || '').trim()
     const initialNickname = (initialUserInfo.nickname || '').trim()
@@ -93,8 +95,14 @@ watch(
     const currentEmail = (newEmail || '').trim()
     const initialEmail = (initialUserInfo.email || '').trim()
     
+    // 检查手机号码是否有更改
+    const currentPhone = (newPhone || '').trim()
+    const initialPhone = (initialUserInfo.phone || '').trim()
+    
     // 任一字段有变化则标记表单已修改
-    isFormModified.value = currentNickname !== initialNickname || currentEmail !== initialEmail
+    isFormModified.value = currentNickname !== initialNickname || 
+                           currentEmail !== initialEmail || 
+                           currentPhone !== initialPhone
   },
   { immediate: true } // 立即执行一次，确保初始状态正确
 )
@@ -119,15 +127,16 @@ const resetForm = async () => {
   // 等待DOM更新
   await nextTick()
   
-  // 重置用户信息，保留用户名和邮箱，并设置默认昵称
+  // 重置用户信息，保留用户名、邮箱、手机号码，并设置默认昵称
   const username = userInfoStore.info?.username || ''
   const email = userInfoStore.info?.email || ''
+  const phone = userInfoStore.info?.phone || ''
   // 当nickname为空或未定义时，默认使用username作为替代值
   const nickname = userInfoStore.info?.nickname && userInfoStore.info.nickname.trim() !== '' 
     ? userInfoStore.info.nickname 
     : username
-  Object.assign(userInfo.value, { username: username, nickname: nickname, email: email })
-  Object.assign(initialUserInfo, { username: username, nickname: nickname, email: email })
+  Object.assign(userInfo.value, { username: username, nickname: nickname, email: email, phone: phone })
+  Object.assign(initialUserInfo, { username: username, nickname: nickname, email: email, phone: phone })
   
   // 重置修改状态
   isFormModified.value = false
@@ -148,7 +157,7 @@ const resetForm = async () => {
 const updateUserInfo = async () => {
 
   try {
-      // 确保提交数据包含所有必要字段：nickname、email、id、username
+      // 确保提交数据包含所有必要字段：nickname、email、phone、id、username
       // 当nickname为空时，使用username作为替代值
       // 确保昵称不超过10个字符（双重保险）
       const nicknameValue = userInfo.value.nickname.trim()
@@ -156,6 +165,7 @@ const updateUserInfo = async () => {
       const updateData = {
         nickname: finalNickname,
         email: userInfo.value.email || '',
+        phone: userInfo.value.phone || '',
         id: userInfo.value.id || 0,
         username: userInfo.value.username || ''
       }
@@ -278,7 +288,13 @@ onBeforeUnmount(() => {
           <!-- 联系邮箱字段（可编辑） -->
           <el-form-item label="联系邮箱">
             <!-- 双向绑定邮箱字段，可编辑状态 -->
-            <el-input v-model="userInfo.email" placeholder="请输入联系邮箱"></el-input>
+            <el-input v-model="userInfo.email" placeholder="暂无联系邮箱"></el-input>
+          </el-form-item>
+          
+          <!-- 手机号码字段（可编辑） -->
+          <el-form-item label="手机号码">
+            <!-- 双向绑定手机号码字段，可编辑状态 -->
+            <el-input v-model="userInfo.phone" placeholder="暂无手机号码"></el-input>
           </el-form-item>
           
           <!-- 用户昵称编辑字段（限制10个字符） -->
