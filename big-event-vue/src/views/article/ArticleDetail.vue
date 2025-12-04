@@ -952,7 +952,7 @@ watch(() => route.params.id, () => {
           <div v-if="commentsLoading" class="comments-loading">正在加载评论...</div>
           <template v-else>
             <template v-if="comments.length">
-              <CommentTree v-for="c in comments" :key="c.id" :node="c" :depth="0" @submit-reply="onSubmitReply"
+              <CommentTree v-for="item in comments" :key="item.id" :node="item" :depth="0" @submit-reply="onSubmitReply"
                 @toggle-like="onToggleCommentLike" />
             </template>
             <ElEmpty v-else description="暂无评论" />

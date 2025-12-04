@@ -18,16 +18,19 @@ spring:
           min-idle: 0
   mail:
     host: smtp.qq.com
-    username: 3486692880@qq.com
-    password: 123456
+    port: 465  # QQ邮箱使用465端口（SSL加密）
+    username: 3486692880@qq.com  # 您的QQ邮箱地址
+    password: ltszuxrjdfkvcieh  # 这里需要填写您获取的授权码，而不是QQ密码
+    default-encoding: UTF-8
     properties:
       mail:
         smtp:
           auth: true
-          starttls:
-            enable: true
           ssl:
-            enable: true
+            enable: true  # 启用SSL加密
+          socketFactory:
+            class: javax.net.ssl.SSLSocketFactory
+            port: 465
   spug:
     sms:
       # Spug短信服务API地址
@@ -42,9 +45,9 @@ spring:
 
   #上传文件限制大小10mb
   servlet:
-      multipart:
-        max-file-size: 10MB
-        max-request-size: 10MB
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 10MB
 
 
 #    映射下划线到驼峰命名,开启驼峰命名和下划线命名的自动转换
